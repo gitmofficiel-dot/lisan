@@ -418,8 +418,12 @@ fn is_builtin(name: &str) -> bool {
         "طول" | "نوع" | "نص" | "عدد" | "أضف" | "اضف" | "مدى" | "يحتوي" |
         "مفاتيح" | "قيم" | "احذف" | "قسّم" | "قسم" | "ادمج" | "استبدل" |
         "اقتطع" | "نظّف" | "نظف" | "مطلق" | "جذر" | "قرّب" | "قرب" |
+        "أرضية" | "ارضية" | "سقف" | "قوة" |
         "أدنى" | "ادنى" | "أعلى" | "اعلى" | "اقرأ_ملف" | "اكتب_ملف" |
-        "تحقق" | "تحقق_يساوي")
+        "تحقق" | "تحقق_يساوي" |
+        "عكس" | "اعكس" | "فرز" | "مجموع" | "متوسط" | "ابحث" |
+        "يبدأ_ب" | "يبدا_ب" | "ينتهي_ب" | "كرر" |
+        "أحرف_كبيرة" | "احرف_كبيرة" | "أحرف_صغيرة" | "احرف_صغيرة")
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -662,6 +666,172 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 out.push(Value::Number(start + (i as f64) * step));
             }
             Ok(Value::List(out))
+        }
+        "عكس" | "اعكس" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::List(items) => {
+                    let mut rev = items.clone();
+                    rev.reverse();
+                    Ok(Value::List(rev))
+                }
+                Value::Text(text) => {
+                    let rev: String = text.chars().rev().collect();
+                    Ok(Value::Text(rev))
+                }
+                _ => Err("عكس تتطلب قائمة أو نصًا".into()),
+            }
+        }
+        "فرز" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::List(items) => {
+                    let mut sorted = items.clone();
+                    if sorted.is_empty() {
+                        return Ok(Value::List(sorted));
+                    }
+                    let all_numbers = sorted.iter().all(|x| matches!(x, Value::Number(_)));
+                    let all_strings = sorted.iter().all(|x| matches!(x, Value::Text(_)));
+                    if all_numbers {
+                        sorted.sort_by(|a, b| match (a, b) {
+                            (Value::Number(x), Value::Number(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
+                            _ => unreachable!(),
+                        });
+                        Ok(Value::List(sorted))
+                    } else if all_strings {
+                        sorted.sort_by(|a, b| match (a, b) {
+                            (Value::Text(x), Value::Text(y)) => x.cmp(y),
+                            _ => unreachable!(),
+                        });
+                        Ok(Value::List(sorted))
+                    } else {
+                        Err("فرز تتطلب قائمة متجانسة من الأرقام أو النصوص".into())
+                    }
+                }
+                _ => Err("فرز تتطلب قائمة".into()),
+            }
+        }
+        "مجموع" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::List(items) => {
+                    let mut sum = 0.0;
+                    for item in items {
+                        match item {
+                            Value::Number(n) => sum += *n,
+                            _ => return Err("مجموع تتطلب قائمة من الأرقام فقط".into()),
+                        }
+                    }
+                    finite_number(sum)
+                }
+                _ => Err("مجموع تتطلب قائمة".into()),
+            }
+        }
+        "متوسط" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::List(items) => {
+                    if items.is_empty() {
+                        return Err("لا يمكن حساب متوسط قائمة فارغة".into());
+                    }
+                    let mut sum = 0.0;
+                    for item in items {
+                        match item {
+                            Value::Number(n) => sum += *n,
+                            _ => return Err("متوسط تتطلب قائمة من الأرقام فقط".into()),
+                        }
+                    }
+                    finite_number(sum / (items.len() as f64))
+                }
+                _ => Err("متوسط تتطلب قائمة".into()),
+            }
+        }
+        "ابحث" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::List(items), target) => {
+                    let pos = items.iter().position(|x| x == target).map(|i| i as f64).unwrap_or(-1.0);
+                    Ok(Value::Number(pos))
+                }
+                (Value::Text(haystack), Value::Text(needle)) => {
+                    if let Some(byte_idx) = haystack.find(needle) {
+                        let char_idx = haystack[..byte_idx].chars().count() as f64;
+                        Ok(Value::Number(char_idx))
+                    } else {
+                        Ok(Value::Number(-1.0))
+                    }
+                }
+                _ => Err("ابحث تتطلب قائمة وعنصرًا للبحث، أو نصين".into()),
+            }
+        }
+        "يبدأ_ب" | "يبدا_ب" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::Text(s), Value::Text(prefix)) => Ok(Value::Bool(s.starts_with(prefix))),
+                _ => Err("يبدأ_ب تتطلب نصين".into()),
+            }
+        }
+        "ينتهي_ب" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::Text(s), Value::Text(suffix)) => Ok(Value::Bool(s.ends_with(suffix))),
+                _ => Err("ينتهي_ب تتطلب نصين".into()),
+            }
+        }
+        "كرر" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::Text(s), Value::Number(n)) => {
+                    let count = checked_index(Value::Number(*n))?;
+                    let total_len = s.len().saturating_mul(count);
+                    if total_len > 2_000_000 {
+                        return Err("النص المكرر تجاوز الحد الأقصى (2 ميغابايت)".into());
+                    }
+                    Ok(Value::Text(s.repeat(count)))
+                }
+                _ => Err("كرر تتطلب نصًا وعددًا صحيحًا موجبًا".into()),
+            }
+        }
+        "أحرف_كبيرة" | "احرف_كبيرة" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(s) => Ok(Value::Text(s.to_uppercase())),
+                _ => Err("أحرف_كبيرة تتطلب نصًا".into()),
+            }
+        }
+        "أحرف_صغيرة" | "احرف_صغيرة" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(s) => Ok(Value::Text(s.to_lowercase())),
+                _ => Err("أحرف_صغيرة تتطلب نصًا".into()),
+            }
+        }
+        "أرضية" | "ارضية" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Number(n) => finite_number(n.floor()),
+                _ => Err("أرضية تتطلب عددًا".into()),
+            }
+        }
+        "سقف" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Number(n) => finite_number(n.ceil()),
+                _ => Err("سقف تتطلب عددًا".into()),
+            }
+        }
+        "قوة" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::Number(base), Value::Number(exp)) => {
+                    if *base == 0.0 && *exp < 0.0 {
+                        return Err("القسمة على صفر أثناء حساب القوة".into());
+                    }
+                    let res = base.powf(*exp);
+                    finite_number(res)
+                }
+                _ => Err("قوة تتطلب رقمين (الأساس والأس)".into()),
+            }
         }
         _ => Err(format!("دالة غير معرّفة: '{}'", name)),
     }

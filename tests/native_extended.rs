@@ -27,6 +27,15 @@ fn native_range_and_math_functions(){
     assert!(ir.contains("@llvm.fabs.f64"));
 }
 #[test]
+fn native_sum_avg_and_extended_math(){
+    let ir=compile_ir("ليكن أ = [10, 20, 30]؛ اطبع(مجموع(أ))؛ اطبع(متوسط(أ))؛ اطبع(أرضية(3.8))؛ اطبع(سقف(3.2))؛ اطبع(قوة(2, 4))؛").unwrap();
+    assert!(ir.contains("sum.cond"));
+    assert!(ir.contains("avg.cond"));
+    assert!(ir.contains("@llvm.floor.f64"));
+    assert!(ir.contains("@llvm.ceil.f64"));
+    assert!(ir.contains("@llvm.pow.f64"));
+}
+#[test]
 fn native_rejects_unsupported_nested_maps(){
     let err=compile_ir("ليكن س = {\"مفتاح\": 5}؛").unwrap_err();
     assert!(err.contains("لم تُنفّذ"));

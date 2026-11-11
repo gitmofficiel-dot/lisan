@@ -74,3 +74,29 @@ fn latin_digits_allowed_in_identifiers_but_not_arabic_indic_digits() {
         assert!(err.contains("0-9"), "{input} returned {err}");
     }
 }
+
+#[test]
+fn list_reverse_and_sort() {
+    assert_eq!(run("دع ل = [3, 1, 4, 1, 5]؛ اطبع(عكس(ل))؛ اطبع(فرز(ل))؛").unwrap(), ["[5، 1، 4، 1، 3]", "[1، 1، 3، 4، 5]"]);
+    assert_eq!(run(r#"دع ك = ["موز", "تفاح", "برتقال"]؛ اطبع(فرز(ك))؛ اطبع(عكس("لسان"))؛"#).unwrap(), [r#"["برتقال"، "تفاح"، "موز"]"#, "ناسل"]);
+}
+
+#[test]
+fn list_sum_and_mean() {
+    assert_eq!(run("دع أ = [10, 20, 30, 40]؛ اطبع(مجموع(أ))؛ اطبع(متوسط(أ))؛").unwrap(), ["100", "25"]);
+    assert_eq!(run("اطبع(مجموع([]))؛").unwrap(), ["0"]);
+    assert!(run("متوسط([])؛").unwrap_err().contains("فارغة"));
+}
+
+#[test]
+fn search_and_string_features() {
+    assert_eq!(run(r#"دع ن = "مرحبا بلغة لسان"؛ اطبع(ابحث(ن، "لسان"))؛ اطبع(يبدأ_ب(ن، "مرحبا"))؛ اطبع(ينتهي_ب(ن، "لسان"))؛ اطبع(كرر("أهلاً "، 3))؛"#).unwrap(), ["11", "صحيح", "صحيح", "أهلاً أهلاً أهلاً "]);
+    assert_eq!(run("دع ل = [10, 20, 30]؛ اطبع(ابحث(ل، 20))؛ اطبع(ابحث(ل، 99))؛").unwrap(), ["1", "-1"]);
+    assert_eq!(run(r#"اطبع(أحرف_كبيرة("lisan"))؛ اطبع(أحرف_صغيرة("LISAN"))؛"#).unwrap(), ["LISAN", "lisan"]);
+}
+
+#[test]
+fn extended_math_builtins() {
+    assert_eq!(run("اطبع(أرضية(4.9))؛ اطبع(سقف(4.1))؛ اطبع(قوة(2، 10))؛").unwrap(), ["4", "5", "1024"]);
+}
+

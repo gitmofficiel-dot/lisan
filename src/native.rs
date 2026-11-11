@@ -313,9 +313,15 @@ impl<'a> FunctionWriter<'a> {
                         let val=self.new_reg();self.instruction(format!("{} = uitofp i64 {} to double",val,length));
                         return Ok(Value{ty:Type::Number,operand:val});
                     }
-                    "مطلق"|"جذر"|"قرّب"|"قرب" if args.len()==1=>{
+                    "مطلق"|"جذر"|"قرّب"|"قرب"|"أرضية"|"ارضية"|"سقف" if args.len()==1=>{
                         let v=self.generate_expr(&args[0])?;self.requires(&v,Type::Number,"دالة رياضية")?;
-                        let intrinsic=match name.as_str(){"مطلق"=>"fabs","جذر"=>"sqrt",_=>"round"};
+                        let intrinsic=match name.as_str(){
+                            "مطلق"=>"fabs",
+                            "جذر"=>"sqrt",
+                            "أرضية"|"ارضية"=>"floor",
+                            "سقف"=>"ceil",
+                            _=>"round"
+                        };
                         if intrinsic=="sqrt" {
                             let valid=self.new_reg();self.instruction(format!("{} = fcmp oge double {}, 0.0",valid,v.operand));
                             self.reject_unless(valid,"خطأ: الجذر التربيعي لعدد سالب غير مدعوم");
@@ -323,6 +329,72 @@ impl<'a> FunctionWriter<'a> {
                         let reg=self.new_reg();self.instruction(format!("{} = call double @llvm.{}.f64(double {})",reg,intrinsic,v.operand));
                         self.module.intrinsics.insert(intrinsic.into());
                         return Ok(Value{ty:Type::Number,operand:reg});
+                    }
+                    "قوة" if args.len()==2=>{
+                        let base=self.generate_expr(&args[0])?;self.requires(&base,Type::Number,"الأساس")?;
+                        let exp=self.generate_expr(&args[1])?;self.requires(&exp,Type::Number,"الأس")?;
+                        let reg=self.new_reg();
+                        self.instruction(format!("{} = call double @llvm.pow.f64(double {}, double {})",reg,base.operand,exp.operand));
+                        self.module.needs_pow = true;
+                        return Ok(Value{ty:Type::Number,operand:reg});
+                    }
+                    "مجموع" if args.len()==1=>{
+                        let list=self.generate_expr(&args[0])?;
+                        self.requires(&list,Type::NumberList,"مجموع")?;
+                        let (length,data)=self.list_length_and_data(&list);
+                        let sum_ptr=self.new_reg();self.entry_alloca(format!("{} = alloca double",sum_ptr));
+                        self.instruction(format!("store double 0.0, ptr {}",sum_ptr));
+                        let idx_ptr=self.new_reg();self.entry_alloca(format!("{} = alloca i64",idx_ptr));
+                        self.instruction(format!("store i64 0, ptr {}",idx_ptr));
+                        let cond=self.new_label("sum.cond");
+                        let body=self.new_label("sum.body");
+                        let end=self.new_label("sum.end");
+                        self.branch(&cond);self.label(&cond);
+                        let cur_idx=self.new_reg();self.instruction(format!("{} = load i64, ptr {}",cur_idx,idx_ptr));
+                        let cmp=self.new_reg();self.instruction(format!("{} = icmp ult i64 {}, {}",cmp,cur_idx,length));
+                        self.instruction(format!("br i1 {}, label %{}, label %{}",cmp,body,end));self.terminated=true;
+                        self.label(&body);
+                        let gep=self.new_reg();self.instruction(format!("{} = getelementptr double, ptr {}, i64 {}",gep,data,cur_idx));
+                        let elem=self.new_reg();self.instruction(format!("{} = load double, ptr {}",elem,gep));
+                        let cur_sum=self.new_reg();self.instruction(format!("{} = load double, ptr {}",cur_sum,sum_ptr));
+                        let next_sum=self.new_reg();self.instruction(format!("{} = fadd double {}, {}",next_sum,cur_sum,elem));
+                        self.instruction(format!("store double {}, ptr {}",next_sum,sum_ptr));
+                        let next_idx=self.new_reg();self.instruction(format!("{} = add i64 {}, 1",next_idx,cur_idx));
+                        self.instruction(format!("store i64 {}, ptr {}",next_idx,idx_ptr));
+                        self.branch(&cond);self.label(&end);
+                        let res=self.new_reg();self.instruction(format!("{} = load double, ptr {}",res,sum_ptr));
+                        return Ok(Value{ty:Type::Number,operand:res});
+                    }
+                    "متوسط" if args.len()==1=>{
+                        let list=self.generate_expr(&args[0])?;
+                        self.requires(&list,Type::NumberList,"متوسط")?;
+                        let (length,data)=self.list_length_and_data(&list);
+                        let is_non_empty=self.new_reg();self.instruction(format!("{} = icmp ugt i64 {}, 0",is_non_empty,length));
+                        self.reject_unless(is_non_empty,"خطأ: لا يمكن حساب متوسط قائمة فارغة");
+                        let sum_ptr=self.new_reg();self.entry_alloca(format!("{} = alloca double",sum_ptr));
+                        self.instruction(format!("store double 0.0, ptr {}",sum_ptr));
+                        let idx_ptr=self.new_reg();self.entry_alloca(format!("{} = alloca i64",idx_ptr));
+                        self.instruction(format!("store i64 0, ptr {}",idx_ptr));
+                        let cond=self.new_label("avg.cond");
+                        let body=self.new_label("avg.body");
+                        let end=self.new_label("avg.end");
+                        self.branch(&cond);self.label(&cond);
+                        let cur_idx=self.new_reg();self.instruction(format!("{} = load i64, ptr {}",cur_idx,idx_ptr));
+                        let cmp=self.new_reg();self.instruction(format!("{} = icmp ult i64 {}, {}",cmp,cur_idx,length));
+                        self.instruction(format!("br i1 {}, label %{}, label %{}",cmp,body,end));self.terminated=true;
+                        self.label(&body);
+                        let gep=self.new_reg();self.instruction(format!("{} = getelementptr double, ptr {}, i64 {}",gep,data,cur_idx));
+                        let elem=self.new_reg();self.instruction(format!("{} = load double, ptr {}",elem,gep));
+                        let cur_sum=self.new_reg();self.instruction(format!("{} = load double, ptr {}",cur_sum,sum_ptr));
+                        let next_sum=self.new_reg();self.instruction(format!("{} = fadd double {}, {}",next_sum,cur_sum,elem));
+                        self.instruction(format!("store double {}, ptr {}",next_sum,sum_ptr));
+                        let next_idx=self.new_reg();self.instruction(format!("{} = add i64 {}, 1",next_idx,cur_idx));
+                        self.instruction(format!("store i64 {}, ptr {}",next_idx,idx_ptr));
+                        self.branch(&cond);self.label(&end);
+                        let res_sum=self.new_reg();self.instruction(format!("{} = load double, ptr {}",res_sum,sum_ptr));
+                        let len_float=self.new_reg();self.instruction(format!("{} = uitofp i64 {} to double",len_float,length));
+                        let avg=self.new_reg();self.instruction(format!("{} = fdiv double {}, {}",avg,res_sum,len_float));
+                        return Ok(Value{ty:Type::Number,operand:avg});
                     }
                     "أدنى"|"ادنى"|"أعلى"|"اعلى" if args.len()==2=>{
                         let a=self.generate_expr(&args[0])?;let b=self.generate_expr(&args[1])?;
@@ -467,7 +539,7 @@ pub fn generate_llvm(stmts:&[Stmt])->Result<String,String>{
     let main_ir=format!("define i32 @main() {{\n{}\n}}",writer.lines.join("\n"));
     let mut ir=String::from("; Native Lisan: source language compiled to LLVM IR, not interpreted\nsource_filename = \"lisan_native\"\n\n");
     ir.push_str("declare i32 @puts(ptr)\ndeclare i32 @printf(ptr, ...)\ndeclare i32 @snprintf(ptr, i64, ptr, ...)\ndeclare ptr @malloc(i64)\ndeclare ptr @strcpy(ptr, ptr)\ndeclare ptr @strcat(ptr, ptr)\ndeclare i64 @strlen(ptr)\ndeclare i32 @strcmp(ptr, ptr)\ndeclare void @exit(i32)\ndeclare double @llvm.floor.f64(double)\n");
-    for intrinsic in ["fabs","sqrt","round"] {if module.intrinsics.contains(intrinsic){ir.push_str(&format!("declare double @llvm.{}.f64(double)\n",intrinsic));}}
+    for intrinsic in ["fabs","sqrt","round","floor","ceil"] {if module.intrinsics.contains(intrinsic){ir.push_str(&format!("declare double @llvm.{}.f64(double)\n",intrinsic));}}
     if module.needs_pow {ir.push_str("declare double @llvm.pow.f64(double, double)\n");}
     // UTF-8 length counts Unicode scalar values, not bytes.
     ir.push_str("define i64 @lisan_utf8_len(ptr %str) {\nentry:\n  br label %loop\nloop:\n  %p = phi ptr [ %str, %entry ], [ %next, %body ]\n  %count = phi i64 [ 0, %entry ], [ %add, %body ]\n  %byte = load i8, ptr %p\n  %end = icmp eq i8 %byte, 0\n  br i1 %end, label %done, label %body\nbody:\n  %mask = and i8 %byte, -64\n  %continuation = icmp eq i8 %mask, -128\n  %increment = zext i1 %continuation to i64\n  %amount = sub i64 1, %increment\n  %add = add i64 %count, %amount\n  %next = getelementptr i8, ptr %p, i64 1\n  br label %loop\ndone:\n  ret i64 %count\n}\n");

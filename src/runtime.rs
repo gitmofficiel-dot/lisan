@@ -469,7 +469,10 @@ fn is_builtin(name: &str) -> bool {
         "عكس" | "اعكس" | "فرز" | "مجموع" | "متوسط" | "ابحث" |
         "يبدأ_ب" | "يبدا_ب" | "ينتهي_ب" | "كرر" |
         "أحرف_كبيرة" | "احرف_كبيرة" | "أحرف_صغيرة" | "احرف_صغيرة" |
-        "ادخل" | "ملف_موجود" | "ألحق_ملف" | "الحق_ملف" | "الآن" | "الان" | "عدد_صحيح")
+        "ادخل" | "ملف_موجود" | "ألحق_ملف" | "الحق_ملف" | "الآن" | "الان" | "عدد_صحيح" |
+        "عشوائي" | "عدد_عشوائي" | "عنصر_عشوائي" |
+        "بيئة" | "بيئه" | "وسائط" |
+        "تحليل_json" | "ترميز_json" | "تنسيق")
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -491,6 +494,38 @@ fn expect_integer(value: &Value) -> Result<f64, String> {
         Value::Number(n) if n.is_finite() && n.fract() == 0.0
             && n.abs() <= 9_007_199_254_740_991.0 => Ok(*n),
         _ => Err("مدى تتطلب أعدادًا صحيحة دقيقة ضمن النطاق المسموح".into()),
+    }
+}
+
+static RNG_STATE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn next_random_u64() -> u64 {
+    use std::sync::atomic::Ordering;
+    let mut current = RNG_STATE.load(Ordering::Relaxed);
+    if current == 0 {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0x123456789abcdef0);
+        current = nanos ^ 0x9e3779b97f4a7c15;
+    }
+    let z = current.wrapping_add(0x9e3779b97f4a7c15);
+    RNG_STATE.store(z, Ordering::Relaxed);
+    let mut v = z;
+    v = (v ^ (v >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    v = (v ^ (v >> 27)).wrapping_mul(0x94d049bb133111eb);
+    v ^ (v >> 31)
+}
+
+fn random_f64() -> f64 {
+    (next_random_u64() >> 11) as f64 / ((1u64 << 53) as f64)
+}
+
+fn checked_int(value: &Value, fn_name: &str) -> Result<i64, String> {
+    match value {
+        Value::Number(n) if n.is_finite() && n.fract() == 0.0
+            && n.abs() <= 9_007_199_254_740_991.0 => Ok(*n as i64),
+        _ => Err(format!("الدالة '{}' تتطلب أعدادًا صحيحة", fn_name)),
     }
 }
 
@@ -923,6 +958,89 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 Value::Number(n) => finite_number(n.trunc()),
                 Value::Text(s) => finite_number(parse_latin_number(s)?.trunc()),
                 _ => Err("عدد_صحيح تقبل رقمًا أو نصًا رقميًا".into()),
+            }
+        }
+        "عشوائي" => {
+            require_args(name, &args, 0)?;
+            Ok(Value::Number(random_f64()))
+        }
+        "عدد_عشوائي" => {
+            require_args(name, &args, 2)?;
+            let min = checked_int(&args[0], "عدد_عشوائي")?;
+            let max = checked_int(&args[1], "عدد_عشوائي")?;
+            if min > max {
+                return Err("الحد الأدنى يجب أن يكون أصغر من أو يساوي الحد الأقصى في عدد_عشوائي".into());
+            }
+            let range = (max - min + 1) as u64;
+            let val = min + (next_random_u64() % range) as i64;
+            finite_number(val as f64)
+        }
+        "عنصر_عشوائي" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::List(items) => {
+                    if items.is_empty() {
+                        return Err("لا يمكن اختيار عنصر عشوائي من قائمة فارغة".into());
+                    }
+                    let idx = (next_random_u64() as usize) % items.len();
+                    Ok(items[idx].clone())
+                }
+                _ => Err("عنصر_عشوائي تتطلب قائمة".into()),
+            }
+        }
+        "بيئة" | "بيئه" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(var_name) => match std::env::var(var_name) {
+                    Ok(val) => Ok(Value::Text(val)),
+                    Err(_) => Ok(Value::Null),
+                },
+                _ => Err("بيئة تتطلب اسم متغير نصي".into()),
+            }
+        }
+        "وسائط" => {
+            require_args(name, &args, 0)?;
+            let env_args: Vec<Value> = std::env::args().map(Value::Text).collect();
+            Ok(Value::List(env_args))
+        }
+        "تحليل_json" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(raw) => crate::json::parse_json(raw),
+                _ => Err("تحليل_json تتطلب نصًا بتنسيق JSON".into()),
+            }
+        }
+        "ترميز_json" => {
+            require_args(name, &args, 1)?;
+            let json_str = crate::json::to_json_string(&args[0])?;
+            Ok(Value::Text(json_str))
+        }
+        "تنسيق" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::Text(template), Value::List(values)) => {
+                    let mut result = String::new();
+                    let mut val_idx = 0;
+                    let mut chars = template.chars().peekable();
+                    while let Some(c) = chars.next() {
+                        if c == '{' && chars.peek() == Some(&'}') {
+                            chars.next(); // consume '}'
+                            if val_idx < values.len() {
+                                match &values[val_idx] {
+                                    Value::Text(t) => result.push_str(t),
+                                    other => result.push_str(&other.to_string()),
+                                }
+                                val_idx += 1;
+                            } else {
+                                return Err("عدد القيم في القائمة أقل من علامات التنسيق {}".into());
+                            }
+                        } else {
+                            result.push(c);
+                        }
+                    }
+                    Ok(Value::Text(result))
+                }
+                _ => Err("تنسيق تتطلب نص قالب وقائمة بالقيم".into()),
             }
         }
         _ => Err(format!("دالة غير معرّفة: '{}'", name)),

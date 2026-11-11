@@ -13,6 +13,7 @@ const RUNTIME_SOURCES: &[(&str, &str)] = &[
     ("parser.rs", include_str!("parser.rs")),
     ("runtime.rs", include_str!("runtime.rs")),
     ("modules.rs", include_str!("modules.rs")),
+    ("json.rs", include_str!("json.rs")),
 ];
 
 fn str_value(text: &str) -> String { format!("{:?}.to_string()", text) }
@@ -88,6 +89,7 @@ fn emit_stmt(stmt: &Stmt) -> String {
 pub fn generate_rust_main(program: &[Stmt]) -> Result<String, String> {
     let ast = vec_expr(program, emit_stmt);
     let source = format!(r#"mod ast;
+mod json;
 mod lexer;
 mod modules;
 mod parser;

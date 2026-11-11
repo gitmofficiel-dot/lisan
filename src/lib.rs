@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod bundle;
+pub mod json;
 pub mod lexer;
 pub mod modules;
 pub mod native;

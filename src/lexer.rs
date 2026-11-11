@@ -1,6 +1,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     Let, Print, If, Else, While, ForEach, In, Function, Return, Import, Break, Continue, True, False, Null,
+    Try, Catch, Finally, Throw, Match, Case, Default,
     Identifier(String), Number(f64), String(String),
     LeftParen, RightParen, LeftBrace, RightBrace, LeftBracket, RightBracket, Comma, Colon, Semicolon,
     Plus, Minus, Star, Power, Slash, Percent,
@@ -171,6 +172,13 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
                     "و" => TokenKind::AndAnd,
                     "أو" | "او" => TokenKind::OrOr,
                     "ليس" => TokenKind::Bang,
+                    "حاول" => TokenKind::Try,
+                    "التقط" | "أمسك" | "امسك" => TokenKind::Catch,
+                    "أخيرًا" | "أخيرا" | "اخيرا" => TokenKind::Finally,
+                    "ارمِ" | "ارم" | "ألقِ" | "الق" => TokenKind::Throw,
+                    "اختر" => TokenKind::Match,
+                    "حالة" => TokenKind::Case,
+                    "افتراضي" => TokenKind::Default,
                     _ => TokenKind::Identifier(word),
                 }
             }

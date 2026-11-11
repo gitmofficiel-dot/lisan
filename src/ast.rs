@@ -43,4 +43,16 @@ pub enum Stmt {
     Return(Option<Expr>),
     Break,
     Continue,
+    TryCatch {
+        try_body: Vec<Stmt>,
+        catch_var: Option<String>,
+        catch_body: Vec<Stmt>,
+        finally_body: Option<Vec<Stmt>>,
+    },
+    Throw(Expr),
+    Match {
+        target: Expr,
+        cases: Vec<(Expr, Vec<Stmt>)>,
+        default_case: Option<Vec<Stmt>>,
+    },
 }

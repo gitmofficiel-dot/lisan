@@ -139,6 +139,69 @@ impl Parser {
             self.semicolon()?;
             return Ok(Stmt::Continue);
         }
+        if self.take(&TokenKind::Throw) {
+            let expr = self.expression()?;
+            self.semicolon()?;
+            return Ok(Stmt::Throw(expr));
+        }
+        if self.take(&TokenKind::Try) {
+            let try_body = self.block()?;
+            self.expect(&TokenKind::Catch, "متوقع 'التقط' أو 'أمسك' بعد كتلة حاول")?;
+            let mut catch_var = None;
+            if self.take(&TokenKind::LeftParen) {
+                catch_var = Some(self.identifier()?);
+                self.expect(&TokenKind::RightParen, "متوقع ')' بعد متغير الخطأ")?;
+            }
+            let catch_body = self.block()?;
+            let finally_body = if self.take(&TokenKind::Finally) {
+                Some(self.block()?)
+            } else {
+                None
+            };
+            return Ok(Stmt::TryCatch {
+                try_body,
+                catch_var,
+                catch_body,
+                finally_body,
+            });
+        }
+        if self.take(&TokenKind::Match) {
+            self.expect(&TokenKind::LeftParen, "متوقع '(' بعد اختر")?;
+            let target = self.expression()?;
+            self.expect(&TokenKind::RightParen, "متوقع ')' بعد تعبير اختر")?;
+            self.expect(&TokenKind::LeftBrace, "متوقع '{' لكتلة اختر")?;
+            let mut cases = Vec::new();
+            let mut default_case = None;
+            while !self.is(&TokenKind::RightBrace) && !self.is(&TokenKind::Eof) {
+                if self.take(&TokenKind::Case) {
+                    let val = self.expression()?;
+                    self.expect(&TokenKind::Colon, "متوقع ':' بعد تعبير حالة")?;
+                    let mut stmts = Vec::new();
+                    while !self.is(&TokenKind::Case) && !self.is(&TokenKind::Default) && !self.is(&TokenKind::RightBrace) && !self.is(&TokenKind::Eof) {
+                        stmts.push(self.statement()?);
+                    }
+                    cases.push((val, stmts));
+                } else if self.take(&TokenKind::Default) {
+                    if default_case.is_some() {
+                        return Err(self.error("لا يمكن تكرار حالة 'افتراضي' في جملة اختر"));
+                    }
+                    self.expect(&TokenKind::Colon, "متوقع ':' بعد افتراضي")?;
+                    let mut stmts = Vec::new();
+                    while !self.is(&TokenKind::Case) && !self.is(&TokenKind::Default) && !self.is(&TokenKind::RightBrace) && !self.is(&TokenKind::Eof) {
+                        stmts.push(self.statement()?);
+                    }
+                    default_case = Some(stmts);
+                } else {
+                    return Err(self.error("متوقع 'حالة' أو 'افتراضي' داخل كتلة اختر"));
+                }
+            }
+            self.expect(&TokenKind::RightBrace, "متوقع '}' لإغلاق كتلة اختر")?;
+            return Ok(Stmt::Match {
+                target,
+                cases,
+                default_case,
+            });
+        }
         if self.is(&TokenKind::LeftBrace) { return Ok(Stmt::Block(self.block()?)); }
         let expr = self.expression()?;
         self.semicolon()?;

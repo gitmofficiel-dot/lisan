@@ -69,6 +69,18 @@ fn emit_stmt(stmt: &Stmt) -> String {
         },
         Stmt::Break => "Stmt::Break".into(),
         Stmt::Continue => "Stmt::Continue".into(),
+        Stmt::Throw(expr) => format!("Stmt::Throw({})", emit_expr(expr)),
+        Stmt::TryCatch { try_body, catch_var, catch_body, finally_body } => {
+            let cv = match catch_var { None => "None".to_string(), Some(v) => format!("Some({})", str_value(v)) };
+            let fin = match finally_body { None => "None".to_string(), Some(f) => format!("Some({})", vec_expr(f, emit_stmt)) };
+            format!("Stmt::TryCatch {{ try_body: {}, catch_var: {}, catch_body: {}, finally_body: {} }}",
+                vec_expr(try_body, emit_stmt), cv, vec_expr(catch_body, emit_stmt), fin)
+        }
+        Stmt::Match { target, cases, default_case } => {
+            let c = vec_expr(cases, |(e, stmts)| format!("({}, {})", emit_expr(e), vec_expr(stmts, emit_stmt)));
+            let def = match default_case { None => "None".to_string(), Some(d) => format!("Some({})", vec_expr(d, emit_stmt)) };
+            format!("Stmt::Match {{ target: {}, cases: {}, default_case: {} }}", emit_expr(target), c, def)
+        }
     }
 }
 

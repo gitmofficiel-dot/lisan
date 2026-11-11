@@ -493,7 +493,52 @@ impl<'a> FunctionWriter<'a> {
             Stmt::Function(_)=>Err("تعريف دالة داخل كتلة غير مدعوم في المترجم الأصلي".into()),
             Stmt::Import(_)=>Err("الاستيراد المتداخل غير مسموح".into()),
             Stmt::ForEach(name,iterable,body)=>self.for_each(name,iterable,body),
+            Stmt::Match { target, cases, default_case } => {
+                let target_val = self.generate_expr(target)?;
+                let end_label = self.new_label("match.end");
+                for (case_expr, case_body) in cases {
+                    let next_case_label = self.new_label("match.next");
+                    let case_val = self.generate_expr(case_expr)?;
+                    let is_match = self.compare_equality(&target_val, &case_val)?;
+                    let case_body_label = self.new_label("match.case");
+                    self.instruction(format!("br i1 {}, label %{}, label %{}", is_match.operand, case_body_label, next_case_label));
+                    self.terminated = true;
+
+                    self.label(&case_body_label);
+                    self.scope(|this| this.statements(case_body))?;
+                    if !self.terminated { self.branch(&end_label); }
+
+                    self.label(&next_case_label);
+                }
+                if let Some(default_body) = default_case {
+                    self.scope(|this| this.statements(default_body))?;
+                }
+                if !self.terminated { self.branch(&end_label); }
+                self.label(&end_label);
+                Ok(())
+            }
+            Stmt::TryCatch { .. } | Stmt::Throw(_) => Err("معالجة الاستثناءات (حاول/التقط/أخيرًا/ارمِ) غير مدعومة بعد في المترجم الأصلي AOT، وتعمل مع المفسّر".into()),
         }
+    }
+    fn compare_equality(&mut self, a: &Value, b: &Value) -> Result<Value, String> {
+        if a.ty == Type::Text && b.ty == Type::Text {
+            let cmp = self.new_reg();
+            self.instruction(format!("{} = call i32 @strcmp(ptr {}, ptr {})", cmp, a.operand, b.operand));
+            let out = self.new_reg();
+            self.instruction(format!("{} = icmp eq i32 {}, 0", out, cmp));
+            return Ok(Value { ty: Type::Boolean, operand: out });
+        }
+        if a.ty != b.ty {
+            return Err("لا يجوز خلط الأنواع في جملة اختر".into());
+        }
+        let (cmd, llvm_ty) = match a.ty {
+            Type::Number => ("fcmp oeq", "double"),
+            Type::Boolean => ("icmp eq", "i1"),
+            _ => return Err("المقارنة في جملة اختر مدعومة فقط للأعداد والنصوص والقيم المنطقية".into()),
+        };
+        let reg = self.new_reg();
+        self.instruction(format!("{} = {} {} {}, {}", reg, cmd, llvm_ty, a.operand, b.operand));
+        Ok(Value { ty: Type::Boolean, operand: reg })
     }
 }
 

@@ -36,6 +36,25 @@ fn native_sum_avg_and_extended_math(){
     assert!(ir.contains("@llvm.pow.f64"));
 }
 #[test]
+fn native_match_statement(){
+    let ir=compile_ir(r#"
+اختر (2) {
+    حالة 1: {
+        اطبع("واحد")؛
+    }
+    حالة 2: {
+        اطبع("اثنان")؛
+    }
+    افتراضي: {
+        اطبع("غير معروف")؛
+    }
+}
+"#).unwrap();
+    assert!(ir.contains("match.case"));
+    assert!(ir.contains("match.next"));
+    assert!(ir.contains("match.end"));
+}
+#[test]
 fn native_rejects_unsupported_nested_maps(){
     let err=compile_ir("ليكن س = {\"مفتاح\": 5}؛").unwrap_err();
     assert!(err.contains("لم تُنفّذ"));

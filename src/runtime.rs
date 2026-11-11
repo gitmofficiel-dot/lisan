@@ -7,7 +7,7 @@ const MAX_CALL_DEPTH: usize = 128;
 const MAX_LIST_SIZE: usize = 10_000;
 
 /// Flow through nested statements; loops consume Break/Continue, functions consume Return.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Flow {
     Next,
     Return(Value),
@@ -187,6 +187,51 @@ impl Interpreter {
             }
             Stmt::Break => return Ok(Flow::Break),
             Stmt::Continue => return Ok(Flow::Continue),
+            Stmt::Throw(expr) => {
+                let value = self.eval(expr)?;
+                return Err(value.to_string());
+            }
+            Stmt::TryCatch { try_body, catch_var, catch_body, finally_body } => {
+                let try_res = self.execute_statements(try_body, true);
+                let mut flow = match try_res {
+                    Ok(signal) => signal,
+                    Err(err_msg) => {
+                        self.scopes.push(HashMap::new());
+                        if let Some(var) = catch_var {
+                            self.scopes.last_mut().unwrap().insert(var.clone(), Value::Text(err_msg));
+                        }
+                        let catch_res = self.execute_statements(catch_body, false);
+                        self.scopes.pop();
+                        catch_res?
+                    }
+                };
+                if let Some(finally) = finally_body {
+                    let fin_res = self.execute_statements(finally, true)?;
+                    if matches!(fin_res, Flow::Return(_) | Flow::Break | Flow::Continue) {
+                        flow = fin_res;
+                    }
+                }
+                return Ok(flow);
+            }
+            Stmt::Match { target, cases, default_case } => {
+                let target_val = self.eval(target)?;
+                let mut matched = false;
+                for (case_expr, case_stmts) in cases {
+                    let case_val = self.eval(case_expr)?;
+                    if target_val == case_val {
+                        matched = true;
+                        let flow = self.execute_statements(case_stmts, true)?;
+                        if flow != Flow::Next { return Ok(flow); }
+                        break;
+                    }
+                }
+                if !matched {
+                    if let Some(def_stmts) = default_case {
+                        let flow = self.execute_statements(def_stmts, true)?;
+                        if flow != Flow::Next { return Ok(flow); }
+                    }
+                }
+            }
         }
         Ok(Flow::Next)
     }

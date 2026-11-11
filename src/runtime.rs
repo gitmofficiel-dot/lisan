@@ -423,7 +423,8 @@ fn is_builtin(name: &str) -> bool {
         "تحقق" | "تحقق_يساوي" |
         "عكس" | "اعكس" | "فرز" | "مجموع" | "متوسط" | "ابحث" |
         "يبدأ_ب" | "يبدا_ب" | "ينتهي_ب" | "كرر" |
-        "أحرف_كبيرة" | "احرف_كبيرة" | "أحرف_صغيرة" | "احرف_صغيرة")
+        "أحرف_كبيرة" | "احرف_كبيرة" | "أحرف_صغيرة" | "احرف_صغيرة" |
+        "ادخل" | "ملف_موجود" | "ألحق_ملف" | "الحق_ملف" | "الآن" | "الان" | "عدد_صحيح")
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -831,6 +832,52 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                     finite_number(res)
                 }
                 _ => Err("قوة تتطلب رقمين (الأساس والأس)".into()),
+            }
+        }
+        "ادخل" => {
+            if args.len() > 1 { return Err("ادخل تقبل رسالة اختيارية واحدة".into()); }
+            if let Some(Value::Text(prompt)) = args.first() {
+                use std::io::Write;
+                print!("{}", prompt);
+                let _ = std::io::stdout().flush();
+            }
+            let mut line = String::new();
+            std::io::stdin().read_line(&mut line).map_err(|e| format!("تعذّرت قراءة الإدخال: {}", e))?;
+            Ok(Value::Text(line.trim_end_matches(['\n', '\r']).to_string()))
+        }
+        "ملف_موجود" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(path) => Ok(Value::Bool(std::path::Path::new(path).is_file())),
+                _ => Err("ملف_موجود تتطلب مسارًا نصيًا".into()),
+            }
+        }
+        "ألحق_ملف" | "الحق_ملف" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::Text(path), Value::Text(contents)) => {
+                    use std::io::Write;
+                    if contents.len() > 2_000_000 { return Err("حجم النص يتجاوز 2 ميغابايت".into()); }
+                    let mut file = std::fs::OpenOptions::new().create(true).append(true).open(path)
+                        .map_err(|e| format!("تعذّر فتح الملف: {}", e))?;
+                    file.write_all(contents.as_bytes()).map_err(|e| format!("تعذّرت الكتابة: {}", e))?;
+                    Ok(Value::Bool(true))
+                }
+                _ => Err("ألحق_ملف تتطلب مسارًا ونصًا".into()),
+            }
+        }
+        "الآن" | "الان" => {
+            require_args(name, &args, 0)?;
+            let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| format!("خطأ في قراءة الوقت: {}", e))?.as_secs_f64();
+            Ok(Value::Number(secs))
+        }
+        "عدد_صحيح" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Number(n) => finite_number(n.trunc()),
+                Value::Text(s) => finite_number(parse_latin_number(s)?.trunc()),
+                _ => Err("عدد_صحيح تقبل رقمًا أو نصًا رقميًا".into()),
             }
         }
         _ => Err(format!("دالة غير معرّفة: '{}'", name)),

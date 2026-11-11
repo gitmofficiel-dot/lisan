@@ -100,3 +100,15 @@ fn extended_math_builtins() {
     assert_eq!(run("اطبع(أرضية(4.9))؛ اطبع(سقف(4.1))؛ اطبع(قوة(2، 10))؛").unwrap(), ["4", "5", "1024"]);
 }
 
+
+#[test]
+fn io_time_and_integer_builtins() {
+    let path = std::env::temp_dir().join(format!("lisan-io-{}.txt", std::process::id()));
+    let p = path.to_string_lossy().replace('\\', "/");
+    let src = format!(
+        "اطبع(ملف_موجود(\"{p}\"))؛ ألحق_ملف(\"{p}\"، \"أ\")؛ ألحق_ملف(\"{p}\"، \"ب\")؛ اطبع(اقرأ_ملف(\"{p}\"))؛ اطبع(ملف_موجود(\"{p}\"))؛ اطبع(عدد_صحيح(7.9))؛ اطبع(عدد_صحيح(\"12.5\"))؛ اطبع(الآن() > 1000000)؛"
+    );
+    let out = run(&src).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(out, ["خطأ", "أب", "صحيح", "7", "12", "صحيح"]);
+}

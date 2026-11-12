@@ -217,7 +217,13 @@ impl Parser {
         let enclosing_loop_depth = self.loop_depth;
         self.loop_depth = 0;
         self.function_depth += 1;
-        let body = self.block();
+        let body = if self.take(&TokenKind::FatArrow) {
+            let expr = self.expression()?;
+            self.semicolon()?;
+            Ok(vec![Stmt::Return(Some(expr))])
+        } else {
+            self.block()
+        };
         self.function_depth -= 1;
         self.loop_depth = enclosing_loop_depth;
         Ok(Function { name, params, body: body? })
@@ -225,6 +231,11 @@ impl Parser {
 
     fn class_declaration(&mut self) -> Result<Stmt, String> {
         let name = self.identifier()?;
+        let parent = if self.take(&TokenKind::Extends) {
+            Some(self.identifier()?)
+        } else {
+            None
+        };
         self.expect(&TokenKind::LeftBrace, "متوقع '{' لبدء جسم الصنف")?;
         let mut methods = Vec::new();
         while !self.is(&TokenKind::RightBrace) && !self.is(&TokenKind::Eof) {
@@ -238,7 +249,7 @@ impl Parser {
             }
         }
         self.expect(&TokenKind::RightBrace, "متوقع '}' لإنهاء جسم الصنف")?;
-        Ok(Stmt::Class(crate::ast::ClassDef { name, methods }))
+        Ok(Stmt::Class(crate::ast::ClassDef { name, parent, methods }))
     }
 
     fn semicolon(&mut self) -> Result<(), String> {
@@ -394,6 +405,32 @@ impl Parser {
             TokenKind::True => { self.cursor += 1; Ok(Expr::Bool(true)) }
             TokenKind::False => { self.cursor += 1; Ok(Expr::Bool(false)) }
             TokenKind::Null => { self.cursor += 1; Ok(Expr::Null) }
+            TokenKind::Function => {
+                self.cursor += 1;
+                self.expect(&TokenKind::LeftParen, "متوقع '(' بعد 'دالة' في الدالة المجهولة")?;
+                let mut params = Vec::new();
+                if !self.is(&TokenKind::RightParen) {
+                    loop {
+                        let name = self.identifier()?;
+                        if params.contains(&name) { return Err(self.error("معامل مكرر في الدالة")); }
+                        params.push(name);
+                        if !self.take(&TokenKind::Comma) { break; }
+                    }
+                }
+                self.expect(&TokenKind::RightParen, "متوقع ')' بعد معاملات الدالة")?;
+                let enclosing_loop_depth = self.loop_depth;
+                self.loop_depth = 0;
+                self.function_depth += 1;
+                let body = if self.take(&TokenKind::FatArrow) {
+                    let expr = self.expression()?;
+                    Ok(vec![Stmt::Return(Some(expr))])
+                } else {
+                    self.block()
+                };
+                self.function_depth -= 1;
+                self.loop_depth = enclosing_loop_depth;
+                Ok(Expr::Lambda(params, body?))
+            }
             TokenKind::New => {
                 self.cursor += 1;
                 let class_name = self.identifier()?;

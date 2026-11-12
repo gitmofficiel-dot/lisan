@@ -16,6 +16,7 @@ pub enum Expr {
     GetProperty(Box<Expr>, String),
     SetProperty(Box<Expr>, String, Box<Expr>),
     MethodCall(Box<Expr>, String, Vec<Expr>),
+    Lambda(Vec<String>, Vec<Stmt>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -35,6 +36,7 @@ pub struct Function {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClassDef {
     pub name: String,
+    pub parent: Option<String>,
     pub methods: Vec<Function>,
 }
 

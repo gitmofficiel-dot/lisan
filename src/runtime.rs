@@ -27,6 +27,11 @@ pub enum Value {
         class_name: String,
         fields: std::rc::Rc<std::cell::RefCell<Vec<(String, Value)>>>,
     },
+    Lambda {
+        params: Vec<String>,
+        body: Vec<Stmt>,
+        captured: Vec<(String, Value)>,
+    },
 }
 
 impl fmt::Display for Value {
@@ -37,6 +42,7 @@ impl fmt::Display for Value {
             Value::Bool(true) => write!(f, "صحيح"),
             Value::Bool(false) => write!(f, "خطأ"),
             Value::Null => write!(f, "لاشيء"),
+            Value::Lambda { params, .. } => write!(f, "<دالة({})>", params.join("، ")),
             Value::Instance { class_name, fields } => {
                 write!(f, "{} {{", class_name)?;
                 let borrowed = fields.borrow();
@@ -196,7 +202,12 @@ impl Interpreter {
                 }
             }
             Stmt::Function(f) => { self.functions.insert(f.name.clone(), f.clone()); }
-            Stmt::Class(c) => { self.classes.insert(c.name.clone(), c.clone()); }
+            Stmt::Class(c) => {
+                if c.parent.as_deref() == Some(c.name.as_str()) {
+                    return Err(format!("لا يجوز للصنف '{}' أن يرث من نفسه", c.name));
+                }
+                self.classes.insert(c.name.clone(), c.clone());
+            }
             Stmt::Return(expr) => {
                 let value = match expr { Some(expr) => self.eval(expr)?, None => Value::Null };
                 return Ok(Flow::Return(value));
@@ -255,6 +266,13 @@ impl Interpreter {
     fn get_variable(&self, name: &str) -> Result<Value, String> {
         if let Some(val) = self.scopes.iter().rev().find_map(|scope| scope.get(name)) {
             return Ok(val.clone());
+        }
+        if let Some(f) = self.functions.get(name) {
+            return Ok(Value::Lambda {
+                params: f.params.clone(),
+                body: f.body.clone(),
+                captured: Vec::new(),
+            });
         }
         let mut available: Vec<&str> = Vec::new();
         for scope in &self.scopes {
@@ -417,6 +435,139 @@ impl Interpreter {
             Expr::GetProperty(target, prop) => self.eval_get_property(target, prop),
             Expr::SetProperty(target, prop, expr) => self.eval_set_property(target, prop, expr),
             Expr::MethodCall(target, method_name, args) => self.eval_method_call(target, method_name, args),
+            Expr::Lambda(params, body) => {
+                let mut captured = Vec::new();
+                for scope in self.scopes.iter().skip(1) {
+                    for (k, v) in scope {
+                        if let Some((_, existing)) = captured.iter_mut().find(|(ek, _): &&mut (String, Value)| ek == k) {
+                            *existing = v.clone();
+                        } else {
+                            captured.push((k.clone(), v.clone()));
+                        }
+                    }
+                }
+                Ok(Value::Lambda {
+                    params: params.clone(),
+                    body: body.clone(),
+                    captured,
+                })
+            }
+        }
+    }
+
+    fn find_class_method(&self, start_class: &str, method_name: &str) -> Result<Option<(String, Function)>, String> {
+        let mut current = Some(start_class.to_string());
+        let mut depth = 0;
+        while let Some(cname) = current {
+            depth += 1;
+            if depth > 32 {
+                return Err("تجاوز حد عمق الوراثة بين الأصناف (قد توجد حلقة وراثة)".into());
+            }
+            let cdef = self.classes.get(&cname).ok_or_else(|| format!("تعريف الصنف '{}' غير موجود", cname))?;
+            if let Some(m) = cdef.methods.iter().find(|m| m.name == method_name).cloned() {
+                return Ok(Some((cname, m)));
+            }
+            current = cdef.parent.clone();
+        }
+        Ok(None)
+    }
+
+    fn find_class_constructor(&self, start_class: &str) -> Result<Option<(String, Function)>, String> {
+        let mut current = Some(start_class.to_string());
+        let mut depth = 0;
+        while let Some(cname) = current {
+            depth += 1;
+            if depth > 32 {
+                return Err("تجاوز حد عمق الوراثة بين الأصناف".into());
+            }
+            let cdef = self.classes.get(&cname).ok_or_else(|| format!("تعريف الصنف '{}' غير موجود", cname))?;
+            if let Some(m) = cdef.methods.iter().find(|m| m.name == "بناء" || m.name == "إنشاء" || m.name == "تهيئة").cloned() {
+                return Ok(Some((cname, m)));
+            }
+            current = cdef.parent.clone();
+        }
+        Ok(None)
+    }
+
+    fn collect_class_method_names(&self, start_class: &str) -> Vec<String> {
+        let mut names = Vec::new();
+        let mut current = Some(start_class.to_string());
+        let mut depth = 0;
+        while let Some(cname) = current {
+            depth += 1;
+            if depth > 32 { break; }
+            if let Some(cdef) = self.classes.get(&cname) {
+                for m in &cdef.methods {
+                    if !names.contains(&m.name) {
+                        names.push(m.name.clone());
+                    }
+                }
+                current = cdef.parent.clone();
+            } else {
+                break;
+            }
+        }
+        names
+    }
+
+    #[inline(never)]
+    fn invoke_method(&mut self, self_val: Value, owner_class: &str, method: &Function, evaluated_args: Vec<Value>) -> Result<Value, String> {
+        if method.params.len() != evaluated_args.len() {
+            return Err(format!("الطريقة '{}.{}' تتوقع {} معاملات، استلمت {}",
+                owner_class, method.name, method.params.len(), evaluated_args.len()));
+        }
+        if self.call_depth >= MAX_CALL_DEPTH {
+            return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
+        }
+        let mut local = HashMap::new();
+        local.insert("هذا".to_string(), self_val.clone());
+        local.insert("ذاتي".to_string(), self_val);
+        local.insert("__class_owner".to_string(), Value::Text(owner_class.to_string()));
+        for (param, arg) in method.params.iter().zip(evaluated_args) {
+            local.insert(param.clone(), arg);
+        }
+        let globals = self.scopes[0].clone();
+        let previous_scopes = std::mem::replace(&mut self.scopes, vec![globals, local]);
+        self.call_depth += 1;
+        let result = self.execute_statements(&method.body, false);
+        self.call_depth -= 1;
+        let updated_globals = self.scopes[0].clone();
+        self.scopes = previous_scopes;
+        self.scopes[0] = updated_globals;
+        match result? {
+            Flow::Return(value) => Ok(value),
+            Flow::Next => Ok(Value::Null),
+            Flow::Break | Flow::Continue => Err("تحكم حلقة خارج الحلقة في الطريقة".into()),
+        }
+    }
+
+    #[inline(never)]
+    fn invoke_lambda(&mut self, params: &[String], body: &[Stmt], captured: &[(String, Value)], evaluated_args: Vec<Value>) -> Result<Value, String> {
+        if params.len() != evaluated_args.len() {
+            return Err(format!("الدالة تتوقع {} معاملات، استلمت {}", params.len(), evaluated_args.len()));
+        }
+        if self.call_depth >= MAX_CALL_DEPTH {
+            return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
+        }
+        let mut local = HashMap::new();
+        for (k, v) in captured {
+            local.insert(k.clone(), v.clone());
+        }
+        for (param, arg) in params.iter().zip(evaluated_args) {
+            local.insert(param.clone(), arg);
+        }
+        let globals = self.scopes[0].clone();
+        let previous_scopes = std::mem::replace(&mut self.scopes, vec![globals, local]);
+        self.call_depth += 1;
+        let result = self.execute_statements(body, false);
+        self.call_depth -= 1;
+        let updated_globals = self.scopes[0].clone();
+        self.scopes = previous_scopes;
+        self.scopes[0] = updated_globals;
+        match result? {
+            Flow::Return(value) => Ok(value),
+            Flow::Next => Ok(Value::Null),
+            Flow::Break | Flow::Continue => Err("تحكم حلقة خارج الحلقة في الدالة".into()),
         }
     }
 
@@ -468,6 +619,31 @@ impl Interpreter {
 
     #[inline(never)]
     fn eval_method_call(&mut self, target: &Expr, method_name: &str, args: &[Expr]) -> Result<Value, String> {
+        if let Expr::Variable(v) = target {
+            if v == "أصل" || v == "الأصل" {
+                let self_val = self.get_variable("هذا").map_err(|_| "لا يمكن استخدام 'أصل' خارج طريقة صنف".to_string())?;
+                let owner_class = match self.get_variable("__class_owner") {
+                    Ok(Value::Text(s)) => s,
+                    _ => match &self_val {
+                        Value::Instance { class_name, .. } => class_name.clone(),
+                        _ => return Err("لا يمكن استخدام 'أصل' خارج كائن".into()),
+                    },
+                };
+                let cdef = self.classes.get(&owner_class).ok_or_else(|| format!("تعريف الصنف '{}' غير موجود", owner_class))?;
+                let parent_name = cdef.parent.clone().ok_or_else(|| format!("الصنف '{}' لا يرث من أي صنف أب", owner_class))?;
+                let mut evaluated_args = Vec::with_capacity(args.len());
+                for a in args {
+                    evaluated_args.push(self.eval(a)?);
+                }
+                let (found_owner, method) = if method_name == "بناء" || method_name == "إنشاء" || method_name == "تهيئة" {
+                    self.find_class_constructor(&parent_name)?.ok_or_else(|| format!("الصنف الأب '{}' لا يملك دالة بناء", parent_name))?
+                } else {
+                    self.find_class_method(&parent_name, method_name)?.ok_or_else(|| format!("الطريقة '{}' غير معرفة في الصنف الأب '{}'", method_name, parent_name))?
+                };
+                return self.invoke_method(self_val, &found_owner, &method, evaluated_args);
+            }
+        }
+
         let obj = self.eval(target)?;
         let mut evaluated_args = Vec::with_capacity(args.len());
         for a in args {
@@ -476,44 +652,16 @@ impl Interpreter {
 
         match obj {
             Value::Instance { class_name, fields } => {
-                let class_def = match self.classes.get(&class_name).cloned() {
-                    Some(c) => c,
-                    None => return Err(format!("تعريف الصنف '{}' غير موجود", class_name)),
-                };
-                let method = match class_def.methods.iter().find(|m| &m.name == method_name).cloned() {
-                    Some(m) => m,
+                let (owner_class, method) = match self.find_class_method(&class_name, method_name)? {
+                    Some(found) => found,
                     None => {
-                        let method_names: Vec<&str> = class_def.methods.iter().map(|m| m.name.as_str()).collect();
+                        let all_names = self.collect_class_method_names(&class_name);
+                        let method_names: Vec<&str> = all_names.iter().map(|s| s.as_str()).collect();
                         return Err(crate::diagnostics::suggest_function_error(method_name, &method_names));
                     }
                 };
-                if method.params.len() != evaluated_args.len() {
-                    return Err(format!("الطريقة '{}.{}' تتوقع {} معاملات، استلمت {}",
-                        class_name, method_name, method.params.len(), evaluated_args.len()));
-                }
-                if self.call_depth >= MAX_CALL_DEPTH {
-                    return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
-                }
-                let mut local = HashMap::new();
-                let self_val = Value::Instance { class_name: class_name.clone(), fields: fields.clone() };
-                local.insert("هذا".to_string(), self_val.clone());
-                local.insert("ذاتي".to_string(), self_val);
-                for (param, arg) in method.params.iter().zip(evaluated_args) {
-                    local.insert(param.clone(), arg);
-                }
-                let globals = self.scopes[0].clone();
-                let previous_scopes = std::mem::replace(&mut self.scopes, vec![globals, local]);
-                self.call_depth += 1;
-                let result = self.execute_statements(&method.body, false);
-                self.call_depth -= 1;
-                let updated_globals = self.scopes[0].clone();
-                self.scopes = previous_scopes;
-                self.scopes[0] = updated_globals;
-                match result? {
-                    Flow::Return(value) => Ok(value),
-                    Flow::Next => Ok(Value::Null),
-                    Flow::Break | Flow::Continue => Err("تحكم حلقة خارج الحلقة في الطريقة".into()),
-                }
+                let self_val = Value::Instance { class_name, fields };
+                self.invoke_method(self_val, &owner_class, &method, evaluated_args)
             }
             Value::Text(text) => {
                 match method_name {
@@ -571,6 +719,40 @@ impl Interpreter {
                         }
                         Ok(Value::Number(sum))
                     }
+                    "طبّق" | "طبق" if evaluated_args.len() == 1 => match &evaluated_args[0] {
+                        Value::Lambda { params, body, captured } => {
+                            let mut mapped = Vec::with_capacity(items.len());
+                            for item in items {
+                                mapped.push(self.invoke_lambda(params, body, captured, vec![item])?);
+                            }
+                            Ok(Value::List(mapped))
+                        }
+                        _ => Err("طريقة طبّق تتطلب دالة كمعامل".into()),
+                    },
+                    "رشّح" | "رشح" if evaluated_args.len() == 1 => match &evaluated_args[0] {
+                        Value::Lambda { params, body, captured } => {
+                            let mut filtered = Vec::new();
+                            for item in items {
+                                match self.invoke_lambda(params, body, captured, vec![item.clone()])? {
+                                    Value::Bool(true) => filtered.push(item),
+                                    Value::Bool(false) => {}
+                                    _ => return Err("دالة الترشيح في رشّح يجب أن ترجع قيمة منطقية".into()),
+                                }
+                            }
+                            Ok(Value::List(filtered))
+                        }
+                        _ => Err("طريقة رشّح تتطلب دالة كمعامل".into()),
+                    },
+                    "اختزل" if evaluated_args.len() == 2 => match &evaluated_args[1] {
+                        Value::Lambda { params, body, captured } => {
+                            let mut acc = evaluated_args[0].clone();
+                            for item in items {
+                                acc = self.invoke_lambda(params, body, captured, vec![acc, item])?;
+                            }
+                            Ok(acc)
+                        }
+                        _ => Err("طريقة اختزل تتطلب قيمة ابتدائية ودالة ثنائية".into()),
+                    },
                     _ => Err(format!("الطريقة '{}' غير مدعومة للقوائم", method_name)),
                 }
             }
@@ -630,41 +812,32 @@ impl Interpreter {
     }
 
     fn call(&mut self, name: &str, args: &[Expr]) -> Result<Value, String> {
-        if let Some(class_def) = self.classes.get(name).cloned() {
+        if self.classes.contains_key(name) {
             let instance = Value::Instance {
                 class_name: name.to_string(),
                 fields: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
             };
-            if let Some(ctor) = class_def.methods.iter().find(|m| m.name == "بناء" || m.name == "إنشاء" || m.name == "تهيئة").cloned() {
+            if let Some((owner_class, ctor)) = self.find_class_constructor(name)? {
                 if args.len() != ctor.params.len() {
                     return Err(format!("دالة بناء الصنف '{}' تتوقع {} معاملات، استلمت {}",
                         name, ctor.params.len(), args.len()));
                 }
-                if self.call_depth >= MAX_CALL_DEPTH {
-                    return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
+                let mut evaluated_args = Vec::with_capacity(args.len());
+                for arg in args {
+                    evaluated_args.push(self.eval(arg)?);
                 }
-                let mut local = HashMap::new();
-                local.insert("هذا".to_string(), instance.clone());
-                local.insert("ذاتي".to_string(), instance.clone());
-                for (param, arg) in ctor.params.iter().zip(args) {
-                    local.insert(param.clone(), self.eval(arg)?);
-                }
-                let globals = self.scopes[0].clone();
-                let previous_scopes = std::mem::replace(&mut self.scopes, vec![globals, local]);
-                self.call_depth += 1;
-                let result = self.execute_statements(&ctor.body, false);
-                self.call_depth -= 1;
-                let updated_globals = self.scopes[0].clone();
-                self.scopes = previous_scopes;
-                self.scopes[0] = updated_globals;
-                match result? {
-                    Flow::Return(_) | Flow::Next => {},
-                    Flow::Break | Flow::Continue => return Err("تحكم حلقة خارج الحلقة في دالة البناء".into()),
-                }
+                self.invoke_method(instance.clone(), &owner_class, &ctor, evaluated_args)?;
             } else if !args.is_empty() {
                 return Err(format!("الصنف '{}' ليس له دالة بناء تقبل معاملات", name));
             }
             return Ok(instance);
+        }
+        if let Some(Value::Lambda { params, body, captured }) = self.scopes.iter().rev().find_map(|s| s.get(name)).cloned() {
+            let mut evaluated_args = Vec::with_capacity(args.len());
+            for arg in args {
+                evaluated_args.push(self.eval(arg)?);
+            }
+            return self.invoke_lambda(&params, &body, &captured, evaluated_args);
         }
         if !self.functions.contains_key(name) && is_builtin(name) {
             let mut values = Vec::with_capacity(args.len());
@@ -681,31 +854,11 @@ impl Interpreter {
                 return Err(crate::diagnostics::suggest_function_error(name, &func_names));
             }
         };
-        if args.len() != function.params.len() {
-            return Err(format!("الدالة '{}' تتوقع {} معاملات، استلمت {}",
-                name, function.params.len(), args.len()));
+        let mut evaluated_args = Vec::with_capacity(args.len());
+        for arg in args {
+            evaluated_args.push(self.eval(arg)?);
         }
-        if self.call_depth >= MAX_CALL_DEPTH {
-            return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
-        }
-        let mut local = HashMap::new();
-        for (param, arg) in function.params.iter().zip(args) {
-            local.insert(param.clone(), self.eval(arg)?);
-        }
-        // Local variables of the caller are invisible; globals are visible and writable.
-        let globals = self.scopes[0].clone();
-        let previous_scopes = std::mem::replace(&mut self.scopes, vec![globals, local]);
-        self.call_depth += 1;
-        let result = self.execute_statements(&function.body, false);
-        self.call_depth -= 1;
-        let updated_globals = self.scopes[0].clone();
-        self.scopes = previous_scopes;
-        self.scopes[0] = updated_globals;
-        match result? {
-            Flow::Return(value) => Ok(value),
-            Flow::Next => Ok(Value::Null),
-            Flow::Break | Flow::Continue => Err("تحكم حلقة خارج الحلقة في الدالة".into()),
-        }
+        self.invoke_lambda(&function.params, &function.body, &[], evaluated_args)
     }
 }
 
@@ -742,7 +895,9 @@ fn is_builtin(name: &str) -> bool {
         "ادخل" | "ملف_موجود" | "ألحق_ملف" | "الحق_ملف" | "الآن" | "الان" | "عدد_صحيح" |
         "عشوائي" | "عدد_عشوائي" | "عنصر_عشوائي" |
         "بيئة" | "بيئه" | "وسائط" |
-        "تحليل_json" | "ترميز_json" | "تنسيق")
+        "تحليل_json" | "ترميز_json" | "تنسيق" |
+        "مجلد_موجود" | "أنشئ_مجلد" | "انشئ_مجلد" | "قائمة_ملفات" | "احذف_ملف" | "مسار_حالي" |
+        "اطلب_ويب" | "جلب_ويب")
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -834,6 +989,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 Value::List(_) => "قائمة".to_string(),
                 Value::Map(_) => "قاموس".to_string(),
                 Value::Instance { class_name, .. } => class_name.clone(),
+                Value::Lambda { .. } => "دالة".to_string(),
             };
             Ok(Value::Text(kind))
         }
@@ -1315,9 +1471,126 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 _ => Err("تنسيق تتطلب نص قالب وقائمة بالقيم".into()),
             }
         }
+        "مجلد_موجود" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(path) => Ok(Value::Bool(std::path::Path::new(path).is_dir())),
+                _ => Err("مجلد_موجود تتطلب مساراً نصياً".into()),
+            }
+        }
+        "أنشئ_مجلد" | "انشئ_مجلد" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(path) => {
+                    std::fs::create_dir_all(path)
+                        .map_err(|e| format!("تعذر إنشاء المجلد '{}': {}", path, e))?;
+                    Ok(Value::Bool(true))
+                }
+                _ => Err("أنشئ_مجلد تتطلب مساراً نصياً".into()),
+            }
+        }
+        "قائمة_ملفات" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(path) => {
+                    let entries = std::fs::read_dir(path)
+                        .map_err(|e| format!("تعذر قراءة محتويات المجلد '{}': {}", path, e))?;
+                    let mut names = Vec::new();
+                    for entry in entries {
+                        let entry = entry.map_err(|e| format!("خطأ أثناء قراءة مدخل المجلد: {}", e))?;
+                        if let Some(name_str) = entry.file_name().to_str() {
+                            names.push(name_str.to_string());
+                        }
+                    }
+                    names.sort();
+                    Ok(Value::List(names.into_iter().map(Value::Text).collect()))
+                }
+                _ => Err("قائمة_ملفات تتطلب مساراً نصياً".into()),
+            }
+        }
+        "احذف_ملف" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(path) => {
+                    std::fs::remove_file(path)
+                        .map_err(|e| format!("تعذر حذف الملف '{}': {}", path, e))?;
+                    Ok(Value::Bool(true))
+                }
+                _ => Err("احذف_ملف تتطلب مساراً نصياً".into()),
+            }
+        }
+        "مسار_حالي" => {
+            require_args(name, &args, 0)?;
+            let dir = std::env::current_dir()
+                .map_err(|e| format!("تعذر معرفة المسار الحالي: {}", e))?;
+            Ok(Value::Text(dir.to_string_lossy().into_owned()))
+        }
+        "اطلب_ويب" | "جلب_ويب" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(url) => http_get(url),
+                _ => Err("اطلب_ويب تتطلب رابطاً نصياً (URL)".into()),
+            }
+        }
         _ => {
             let empty: Vec<&str> = Vec::new();
             Err(crate::diagnostics::suggest_function_error(name, &empty))
         }
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn http_get(url: &str) -> Result<Value, String> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+
+    let stripped = if let Some(s) = url.strip_prefix("http://") {
+        s
+    } else if url.starts_with("https://") {
+        return Err("اطلب_ويب المدمجة بدون مكتبات خارجية تدعم بروتوكول http:// المباشر؛ لبروتوكول https استخدم خادم وكيل محلي".into());
+    } else {
+        url
+    };
+
+    let (host_port, path) = match stripped.find('/') {
+        Some(idx) => (&stripped[..idx], &stripped[idx..]),
+        None => (stripped, "/"),
+    };
+
+    let addr = if host_port.contains(':') {
+        host_port.to_string()
+    } else {
+        format!("{}:80", host_port)
+    };
+
+    let host_only = host_port.split(':').next().unwrap_or(host_port);
+
+    let mut stream = TcpStream::connect(&addr)
+        .map_err(|e| format!("تعذر الاتصال بالخادم '{}': {}", addr, e))?;
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: Lisan/1.0\r\nConnection: close\r\n\r\n",
+        path, host_only
+    );
+    stream.write_all(request.as_bytes())
+        .map_err(|e| format!("فشل إرسال طلب الشبكة: {}", e))?;
+
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response)
+        .map_err(|e| format!("فشل قراءة استجابة الشبكة: {}", e))?;
+
+    let text = String::from_utf8_lossy(&response);
+    if let Some(idx) = text.find("\r\n\r\n") {
+        Ok(Value::Text(text[idx + 4..].to_string()))
+    } else if let Some(idx) = text.find("\n\n") {
+        Ok(Value::Text(text[idx + 2..].to_string()))
+    } else {
+        Ok(Value::Text(text.into_owned()))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn http_get(_url: &str) -> Result<Value, String> {
+    Err("اطلب_ويب عبر المقابس المباشرة غير متاحة داخل WebAssembly".into())
 }

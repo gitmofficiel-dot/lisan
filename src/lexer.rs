@@ -2,9 +2,9 @@
 pub enum TokenKind {
     Let, Print, If, Else, While, ForEach, In, Function, Return, Import, Break, Continue, True, False, Null,
     Try, Catch, Finally, Throw, Match, Case, Default,
-    Class, New,
+    Class, New, Extends,
     Identifier(String), Number(f64), String(String),
-    LeftParen, RightParen, LeftBrace, RightBrace, LeftBracket, RightBracket, Comma, Colon, Semicolon, Dot,
+    LeftParen, RightParen, LeftBrace, RightBrace, LeftBracket, RightBracket, Comma, Colon, Semicolon, Dot, FatArrow,
     Plus, Minus, Star, Power, Slash, Percent,
     Equal, EqualEqual, Bang, BangEqual,
     Less, LessEqual, Greater, GreaterEqual, AndAnd, OrOr, Eof,
@@ -66,6 +66,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
             '/' => TokenKind::Slash,
             '%' => TokenKind::Percent,
             '=' if chars.get(i + 1) == Some(&'=') => { i += 1; column += 1; TokenKind::EqualEqual }
+            '=' if chars.get(i + 1) == Some(&'>') => { i += 1; column += 1; TokenKind::FatArrow }
             '=' => TokenKind::Equal,
             '!' if chars.get(i + 1) == Some(&'=') => { i += 1; column += 1; TokenKind::BangEqual }
             '!' => TokenKind::Bang,
@@ -182,6 +183,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
                     "حالة" => TokenKind::Case,
                     "افتراضي" => TokenKind::Default,
                     "صنف" | "فئة" | "هيكل" => TokenKind::Class,
+                    "يرث" | "يمتد" => TokenKind::Extends,
                     "جديد" => TokenKind::New,
                     _ => TokenKind::Identifier(word),
                 }

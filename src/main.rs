@@ -4,11 +4,31 @@ use std::env;
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 0.9.2 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
+        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
         return;
     }
     if args.len() == 1 && (args[0] == "-V" || args[0] == "--version") {
-        println!("لسان 0.9.2");
+        println!("لسان 1.0.0");
+        return;
+    }
+    if !args.is_empty() && args[0] == "--init" {
+        let project_name = if args.len() >= 2 { &args[1] } else { "مشروع_لسان" };
+        if let Err(err) = init_project(project_name) {
+            eprintln!("خطأ في تهيئة المشروع: {}", err);
+            std::process::exit(1);
+        }
+        return;
+    }
+    if !args.is_empty() && args[0] == "--web" {
+        let port: u16 = if args.len() >= 2 {
+            args[1].parse().unwrap_or(8080)
+        } else {
+            8080
+        };
+        if let Err(err) = serve_web_playground(port) {
+            eprintln!("خطأ في تشغيل خادم الويب: {}", err);
+            std::process::exit(1);
+        }
         return;
     }
     if args.len() >= 2 && (args[0] == "--native" || args[0] == "--emit-llvm") {
@@ -125,7 +145,7 @@ fn main() {
 
 fn start_repl() {
     use std::io::{self, Write};
-    println!("لسان 0.9.1 (نوفمبر 2026) | الطرفية التفاعلية للغة لسان");
+    println!("لسان 1.0.0 | الطرفية التفاعلية للغة لسان");
     println!("اكتب تعليماتك البرمجية بالعربية واضغط Enter للتنفيذ.");
     println!("اكتب 'خروج' أو 'exit' للإنهاء، أو 'مسح' لإعادة تهيئة المتغيرات.\n");
 
@@ -164,6 +184,90 @@ fn start_repl() {
             }
         }
     }
+}
+
+fn init_project(name: &str) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+
+    let root = Path::new(name);
+    let src_dir = root.join("src");
+    fs::create_dir_all(&src_dir).map_err(|e| format!("تعذّر إنشاء مجلد المشروع: {}", e))?;
+
+    let manifest = format!(
+        "{{\n  \"الاسم\": \"{}\",\n  \"الإصدار\": \"1.0.0\",\n  \"المدخل\": \"src/الرئيسي.lsn\"\n}}\n",
+        name
+    );
+    fs::write(root.join("lisan.json"), manifest)
+        .map_err(|e| format!("تعذّر إنشاء ملف الإعدادات lisan.json: {}", e))?;
+
+    let main_code = r#"# مشروع لسان جديد
+
+صنف تطبيق {
+    دالة بناء(الاسم) {
+        هذا.الاسم = الاسم
+    }
+
+    دالة ابدأ() {
+        اطبع(تنسيق("مرحباً بك في {}!", هذا.الاسم))
+    }
+}
+
+دع ت = جديد تطبيق("مشروعي الأول بلغة لسان")
+ت.ابدأ()
+"#;
+    fs::write(src_dir.join("الرئيسي.lsn"), main_code)
+        .map_err(|e| format!("تعذّر إنشاء الملف الرئيسي: {}", e))?;
+
+    println!("تم إنشاء مشروع لسان بنجاح في: {}", root.display());
+    println!("لتشغيل المشروع:\n  lisan --interpret {}/src/الرئيسي.lsn", name);
+    Ok(())
+}
+
+fn serve_web_playground(port: u16) -> Result<(), String> {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    let addr = format!("127.0.0.1:{}", port);
+    let listener = TcpListener::bind(&addr)
+        .map_err(|e| format!("تعذّر حجز المنفذ {}: {}", addr, e))?;
+
+    println!("بيئة لسان التفاعلية تعمل على: http://{}", addr);
+    println!("اضغط Ctrl+C لإيقاف الخادم.");
+
+    for stream in listener.incoming().flatten() {
+        let mut stream = stream;
+        let mut buf = [0u8; 4096];
+        let n = stream.read(&mut buf).unwrap_or(0);
+        if n == 0 {
+            continue;
+        }
+        let req = String::from_utf8_lossy(&buf[..n]);
+        let path = req
+            .lines()
+            .next()
+            .and_then(|line| line.split_whitespace().nth(1))
+            .unwrap_or("/");
+
+        let (content_type, body) = if path == "/lisan.wasm" {
+            let wasm = std::fs::read("web/lisan.wasm").unwrap_or_default();
+            ("application/wasm", wasm)
+        } else {
+            let html = std::fs::read("web/index.html").unwrap_or_else(|_| {
+                b"<h1>Lisan 1.0.0 Web Playground</h1>".to_vec()
+            });
+            ("text/html; charset=utf-8", html)
+        };
+
+        let header = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            content_type,
+            body.len()
+        );
+        let _ = stream.write_all(header.as_bytes());
+        let _ = stream.write_all(&body);
+    }
+    Ok(())
 }
 
 fn execute(interpreter: &mut Interpreter, source: &str) {

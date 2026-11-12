@@ -51,6 +51,7 @@ fn emit_expr(expr: &Expr) -> String {
         Expr::GetProperty(target, prop) => format!("Expr::GetProperty({}, {})", boxed(target), str_value(prop)),
         Expr::SetProperty(target, prop, expr) => format!("Expr::SetProperty({}, {}, {})", boxed(target), str_value(prop), boxed(expr)),
         Expr::MethodCall(target, method, args) => format!("Expr::MethodCall({}, {}, {})", boxed(target), str_value(method), vec_expr(args, emit_expr)),
+        Expr::Lambda(params, body) => format!("Expr::Lambda({}, {})", vec_expr(params, |s| str_value(s)), vec_expr(body, emit_stmt)),
     }
 }
 fn emit_function(f: &Function) -> String {
@@ -70,7 +71,10 @@ fn emit_stmt(stmt: &Stmt) -> String {
         Stmt::While(cond, body) => format!("Stmt::While({}, {})", emit_expr(cond), vec_expr(body, emit_stmt)),
         Stmt::ForEach(name, expr, body) => format!("Stmt::ForEach({}, {}, {})", str_value(name), emit_expr(expr), vec_expr(body, emit_stmt)),
         Stmt::Function(fun) => format!("Stmt::Function({})", emit_function(fun)),
-        Stmt::Class(c) => format!("Stmt::Class(ClassDef {{ name: {}, methods: {} }})", str_value(&c.name), vec_expr(&c.methods, emit_function)),
+        Stmt::Class(c) => {
+            let p = match &c.parent { None => "None".to_string(), Some(parent) => format!("Some({})", str_value(parent)) };
+            format!("Stmt::Class(ClassDef {{ name: {}, parent: {}, methods: {} }})", str_value(&c.name), p, vec_expr(&c.methods, emit_function))
+        }
         Stmt::Return(opt) => match opt {
             Some(e) => format!("Stmt::Return(Some({}))", emit_expr(e)),
             None => "Stmt::Return(None)".into(),

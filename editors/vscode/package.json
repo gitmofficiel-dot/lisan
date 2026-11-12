@@ -1,15 +1,36 @@
 {
-  "name": "lisan-language-support",
-  "displayName": "Lisan (لسان) Language Support",
-  "description": "تمييز الشيفرة العربية وملفات .lsn في Visual Studio Code",
-  "version": "0.1.0",
-  "publisher": "lisan-community",
-  "private": true,
-  "engines": {"vscode": "^1.85.0"},
-  "categories": ["Programming Languages"],
+  "name": "lisan-arabic-lang",
+  "displayName": "Lisan (لسان) - لغة البرمجة العربية",
+  "description": "دعم التلوين النحوي وإعدادات المحرر للغة البرمجة العربية لسان (.lsn)",
+  "version": "1.0.0",
+  "publisher": "lisan-lang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
   "contributes": {
-    "languages": [{"id": "lisan", "aliases": ["لسان", "Lisan"], "extensions": [".lsn"], "configuration": "./language-configuration.json"}],
-    "grammars": [{"language": "lisan", "scopeName": "source.lisan", "path": "./syntaxes/lisan.tmLanguage.json"}],
-    "snippets": [{"language": "lisan", "path": "./snippets/lisan.json"}]
+    "languages": [
+      {
+        "id": "lisan",
+        "aliases": [
+          "Lisan",
+          "لسان",
+          "lisan"
+        ],
+        "extensions": [
+          ".lsn"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lisan",
+        "scopeName": "source.lisan",
+        "path": "./syntaxes/lisan.tmLanguage.json"
+      }
+    ]
   }
 }

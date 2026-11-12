@@ -261,6 +261,9 @@ fn serialize_value(value: &Value, out: &mut String) -> Result<(), String> {
             }
             out.push('}');
         }
+        Value::Lambda { .. } => {
+            return Err("لا يمكن تحويل دالة مجهولة إلى JSON".into());
+        }
     }
     Ok(())
 }

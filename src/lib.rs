@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod bundle;
+pub mod bytecode;
 pub mod diagnostics;
 pub mod json;
 pub mod lexer;
@@ -7,6 +8,7 @@ pub mod modules;
 pub mod native;
 pub mod parser;
 pub mod runtime;
+pub mod vm;
 pub mod wasm;
 
 pub use runtime::{Interpreter, Value};

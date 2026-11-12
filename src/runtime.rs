@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 const MAX_STEPS: usize = 250_000;
-const MAX_CALL_DEPTH: usize = 128;
+const MAX_CALL_DEPTH: usize = 64;
 const MAX_LIST_SIZE: usize = 10_000;
 
 /// Flow through nested statements; loops consume Break/Continue, functions consume Return.
@@ -23,6 +23,10 @@ pub enum Value {
     Null,
     List(Vec<Value>),
     Map(Vec<(String, Value)>),
+    Instance {
+        class_name: String,
+        fields: std::rc::Rc<std::cell::RefCell<Vec<(String, Value)>>>,
+    },
 }
 
 impl fmt::Display for Value {
@@ -33,6 +37,15 @@ impl fmt::Display for Value {
             Value::Bool(true) => write!(f, "صحيح"),
             Value::Bool(false) => write!(f, "خطأ"),
             Value::Null => write!(f, "لاشيء"),
+            Value::Instance { class_name, fields } => {
+                write!(f, "{} {{", class_name)?;
+                let borrowed = fields.borrow();
+                for (i, (key, value)) in borrowed.iter().enumerate() {
+                    if i > 0 { write!(f, "، ")?; }
+                    write!(f, "{}: {}", key, value)?;
+                }
+                write!(f, "}}")
+            }
             Value::Map(pairs) => {
                 write!(f, "{{")?;
                 for (i, (key, value)) in pairs.iter().enumerate() {
@@ -61,8 +74,9 @@ impl fmt::Display for Value {
 }
 
 pub struct Interpreter {
-    scopes: Vec<HashMap<String, Value>>,
-    functions: HashMap<String, Function>,
+    pub scopes: Vec<HashMap<String, Value>>,
+    pub functions: HashMap<String, Function>,
+    pub classes: HashMap<String, crate::ast::ClassDef>,
     output: Vec<String>,
     steps: usize,
     call_depth: usize,
@@ -73,6 +87,7 @@ impl Default for Interpreter {
         Self {
             scopes: vec![HashMap::new()],
             functions: HashMap::new(),
+            classes: HashMap::new(),
             output: Vec::new(),
             steps: 0,
             call_depth: 0,
@@ -181,6 +196,7 @@ impl Interpreter {
                 }
             }
             Stmt::Function(f) => { self.functions.insert(f.name.clone(), f.clone()); }
+            Stmt::Class(c) => { self.classes.insert(c.name.clone(), c.clone()); }
             Stmt::Return(expr) => {
                 let value = match expr { Some(expr) => self.eval(expr)?, None => Value::Null };
                 return Ok(Flow::Return(value));
@@ -248,6 +264,9 @@ impl Interpreter {
         }
         for f in self.functions.keys() {
             available.push(f.as_str());
+        }
+        for c in self.classes.keys() {
+            available.push(c.as_str());
         }
         Err(crate::diagnostics::suggest_variable_error(name, &available))
     }
@@ -317,7 +336,17 @@ impl Interpreter {
                             Err(crate::diagnostics::suggest_dict_key_error(&key, &available_keys))
                         }
                     }
-                    _ => Err("الفهرسة تتطلب قائمة أو نصًا أو قاموسًا".into()),
+                    Value::Instance { class_name: _, ref fields } => {
+                        let key = checked_key(key)?;
+                        let borrowed = fields.borrow();
+                        if let Some((_, value)) = borrowed.iter().find(|(k, _)| k == &key) {
+                            Ok(value.clone())
+                        } else {
+                            let available_keys: Vec<&str> = borrowed.iter().map(|(k, _)| k.as_str()).collect();
+                            Err(crate::diagnostics::suggest_dict_key_error(&key, &available_keys))
+                        }
+                    }
+                    _ => Err("الفهرسة تتطلب قائمة أو نصًا أو قاموسًا أو كائنًا".into()),
                 }
             }
             Expr::AssignIndex(name, index, expr) => {
@@ -342,6 +371,16 @@ impl Interpreter {
                                 } else {
                                     if items.len() >= MAX_LIST_SIZE { return Err("القاموس تجاوز الحد الأقصى".into()); }
                                     items.push((key, value.clone()));
+                                }
+                                Ok(value)
+                            }
+                            Value::Instance { fields, .. } => {
+                                let key = checked_key(key)?;
+                                let mut borrowed = fields.borrow_mut();
+                                if let Some((_, existing)) = borrowed.iter_mut().find(|(name, _)| name == &key) {
+                                    *existing = value.clone();
+                                } else {
+                                    borrowed.push((key, value.clone()));
                                 }
                                 Ok(value)
                             }
@@ -375,6 +414,179 @@ impl Interpreter {
                 self.binary(lhs, *op, rhs)
             }
             Expr::Call(name, args) => self.call(name, args),
+            Expr::GetProperty(target, prop) => self.eval_get_property(target, prop),
+            Expr::SetProperty(target, prop, expr) => self.eval_set_property(target, prop, expr),
+            Expr::MethodCall(target, method_name, args) => self.eval_method_call(target, method_name, args),
+        }
+    }
+
+    #[inline(never)]
+    fn eval_get_property(&mut self, target: &Expr, prop: &str) -> Result<Value, String> {
+        let value = self.eval(target)?;
+        match value {
+            Value::Instance { class_name: _, ref fields } => {
+                let borrowed = fields.borrow();
+                if let Some((_, val)) = borrowed.iter().find(|(k, _)| k == prop) {
+                    return Ok(val.clone());
+                }
+                let available: Vec<&str> = borrowed.iter().map(|(k, _)| k.as_str()).collect();
+                Err(crate::diagnostics::suggest_dict_key_error(prop, &available))
+            }
+            Value::Text(ref text) => match prop {
+                "طول" => Ok(Value::Number(text.chars().count() as f64)),
+                _ => Err(format!("خاصية '{}' غير معروفة للنصوص", prop)),
+            },
+            Value::List(ref items) => match prop {
+                "طول" => Ok(Value::Number(items.len() as f64)),
+                _ => Err(format!("خاصية '{}' غير معروفة للقوائم", prop)),
+            },
+            Value::Map(ref pairs) => match prop {
+                "طول" | "حجم" => Ok(Value::Number(pairs.len() as f64)),
+                _ => Err(format!("خاصية '{}' غير معروفة للقواميس", prop)),
+            },
+            _ => Err("الوصول للخصائص عبر '.' يتطلب كائنًا أو بنية بيانات".into()),
+        }
+    }
+
+    #[inline(never)]
+    fn eval_set_property(&mut self, target: &Expr, prop: &str, expr: &Expr) -> Result<Value, String> {
+        let obj = self.eval(target)?;
+        let new_val = self.eval(expr)?;
+        match obj {
+            Value::Instance { fields, .. } => {
+                let mut borrowed = fields.borrow_mut();
+                if let Some((_, val)) = borrowed.iter_mut().find(|(k, _)| k == prop) {
+                    *val = new_val.clone();
+                } else {
+                    borrowed.push((prop.to_string(), new_val.clone()));
+                }
+                Ok(new_val)
+            }
+            _ => Err("إسناد الخصائص عبر '.' يتطلب كائنًا".into()),
+        }
+    }
+
+    #[inline(never)]
+    fn eval_method_call(&mut self, target: &Expr, method_name: &str, args: &[Expr]) -> Result<Value, String> {
+        let obj = self.eval(target)?;
+        let mut evaluated_args = Vec::with_capacity(args.len());
+        for a in args {
+            evaluated_args.push(self.eval(a)?);
+        }
+
+        match obj {
+            Value::Instance { class_name, fields } => {
+                let class_def = match self.classes.get(&class_name).cloned() {
+                    Some(c) => c,
+                    None => return Err(format!("تعريف الصنف '{}' غير موجود", class_name)),
+                };
+                let method = match class_def.methods.iter().find(|m| &m.name == method_name).cloned() {
+                    Some(m) => m,
+                    None => {
+                        let method_names: Vec<&str> = class_def.methods.iter().map(|m| m.name.as_str()).collect();
+                        return Err(crate::diagnostics::suggest_function_error(method_name, &method_names));
+                    }
+                };
+                if method.params.len() != evaluated_args.len() {
+                    return Err(format!("الطريقة '{}.{}' تتوقع {} معاملات، استلمت {}",
+                        class_name, method_name, method.params.len(), evaluated_args.len()));
+                }
+                if self.call_depth >= MAX_CALL_DEPTH {
+                    return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
+                }
+                let mut local = HashMap::new();
+                let self_val = Value::Instance { class_name: class_name.clone(), fields: fields.clone() };
+                local.insert("هذا".to_string(), self_val.clone());
+                local.insert("ذاتي".to_string(), self_val);
+                for (param, arg) in method.params.iter().zip(evaluated_args) {
+                    local.insert(param.clone(), arg);
+                }
+                let globals = self.scopes[0].clone();
+                let previous_scopes = std::mem::replace(&mut self.scopes, vec![globals, local]);
+                self.call_depth += 1;
+                let result = self.execute_statements(&method.body, false);
+                self.call_depth -= 1;
+                let updated_globals = self.scopes[0].clone();
+                self.scopes = previous_scopes;
+                self.scopes[0] = updated_globals;
+                match result? {
+                    Flow::Return(value) => Ok(value),
+                    Flow::Next => Ok(Value::Null),
+                    Flow::Break | Flow::Continue => Err("تحكم حلقة خارج الحلقة في الطريقة".into()),
+                }
+            }
+            Value::Text(text) => {
+                match method_name {
+                    "طول" if evaluated_args.is_empty() => Ok(Value::Number(text.chars().count() as f64)),
+                    "تحتوي" if evaluated_args.len() == 1 => match &evaluated_args[0] {
+                        Value::Text(sub) => Ok(Value::Bool(text.contains(sub))),
+                        _ => Err("طريقة تحتوي تتطلب نصاً للبحث".into()),
+                    },
+                    "تقسيم" if evaluated_args.len() == 1 => match &evaluated_args[0] {
+                        Value::Text(delim) => {
+                            let parts: Vec<Value> = text.split(delim).map(|s| Value::Text(s.to_string())).collect();
+                            Ok(Value::List(parts))
+                        }
+                        _ => Err("طريقة تقسيم تتطلب فاصلاً نصياً".into()),
+                    },
+                    "عكس" if evaluated_args.is_empty() => Ok(Value::Text(text.chars().rev().collect())),
+                    "أحرف_كبيرة" if evaluated_args.is_empty() => Ok(Value::Text(text.to_uppercase())),
+                    "أحرف_صغيرة" if evaluated_args.is_empty() => Ok(Value::Text(text.to_lowercase())),
+                    "استبدل" | "أعد" if evaluated_args.len() == 2 => match (&evaluated_args[0], &evaluated_args[1]) {
+                        (Value::Text(from), Value::Text(to)) => Ok(Value::Text(text.replace(from, to))),
+                        _ => Err("طريقة استبدل تتطلب نصين (القديم والجديد)".into()),
+                    },
+                    _ => Err(format!("الطريقة '{}' غير مدعومة للنصوص", method_name)),
+                }
+            }
+            Value::List(items) => {
+                match method_name {
+                    "طول" if evaluated_args.is_empty() => Ok(Value::Number(items.len() as f64)),
+                    "أضف" | "اضف" if evaluated_args.len() == 1 => {
+                        let mut updated = items.clone();
+                        updated.push(evaluated_args[0].clone());
+                        Ok(Value::List(updated))
+                    }
+                    "عكس" if evaluated_args.is_empty() => {
+                        let mut rev = items.clone();
+                        rev.reverse();
+                        Ok(Value::List(rev))
+                    }
+                    "فرز" if evaluated_args.is_empty() => {
+                        let mut sorted = items.clone();
+                        sorted.sort_by(|a, b| match (a, b) {
+                            (Value::Number(x), Value::Number(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
+                            (Value::Text(x), Value::Text(y)) => x.cmp(y),
+                            _ => std::cmp::Ordering::Equal,
+                        });
+                        Ok(Value::List(sorted))
+                    }
+                    "مجموع" if evaluated_args.is_empty() => {
+                        let mut sum = 0.0;
+                        for it in &items {
+                            match it {
+                                Value::Number(n) => sum += n,
+                                _ => return Err("طريقة مجموع تتطلب قائمة أرقام".into()),
+                            }
+                        }
+                        Ok(Value::Number(sum))
+                    }
+                    _ => Err(format!("الطريقة '{}' غير مدعومة للقوائم", method_name)),
+                }
+            }
+            Value::Map(pairs) => {
+                match method_name {
+                    "طول" | "حجم" if evaluated_args.is_empty() => Ok(Value::Number(pairs.len() as f64)),
+                    "مفاتيح" if evaluated_args.is_empty() => {
+                        Ok(Value::List(pairs.iter().map(|(k, _)| Value::Text(k.clone())).collect()))
+                    }
+                    "قيم" if evaluated_args.is_empty() => {
+                        Ok(Value::List(pairs.iter().map(|(_, v)| v.clone()).collect()))
+                    }
+                    _ => Err(format!("الطريقة '{}' غير مدعومة للقواميس", method_name)),
+                }
+            }
+            _ => Err(format!("لا يمكن استدعاء الطريقة '{}' على هذا النوع", method_name)),
         }
     }
 
@@ -418,6 +630,42 @@ impl Interpreter {
     }
 
     fn call(&mut self, name: &str, args: &[Expr]) -> Result<Value, String> {
+        if let Some(class_def) = self.classes.get(name).cloned() {
+            let instance = Value::Instance {
+                class_name: name.to_string(),
+                fields: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+            };
+            if let Some(ctor) = class_def.methods.iter().find(|m| m.name == "بناء" || m.name == "إنشاء" || m.name == "تهيئة").cloned() {
+                if args.len() != ctor.params.len() {
+                    return Err(format!("دالة بناء الصنف '{}' تتوقع {} معاملات، استلمت {}",
+                        name, ctor.params.len(), args.len()));
+                }
+                if self.call_depth >= MAX_CALL_DEPTH {
+                    return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
+                }
+                let mut local = HashMap::new();
+                local.insert("هذا".to_string(), instance.clone());
+                local.insert("ذاتي".to_string(), instance.clone());
+                for (param, arg) in ctor.params.iter().zip(args) {
+                    local.insert(param.clone(), self.eval(arg)?);
+                }
+                let globals = self.scopes[0].clone();
+                let previous_scopes = std::mem::replace(&mut self.scopes, vec![globals, local]);
+                self.call_depth += 1;
+                let result = self.execute_statements(&ctor.body, false);
+                self.call_depth -= 1;
+                let updated_globals = self.scopes[0].clone();
+                self.scopes = previous_scopes;
+                self.scopes[0] = updated_globals;
+                match result? {
+                    Flow::Return(_) | Flow::Next => {},
+                    Flow::Break | Flow::Continue => return Err("تحكم حلقة خارج الحلقة في دالة البناء".into()),
+                }
+            } else if !args.is_empty() {
+                return Err(format!("الصنف '{}' ليس له دالة بناء تقبل معاملات", name));
+            }
+            return Ok(instance);
+        }
         if !self.functions.contains_key(name) && is_builtin(name) {
             let mut values = Vec::with_capacity(args.len());
             for arg in args { values.push(self.eval(arg)?); }
@@ -426,7 +674,10 @@ impl Interpreter {
         let function = match self.functions.get(name).cloned() {
             Some(f) => f,
             None => {
-                let func_names: Vec<&str> = self.functions.keys().map(|s| s.as_str()).collect();
+                let mut func_names: Vec<&str> = self.functions.keys().map(|s| s.as_str()).collect();
+                for c in self.classes.keys() {
+                    func_names.push(c.as_str());
+                }
                 return Err(crate::diagnostics::suggest_function_error(name, &func_names));
             }
         };
@@ -569,20 +820,22 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 Value::List(items) => Ok(Value::Number(items.len() as f64)),
                 Value::Text(text) => Ok(Value::Number(text.chars().count() as f64)),
                 Value::Map(items) => Ok(Value::Number(items.len() as f64)),
-                _ => Err("طول يقبل قائمة أو نصًا فقط".into()),
+                Value::Instance { fields, .. } => Ok(Value::Number(fields.borrow().len() as f64)),
+                _ => Err("طول يقبل قائمة أو نصًا أو قاموسًا أو كائنًا".into()),
             }
         }
         "نوع" => {
             require_args(name, &args, 1)?;
-            let kind = match args[0] {
-                Value::Number(_) => "رقم",
-                Value::Text(_) => "نص",
-                Value::Bool(_) => "منطقي",
-                Value::Null => "لاشيء",
-                Value::List(_) => "قائمة",
-                Value::Map(_) => "قاموس",
+            let kind = match &args[0] {
+                Value::Number(_) => "رقم".to_string(),
+                Value::Text(_) => "نص".to_string(),
+                Value::Bool(_) => "منطقي".to_string(),
+                Value::Null => "لاشيء".to_string(),
+                Value::List(_) => "قائمة".to_string(),
+                Value::Map(_) => "قاموس".to_string(),
+                Value::Instance { class_name, .. } => class_name.clone(),
             };
-            Ok(Value::Text(kind.into()))
+            Ok(Value::Text(kind))
         }
         "نص" => {
             require_args(name, &args, 1)?;

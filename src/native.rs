@@ -518,6 +518,7 @@ impl<'a> FunctionWriter<'a> {
                 Ok(())
             }
             Stmt::TryCatch { .. } | Stmt::Throw(_) => Err("معالجة الاستثناءات (حاول/التقط/أخيرًا/ارمِ) غير مدعومة بعد في المترجم الأصلي AOT، وتعمل مع المفسّر".into()),
+            Stmt::Class(_) => Err("الأصناف وهياكل البيانات الكائنية غير مدعومة بعد في مترجم الآلة الأصلي AOT، وتعمل مع المفسّر وآلة البايت كود".into()),
         }
     }
     fn compare_equality(&mut self, a: &Value, b: &Value) -> Result<Value, String> {

@@ -4,11 +4,11 @@ use std::env;
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 0.9.1 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 عرض تعليمات المترجم");
+        println!("لسان 0.9.2 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
         return;
     }
     if args.len() == 1 && (args[0] == "-V" || args[0] == "--version") {
-        println!("لسان 0.9.1");
+        println!("لسان 0.9.2");
         return;
     }
     if args.len() >= 2 && (args[0] == "--native" || args[0] == "--emit-llvm") {
@@ -85,6 +85,18 @@ fn main() {
     }
     if args.len() == 2 && args[0] == "-e" {
         execute(&mut Interpreter::default(), &args[1]);
+        return;
+    }
+    if args.len() == 2 && args[0] == "--vm" {
+        let source = match std::fs::read_to_string(&args[1]) {
+            Ok(s) => s,
+            Err(e) => { eprintln!("تعذرت قراءة الملف: {}", e); std::process::exit(1); }
+        };
+        let mut vm = lisan::vm::VM::new();
+        match vm.run_source(&source) {
+            Ok(lines) => for output in lines { println!("{}", output); },
+            Err(err) => { eprintln!("خطأ VM: {}", err); std::process::exit(1); }
+        }
         return;
     }
     if args.len() == 2 && args[0] == "--interpret" {

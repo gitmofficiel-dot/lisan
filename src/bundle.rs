@@ -15,6 +15,8 @@ const RUNTIME_SOURCES: &[(&str, &str)] = &[
     ("modules.rs", include_str!("modules.rs")),
     ("json.rs", include_str!("json.rs")),
     ("diagnostics.rs", include_str!("diagnostics.rs")),
+    ("bytecode.rs", include_str!("bytecode.rs")),
+    ("vm.rs", include_str!("vm.rs")),
 ];
 
 fn str_value(text: &str) -> String { format!("{:?}.to_string()", text) }
@@ -46,6 +48,9 @@ fn emit_expr(expr: &Expr) -> String {
         Expr::Unary(op, expr) => format!("Expr::Unary({}, {})", emit_op(*op), boxed(expr)),
         Expr::Binary(left, op, right) => format!("Expr::Binary({}, {}, {})", boxed(left), emit_op(*op), boxed(right)),
         Expr::Call(name, args) => format!("Expr::Call({}, {})", str_value(name), vec_expr(args, emit_expr)),
+        Expr::GetProperty(target, prop) => format!("Expr::GetProperty({}, {})", boxed(target), str_value(prop)),
+        Expr::SetProperty(target, prop, expr) => format!("Expr::SetProperty({}, {}, {})", boxed(target), str_value(prop), boxed(expr)),
+        Expr::MethodCall(target, method, args) => format!("Expr::MethodCall({}, {}, {})", boxed(target), str_value(method), vec_expr(args, emit_expr)),
     }
 }
 fn emit_function(f: &Function) -> String {
@@ -65,6 +70,7 @@ fn emit_stmt(stmt: &Stmt) -> String {
         Stmt::While(cond, body) => format!("Stmt::While({}, {})", emit_expr(cond), vec_expr(body, emit_stmt)),
         Stmt::ForEach(name, expr, body) => format!("Stmt::ForEach({}, {}, {})", str_value(name), emit_expr(expr), vec_expr(body, emit_stmt)),
         Stmt::Function(fun) => format!("Stmt::Function({})", emit_function(fun)),
+        Stmt::Class(c) => format!("Stmt::Class(ClassDef {{ name: {}, methods: {} }})", str_value(&c.name), vec_expr(&c.methods, emit_function)),
         Stmt::Return(opt) => match opt {
             Some(e) => format!("Stmt::Return(Some({}))", emit_expr(e)),
             None => "Stmt::Return(None)".into(),
@@ -90,13 +96,15 @@ fn emit_stmt(stmt: &Stmt) -> String {
 pub fn generate_rust_main(program: &[Stmt]) -> Result<String, String> {
     let ast = vec_expr(program, emit_stmt);
     let source = format!(r#"mod ast;
+mod bytecode;
 mod diagnostics;
 mod json;
 mod lexer;
 mod modules;
 mod parser;
 mod runtime;
-use ast::{{Expr, Function, Op, Stmt}};
+mod vm;
+use ast::{{ClassDef, Expr, Function, Op, Stmt}};
 fn main() {{
     let program: Vec<Stmt> = {ast};
     match runtime::Interpreter::default().run_program(&program) {{

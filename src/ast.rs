@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Number(f64),
     Text(String),
@@ -13,23 +13,32 @@ pub enum Expr {
     Unary(Op, Box<Expr>),
     Binary(Box<Expr>, Op, Box<Expr>),
     Call(String, Vec<Expr>),
+    GetProperty(Box<Expr>, String),
+    SetProperty(Box<Expr>, String, Box<Expr>),
+    MethodCall(Box<Expr>, String, Vec<Expr>),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     Add, Subtract, Multiply, Divide, Modulo, Power,
     Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual,
     And, Or, Not, Negate,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
     pub params: Vec<String>,
     pub body: Vec<Stmt>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassDef {
+    pub name: String,
+    pub methods: Vec<Function>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Import(String),
     Let(String, Expr),
@@ -40,6 +49,7 @@ pub enum Stmt {
     While(Expr, Vec<Stmt>),
     ForEach(String, Expr, Vec<Stmt>),
     Function(Function),
+    Class(ClassDef),
     Return(Option<Expr>),
     Break,
     Continue,

@@ -241,6 +241,26 @@ fn serialize_value(value: &Value, out: &mut String) -> Result<(), String> {
             }
             out.push('}');
         }
+        Value::Instance { fields, .. } => {
+            out.push('{');
+            let borrowed = fields.borrow();
+            for (i, (key, val)) in borrowed.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push('"');
+                for c in key.chars() {
+                    match c {
+                        '"' => out.push_str("\\\""),
+                        '\\' => out.push_str("\\\\"),
+                        other => out.push(other),
+                    }
+                }
+                out.push_str("\": ");
+                serialize_value(val, out)?;
+            }
+            out.push('}');
+        }
     }
     Ok(())
 }

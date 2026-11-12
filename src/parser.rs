@@ -62,26 +62,12 @@ impl Parser {
         }
 
         if self.take(&TokenKind::Function) {
-            let name = self.identifier()?;
-            self.expect(&TokenKind::LeftParen, "متوقع '(' بعد اسم الدالة")?;
-            let mut params = Vec::new();
-            if !self.is(&TokenKind::RightParen) {
-                loop {
-                    let name = self.identifier()?;
-                    if params.contains(&name) { return Err(self.error("معامل مكرر في الدالة")); }
-                    params.push(name);
-                    if !self.take(&TokenKind::Comma) { break; }
-                }
-            }
-            self.expect(&TokenKind::RightParen, "متوقع ')' بعد معاملات الدالة")?;
-            // A function cannot break a loop in its caller.
-            let enclosing_loop_depth = self.loop_depth;
-            self.loop_depth = 0;
-            self.function_depth += 1;
-            let body = self.block();
-            self.function_depth -= 1;
-            self.loop_depth = enclosing_loop_depth;
-            return Ok(Stmt::Function(Function { name, params, body: body? }));
+            let func = self.function_declaration()?;
+            return Ok(Stmt::Function(func));
+        }
+        if self.take(&TokenKind::Class) {
+            let stmt = self.class_declaration()?;
+            return Ok(stmt);
         }
         if self.take(&TokenKind::Let) {
             let name = self.identifier()?;
@@ -214,6 +200,47 @@ impl Parser {
         self.semicolon()?;
         Ok(Stmt::Expr(expr))
     }
+
+    fn function_declaration(&mut self) -> Result<Function, String> {
+        let name = self.identifier()?;
+        self.expect(&TokenKind::LeftParen, "متوقع '(' بعد اسم الدالة")?;
+        let mut params = Vec::new();
+        if !self.is(&TokenKind::RightParen) {
+            loop {
+                let name = self.identifier()?;
+                if params.contains(&name) { return Err(self.error("معامل مكرر في الدالة")); }
+                params.push(name);
+                if !self.take(&TokenKind::Comma) { break; }
+            }
+        }
+        self.expect(&TokenKind::RightParen, "متوقع ')' بعد معاملات الدالة")?;
+        let enclosing_loop_depth = self.loop_depth;
+        self.loop_depth = 0;
+        self.function_depth += 1;
+        let body = self.block();
+        self.function_depth -= 1;
+        self.loop_depth = enclosing_loop_depth;
+        Ok(Function { name, params, body: body? })
+    }
+
+    fn class_declaration(&mut self) -> Result<Stmt, String> {
+        let name = self.identifier()?;
+        self.expect(&TokenKind::LeftBrace, "متوقع '{' لبدء جسم الصنف")?;
+        let mut methods = Vec::new();
+        while !self.is(&TokenKind::RightBrace) && !self.is(&TokenKind::Eof) {
+            if self.take(&TokenKind::Function) {
+                let func = self.function_declaration()?;
+                methods.push(func);
+            } else if self.take(&TokenKind::Semicolon) {
+                // Ignore stray semicolons
+            } else {
+                return Err(self.error("جسم الصنف يجب أن يحتوي على دوال معرّفة بـ 'دالة'"));
+            }
+        }
+        self.expect(&TokenKind::RightBrace, "متوقع '}' لإنهاء جسم الصنف")?;
+        Ok(Stmt::Class(crate::ast::ClassDef { name, methods }))
+    }
+
     fn semicolon(&mut self) -> Result<(), String> {
         if self.take(&TokenKind::Semicolon) {
             while self.take(&TokenKind::Semicolon) {}
@@ -238,11 +265,12 @@ impl Parser {
             let rhs = self.assignment()?;
             match lhs {
                 Expr::Variable(name) => Ok(Expr::Assign(name, Box::new(rhs))),
+                Expr::GetProperty(target, prop) => Ok(Expr::SetProperty(target, prop, Box::new(rhs))),
                 Expr::Index(target, index) => match *target {
                     Expr::Variable(name) => Ok(Expr::AssignIndex(name, index, Box::new(rhs))),
                     _ => Err(self.error("إسناد عناصر القائمة أو القاموس يتطلب متغيرًا مباشرًا")),
                 },
-                _ => Err(self.error("الطرف الأيسر للإسناد يجب أن يكون اسم متغير")),
+                _ => Err(self.error("الطرف الأيسر للإسناد يجب أن يكون اسم متغير أو خاصية")),
             }
         } else { Ok(lhs) }
     }
@@ -319,6 +347,23 @@ impl Parser {
     fn call(&mut self) -> Result<Expr, String> {
         let mut expr = self.primary()?;
         loop {
+            if self.take(&TokenKind::Dot) {
+                let prop = self.identifier()?;
+                if self.take(&TokenKind::LeftParen) {
+                    let mut args = Vec::new();
+                    if !self.is(&TokenKind::RightParen) {
+                        loop {
+                            args.push(self.expression()?);
+                            if !self.take(&TokenKind::Comma) { break; }
+                        }
+                    }
+                    self.expect(&TokenKind::RightParen, "متوقع ')' بعد وسائط استدعاء الطريقة")?;
+                    expr = Expr::MethodCall(Box::new(expr), prop, args);
+                } else {
+                    expr = Expr::GetProperty(Box::new(expr), prop);
+                }
+                continue;
+            }
             if self.take(&TokenKind::LeftBracket) {
                 let index = self.expression()?;
                 self.expect(&TokenKind::RightBracket, "متوقع ']' بعد الفهرس")?;
@@ -349,6 +394,20 @@ impl Parser {
             TokenKind::True => { self.cursor += 1; Ok(Expr::Bool(true)) }
             TokenKind::False => { self.cursor += 1; Ok(Expr::Bool(false)) }
             TokenKind::Null => { self.cursor += 1; Ok(Expr::Null) }
+            TokenKind::New => {
+                self.cursor += 1;
+                let class_name = self.identifier()?;
+                self.expect(&TokenKind::LeftParen, "متوقع '(' بعد اسم الصنف")?;
+                let mut args = Vec::new();
+                if !self.is(&TokenKind::RightParen) {
+                    loop {
+                        args.push(self.expression()?);
+                        if !self.take(&TokenKind::Comma) { break; }
+                    }
+                }
+                self.expect(&TokenKind::RightParen, "متوقع ')' بعد وسائط إنشاء الصنف")?;
+                Ok(Expr::Call(class_name, args))
+            }
             TokenKind::LeftBracket => {
                 self.cursor += 1;
                 let mut items = Vec::new();

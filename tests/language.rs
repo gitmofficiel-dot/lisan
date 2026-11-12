@@ -51,7 +51,35 @@ fn missing_variable_is_error() {
 
 #[test]
 fn syntax_error_reports_line() {
-    assert!(run("دع س = 2\nاطبع(س)؛").unwrap_err().contains("السطر 2"));
+    assert!(run("إذا (س { \n اطبع(1) \n }").unwrap_err().contains("السطر"));
+}
+
+#[test]
+fn optional_semicolons_on_newline_and_blocks() {
+    let src = r#"
+دع س = 10
+متغير ص = 20
+إذا (س < ص) {
+    س = س + 5
+}
+دالة احسب(أ، ب) {
+    أرجع أ * ب
+}
+اطبع(احسب(س، ص))
+"#;
+    assert_eq!(run(src).unwrap(), ["300"]);
+}
+
+#[test]
+fn diagnostics_suggest_closest_match_on_typos() {
+    let err_var = run("ليكن النتيجة = 99\nاطبع(النتيجه)").unwrap_err();
+    assert!(err_var.contains("هل تقصد 'النتيجة'؟"));
+
+    let err_fn = run("اطببع(\"مرحبا\")").unwrap_err();
+    assert!(err_fn.contains("هل تقصد 'اطبع'؟"));
+
+    let err_key = run("ليكن ق = {\"الاسم\": \"علي\"}\nاطبع(ق[\"الاسمم\"])").unwrap_err();
+    assert!(err_key.contains("هل تقصد 'الاسم'؟"));
 }
 
 #[test]

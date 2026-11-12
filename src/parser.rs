@@ -36,6 +36,7 @@ impl Parser {
     fn program(&mut self) -> Result<Vec<Stmt>, String> {
         let mut statements = Vec::new();
         while !self.is(&TokenKind::Eof) {
+            if self.take(&TokenKind::Semicolon) { continue; }
             statements.push(self.statement()?);
         }
         Ok(statements)
@@ -44,6 +45,7 @@ impl Parser {
         self.expect(&TokenKind::LeftBrace, "متوقع '{' لبدء الكتلة")?;
         let mut statements = Vec::new();
         while !self.is(&TokenKind::RightBrace) && !self.is(&TokenKind::Eof) {
+            if self.take(&TokenKind::Semicolon) { continue; }
             statements.push(self.statement()?);
         }
         self.expect(&TokenKind::RightBrace, "متوقع '}' لإنهاء الكتلة")?;
@@ -125,7 +127,12 @@ impl Parser {
         }
         if self.take(&TokenKind::Return) {
             if self.function_depth == 0 { return Err(self.error("لا يجوز استخدام أرجع خارج الدالة")); }
-            let val = if self.is(&TokenKind::Semicolon) { None } else { Some(self.expression()?) };
+            let prev_line = if self.cursor > 0 { self.tokens[self.cursor - 1].line } else { 0 };
+            let is_empty = self.is(&TokenKind::Semicolon)
+                || self.is(&TokenKind::RightBrace)
+                || self.is(&TokenKind::Eof)
+                || (self.current().line > prev_line);
+            let val = if is_empty { None } else { Some(self.expression()?) };
             self.semicolon()?;
             return Ok(Stmt::Return(val));
         }
@@ -208,7 +215,21 @@ impl Parser {
         Ok(Stmt::Expr(expr))
     }
     fn semicolon(&mut self) -> Result<(), String> {
-        self.expect(&TokenKind::Semicolon, "متوقع ';' أو '؛' في نهاية التعليمة")
+        if self.take(&TokenKind::Semicolon) {
+            while self.take(&TokenKind::Semicolon) {}
+            return Ok(());
+        }
+        if self.is(&TokenKind::RightBrace) || self.is(&TokenKind::Eof) {
+            return Ok(());
+        }
+        if self.cursor > 0 {
+            let prev_line = self.tokens[self.cursor - 1].line;
+            let current_line = self.current().line;
+            if current_line > prev_line {
+                return Ok(());
+            }
+        }
+        Err(self.error("متوقع ';' أو '؛' أو سطر جديد لإنهاء التعليمة"))
     }
     fn expression(&mut self) -> Result<Expr, String> { self.assignment() }
     fn assignment(&mut self) -> Result<Expr, String> {

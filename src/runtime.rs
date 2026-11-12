@@ -237,8 +237,19 @@ impl Interpreter {
     }
 
     fn get_variable(&self, name: &str) -> Result<Value, String> {
-        self.scopes.iter().rev().find_map(|scope| scope.get(name)).cloned()
-            .ok_or_else(|| format!("متغير غير معرّف: '{}'", name))
+        if let Some(val) = self.scopes.iter().rev().find_map(|scope| scope.get(name)) {
+            return Ok(val.clone());
+        }
+        let mut available: Vec<&str> = Vec::new();
+        for scope in &self.scopes {
+            for k in scope.keys() {
+                available.push(k.as_str());
+            }
+        }
+        for f in self.functions.keys() {
+            available.push(f.as_str());
+        }
+        Err(crate::diagnostics::suggest_variable_error(name, &available))
     }
 
     fn eval_bool(&mut self, expr: &Expr) -> Result<bool, String> {
@@ -299,9 +310,12 @@ impl Interpreter {
                     }
                     Value::Map(items) => {
                         let key = checked_key(key)?;
-                        items.iter().find(|(stored, _)| stored == &key)
-                            .map(|(_, value)| value.clone())
-                            .ok_or_else(|| format!("مفتاح غير موجود في القاموس: '{}'", key))
+                        if let Some((_, value)) = items.iter().find(|(stored, _)| stored == &key) {
+                            Ok(value.clone())
+                        } else {
+                            let available_keys: Vec<&str> = items.iter().map(|(k, _)| k.as_str()).collect();
+                            Err(crate::diagnostics::suggest_dict_key_error(&key, &available_keys))
+                        }
                     }
                     _ => Err("الفهرسة تتطلب قائمة أو نصًا أو قاموسًا".into()),
                 }
@@ -409,8 +423,13 @@ impl Interpreter {
             for arg in args { values.push(self.eval(arg)?); }
             return call_builtin(name, values);
         }
-        let function = self.functions.get(name).cloned()
-            .ok_or_else(|| format!("دالة غير معرّفة: '{}'", name))?;
+        let function = match self.functions.get(name).cloned() {
+            Some(f) => f,
+            None => {
+                let func_names: Vec<&str> = self.functions.keys().map(|s| s.as_str()).collect();
+                return Err(crate::diagnostics::suggest_function_error(name, &func_names));
+            }
+        };
         if args.len() != function.params.len() {
             return Err(format!("الدالة '{}' تتوقع {} معاملات، استلمت {}",
                 name, function.params.len(), args.len()));
@@ -1043,6 +1062,9 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 _ => Err("تنسيق تتطلب نص قالب وقائمة بالقيم".into()),
             }
         }
-        _ => Err(format!("دالة غير معرّفة: '{}'", name)),
+        _ => {
+            let empty: Vec<&str> = Vec::new();
+            Err(crate::diagnostics::suggest_function_error(name, &empty))
+        }
     }
 }

@@ -108,7 +108,50 @@ fn main() {
         eprintln!("وسائط غير صحيحة. اكتب lisan --help");
         std::process::exit(2);
     }
-    println!("لسان: مترجم عربي أصلي. الاستخدام: lisan ملف.lsn أو lisan --native ملف.lsn --output البرنامج");
+    start_repl();
+}
+
+fn start_repl() {
+    use std::io::{self, Write};
+    println!("لسان 0.9.1 (نوفمبر 2026) | الطرفية التفاعلية للغة لسان");
+    println!("اكتب تعليماتك البرمجية بالعربية واضغط Enter للتنفيذ.");
+    println!("اكتب 'خروج' أو 'exit' للإنهاء، أو 'مسح' لإعادة تهيئة المتغيرات.\n");
+
+    let mut interpreter = Interpreter::default();
+    let stdin = io::stdin();
+    let mut line = String::new();
+
+    loop {
+        print!("لسان > ");
+        let _ = io::stdout().flush();
+        line.clear();
+        if stdin.read_line(&mut line).is_err() || line.is_empty() {
+            break;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if matches!(trimmed, "خروج" | "انهاء" | "exit" | "quit" | "q") {
+            println!("مع السلامة!");
+            break;
+        }
+        if trimmed == "مسح" || trimmed == "clear" {
+            interpreter = Interpreter::default();
+            println!("تمت إعادة ضبط المتغيرات بنجاح.");
+            continue;
+        }
+        match interpreter.run_source(trimmed) {
+            Ok(outputs) => {
+                for out in outputs {
+                    println!("{}", out);
+                }
+            }
+            Err(err) => {
+                eprintln!("خطأ: {}", err);
+            }
+        }
+    }
 }
 
 fn execute(interpreter: &mut Interpreter, source: &str) {

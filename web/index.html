@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة لسان التفاعلية | Lisan Playground (WebAssembly)</title>
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-hover: #0369a1;
+            --bg: #0f172a;
+            --panel-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --error: #ef4444;
+            --editor-bg: #0b1120;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--text);
+        }
+
+        .logo span {
+            color: var(--primary);
+        }
+
+        .tagline {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-right: 0.5rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        select {
+            background-color: var(--editor-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+            cursor: pointer;
+        }
+
+        button.run-btn {
+            background-color: var(--success);
+            color: white;
+            border: none;
+            padding: 0.55rem 1.4rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.2s;
+        }
+
+        button.run-btn:hover {
+            background-color: #059669;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            padding: 1.5rem;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 850px) {
+            .main-container {
+                flex-direction: column;
+            }
+        }
+
+        .editor-pane, .output-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .pane-header {
+            background-color: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 1.25rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        textarea#codeEditor {
+            flex: 1;
+            background-color: var(--editor-bg);
+            color: #e2e8f0;
+            border: none;
+            padding: 1rem 1.25rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.05rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            direction: rtl;
+            tab-size: 4;
+            min-height: 380px;
+        }
+
+        pre#outputConsole {
+            flex: 1;
+            background-color: var(--editor-bg);
+            color: #38bdf8;
+            padding: 1rem 1.25rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            line-height: 1.6;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            direction: rtl;
+            min-height: 380px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 1rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            background-color: var(--panel-bg);
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">
+            <span>لسان</span> 0.9.1
+            <span class="tagline">لغة برمجة عربية عصرية تعمل في المتصفح عبر WebAssembly</span>
+        </div>
+        <div class="actions">
+            <select id="exampleSelector">
+                <option value="welcome">مرحباً بلغة لسان (بدون فواصل)</option>
+                <option value="json">تحليل وترميز JSON</option>
+                <option value="math">الرياضيات والإحصاء</option>
+                <option value="exceptions">معالجة الاستثناءات (حاول/التقط)</option>
+                <option value="match">مطابقة الأنماط (اختر/حالة)</option>
+                <option value="diagnostics">مصحح الأخطاء الذكي</option>
+            </select>
+            <button class="run-btn" id="runButton">
+                <span>▶ تشغيل (Ctrl + Enter)</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="editor-pane">
+            <div class="pane-header">
+                <span>محرر الكود العربي</span>
+                <span class="status-badge" id="wasmStatus">جاري تحميل WebAssembly...</span>
+            </div>
+            <textarea id="codeEditor" spellcheck="false" placeholder="اكتب أوامرك البرمجية هنا بالعربية..."></textarea>
+        </div>
+
+        <div class="output-pane">
+            <div class="pane-header">
+                <span>شاشة المخرجات</span>
+                <button id="clearBtn" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.8rem;">مسح الشاشة</button>
+            </div>
+            <pre id="outputConsole">مرحباً بك في لسان! اضغط "تشغيل" لتنفيذ الكود.</pre>
+        </div>
+    </div>
+
+    <footer>
+        لسان — لغة برمجة عربية عصرية وسريعة مفتوحة المصدر | تعمل بالكامل على جهازك بلا خوادم خارجية
+    </footer>
+
+    <script src="lisan.js"></script>
+    <script>
+        const examples = {
+            welcome: `// مرحباً بك في لغة لسان!
+// كتابة عصرية وسلسة بدون فواصل منقوطة إجبارية
+
+دالة ترحيب(اسم) {
+    أرجع "أهلاً بك يا " + اسم + " في لغة لسان العربية!"
+}
+
+ليكن طلاب = ["سارة", "أحمد", "يوسف"]
+لكل (طالب في طلاب) {
+    اطبع(ترحيب(طالب))
+}
+`,
+            json: `// التعامل الكامل مع JSON في لسان
+
+ليكن بيانات_النظام = {
+    "الاسم": "نواة لسان",
+    "الإصدار": 0.9,
+    "المميزات": ["خفيفة", "عربية", "سريعة"],
+    "جاهز": صحيح
+}
+
+// تحويل كائن لسان إلى نص JSON
+ليكن نص_json = ترميز_json(بيانات_النظام)
+اطبع("النص بعد الترميز: " + نص_json)
+
+// استرجاع الكائن من نص JSON
+ليكن مسترجع = تحليل_json(نص_json)
+اطبع("الميزة الأولى: " + مسترجع["المميزات"][0])
+`,
+            math: `// العمليات الرياضية والإحصائية المدمجة
+
+ليكن درجات = [85, 92, 78, 96, 88]
+
+اطبع("مجموع الدرجات: " + مجموع(درجات))
+اطبع("المتوسط الحسابي: " + متوسط(درجات))
+اطبع("الدرجات مرتبة: " + فرز(درجات))
+اطبع("الدرجات معكوسة: " + عكس(درجات))
+اطبع("الأس 2 ** 8 = " + (2 ** 8))
+`,
+            exceptions: `// معالجة الأخطاء والاستثناءات بأمان
+
+دالة فحص_السن(عمر) {
+    إذا (عمر < 18) {
+        ارمِ "عذراً، يجب أن يكون العمر 18 عاماً فأكثر!"
+    }
+    أرجع "تم قبول التسجيل بنجاح."
+}
+
+حاول {
+    اطبع(فحص_السن(15))
+} التقط (خطأ) {
+    اطبع("تحذير تم اعتراضه: " + خطأ)
+} أخيرًا {
+    اطبع("اكتملت عملية المعالجة.")
+}
+`,
+            match: `// مطابقة الأنماط (اختر / حالة)
+
+دالة تصنيف_الطقس(الحالة) {
+    اختر (الحالة) {
+        حالة "مشمس": {
+            أرجع "الجو دافئ وجميل اليوم"
+        }
+        حالة "ماطر": {
+            أرجع "لا تنسَ أخذ المظلة معك"
+        }
+        افتراضي: {
+            أرجع "حالة طقس اعتيادية"
+        }
+    }
+}
+
+اطبع(تصنيف_الطقس("مشمس"))
+اطبع(تصنيف_الطقس("ماطر"))
+اطبع(تصنيف_الطقس("غائم"))
+`,
+            diagnostics: `// تجربة مصحح الأخطاء الذكي
+// لاحظ الخطأ الإملائي المتعمد في اسم الدالة والمتغير
+
+ليكن النتيجة = 100
+
+// بدلاً من 'اطبع' كتبنا 'اطببع'، وبدلاً من 'النتيجة' كتبنا 'النتيجه'
+// شاهد كيف يرشدك المصحح بدقة:
+اطببع("مرحبا")
+`
+        };
+
+        let runtime = null;
+        const editor = document.getElementById('codeEditor');
+        const consoleEl = document.getElementById('outputConsole');
+        const statusEl = document.getElementById('wasmStatus');
+        const runBtn = document.getElementById('runButton');
+        const selector = document.getElementById('exampleSelector');
+        const clearBtn = document.getElementById('clearBtn');
+
+        editor.value = examples.welcome;
+
+        async function initWasm() {
+            try {
+                runtime = new LisanRuntime();
+                await runtime.init('./lisan.wasm');
+                statusEl.textContent = 'محرك WebAssembly جاهز (36 KB)';
+                statusEl.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
+            } catch (err) {
+                statusEl.textContent = 'تعذر تحميل WebAssembly: ' + err.message;
+                statusEl.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                statusEl.style.color = '#f87171';
+            }
+        }
+
+        function runCode() {
+            if (!runtime) {
+                consoleEl.textContent = 'محرك لسان لم يكتمل تحميله بعد، يرجى الانتظار ثوانٍ معدودة...';
+                return;
+            }
+            const source = editor.value;
+            try {
+                const start = performance.now();
+                const output = runtime.eval(source);
+                const end = performance.now();
+                consoleEl.textContent = output || '(تم التنفيذ بنجاح بلا مخرجات)';
+                consoleEl.style.color = output.startsWith('خطأ:') ? '#ef4444' : '#38bdf8';
+            } catch (err) {
+                consoleEl.textContent = 'خطأ تشغيل: ' + err.message;
+                consoleEl.style.color = '#ef4444';
+            }
+        }
+
+        runBtn.addEventListener('click', runCode);
+
+        selector.addEventListener('change', () => {
+            const key = selector.value;
+            if (examples[key]) {
+                editor.value = examples[key];
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            consoleEl.textContent = '';
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                runCode();
+            }
+        });
+
+        initWasm();
+    </script>
+</body>
+</html>

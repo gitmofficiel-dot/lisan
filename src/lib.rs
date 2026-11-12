@@ -7,6 +7,7 @@ pub mod modules;
 pub mod native;
 pub mod parser;
 pub mod runtime;
+pub mod wasm;
 
 pub use runtime::{Interpreter, Value};
 

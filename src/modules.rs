@@ -7,6 +7,19 @@ use std::path::{Path, PathBuf};
 const MAX_IMPORT_DEPTH: usize = 32;
 const MAX_SOURCE_BYTES: u64 = 2_000_000;
 
+/// التحقق مما إذا كان اسم الوحدة يشير إلى مكتبة قياسية مدمجة في لسان
+pub fn resolve_builtin_module(name: &str) -> Option<&'static str> {
+    let trimmed = name.trim().strip_suffix(".lsn").unwrap_or(name.trim());
+    let norm = crate::diagnostics::normalize_arabic(trimmed);
+    match norm.as_str() {
+        "اردوينو" | "متحكمات" | "arduino" => Some(crate::arduino::STDLIB_ARDUINO),
+        "ايقونات" | "تصميم" | "واجهه" | "هاتف" | "جوال" | "ويب" | "ui" | "mobile" | "web" | "icons" => {
+            Some(crate::ui::STDLIB_UI_AND_MOBILE)
+        }
+        _ => None,
+    }
+}
+
 pub fn load_file(path: &Path) -> Result<Vec<Stmt>, String> {
     let mut visited = HashSet::new();
     let mut active = Vec::new();
@@ -41,6 +54,12 @@ fn load_recursive(path: &Path, visited: &mut HashSet<PathBuf>, active: &mut Vec<
     for statement in statements {
         match statement {
             Stmt::Import(relative) => {
+                if let Some(builtin_src) = resolve_builtin_module(&relative) {
+                    let b_tokens = crate::lexer::tokenize(builtin_src)?;
+                    let b_stmts = crate::parser::parse(b_tokens)?;
+                    merged.extend(b_stmts);
+                    continue;
+                }
                 let imported = Path::new(&relative);
                 if relative.is_empty() || imported.is_absolute() {
                     return Err("استورد تقبل مسارًا نسبيًا غير فارغ فقط".into());

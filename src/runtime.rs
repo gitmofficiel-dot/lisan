@@ -151,7 +151,29 @@ impl Interpreter {
     fn execute(&mut self, stmt: &Stmt) -> Result<Flow, String> {
         self.tick()?;
         match stmt {
-            Stmt::Import(_) => {
+            Stmt::Import(name) => {
+                if let Some(builtin_src) = crate::modules::resolve_builtin_module(name) {
+                    let tokens = crate::lexer::tokenize(builtin_src)?;
+                    let stmts = crate::parser::parse(tokens)?;
+                    for s in &stmts {
+                        match s {
+                            Stmt::Let(var_name, expr) => {
+                                let val = self.eval(expr)?;
+                                self.scopes[0].insert(var_name.clone(), val);
+                            }
+                            Stmt::Function(func) => {
+                                self.functions.insert(func.name.clone(), func.clone());
+                            }
+                            Stmt::Class(cls) => {
+                                self.classes.insert(cls.name.clone(), cls.clone());
+                            }
+                            _ => {
+                                self.execute(s)?;
+                            }
+                        }
+                    }
+                    return Ok(Flow::Next);
+                }
                 return Err("استورد تعمل فقط عند تشغيل ملف .lsn وليس من النص التفاعلي".into());
             }
             Stmt::Let(name, expr) => {
@@ -897,7 +919,15 @@ fn is_builtin(name: &str) -> bool {
         "بيئة" | "بيئه" | "وسائط" |
         "تحليل_json" | "ترميز_json" | "تنسيق" |
         "مجلد_موجود" | "أنشئ_مجلد" | "انشئ_مجلد" | "قائمة_ملفات" | "احذف_ملف" | "مسار_حالي" |
-        "اطلب_ويب" | "جلب_ويب")
+        "اطلب_ويب" | "جلب_ويب" |
+        "وضع_المنفذ" | "اكتب_رقمي" | "اقرأ_رقمي" | "اكتب_تماثلي" | "اقرأ_تماثلي" |
+        "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" | "نبضة_صوت" |
+        "أوقف_صوت" | "تسلسلي_ابدأ" | "تسلسلي_اطبع" | "تسلسلي_متاح" |
+        "تسلسلي_اقرأ" | "خريطة_قيمة" | "قيد_قيمة" | "ترجم_أردوينو" | "ترجم_اردوينو" |
+        "أيقونة" | "ايقونة" | "قائمة_الأيقونات" | "قائمة_الايقونات" | "نسق_تصميم" |
+        "عنصر_بطاقة" | "عنصر_زر" | "عنصر_إحصائية" | "عنصر_احصائية" |
+        "عنصر_مفتاح" | "عنصر_تنبيه" | "عنصر_شارة" | "عنصر_حقل" | "عنصر_شريط_تقدم" |
+        "بناء_تطبيق_هاتف" | "تصدير_تطبيق_هاتف" | "بناء_صفحة_ويب")
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -1532,10 +1562,332 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 _ => Err("اطلب_ويب تتطلب رابطاً نصياً (URL)".into()),
             }
         }
+        // ==================== دوال الأردوينو والمتحكمات الدقيقة ====================
+        "وضع_المنفذ" | "اكتب_رقمي" | "اقرأ_رقمي" | "اكتب_تماثلي" | "اقرأ_تماثلي"
+        | "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" | "نبضة_صوت"
+        | "أوقف_صوت" | "تسلسلي_ابدأ" | "تسلسلي_اطبع" | "تسلسلي_متاح"
+        | "تسلسلي_اقرأ" | "خريطة_قيمة" | "قيد_قيمة" | "ترجم_أردوينو" | "ترجم_اردوينو" => {
+            eval_arduino_builtin(name, args)
+        }
+        // ==================== دوال الأيقونات والتصميمات والهواتف والويب ====================
+        "أيقونة" | "ايقونة" | "قائمة_الأيقونات" | "قائمة_الايقونات" | "نسق_تصميم"
+        | "عنصر_بطاقة" | "عنصر_زر" | "عنصر_إحصائية" | "عنصر_احصائية"
+        | "عنصر_مفتاح" | "عنصر_تنبيه" | "عنصر_شارة" | "عنصر_حقل" | "عنصر_شريط_تقدم"
+        | "بناء_تطبيق_هاتف" | "تصدير_تطبيق_هاتف" | "بناء_صفحة_ويب" => {
+            eval_ui_builtin(name, args)
+        }
         _ => {
             let empty: Vec<&str> = Vec::new();
             Err(crate::diagnostics::suggest_function_error(name, &empty))
         }
+    }
+}
+
+#[inline(never)]
+fn eval_arduino_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
+    match name {
+        "وضع_المنفذ" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::Number(_pin), Value::Text(_mode)) => Ok(Value::Bool(true)),
+                _ => Err("وضع_المنفذ تتطلب رقم المنفذ ونص الوضع ('مخرج' أو 'مدخل')".into()),
+            }
+        }
+        "اكتب_رقمي" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::Number(_pin), Value::Number(v)) => Ok(Value::Number(if *v != 0.0 { 1.0 } else { 0.0 })),
+                (Value::Number(_pin), Value::Bool(b)) => Ok(Value::Number(if *b { 1.0 } else { 0.0 })),
+                (Value::Number(_pin), Value::Text(s)) => Ok(Value::Number(if s == "عالي" || s == "HIGH" { 1.0 } else { 0.0 })),
+                _ => Err("اكتب_رقمي تتطلب رقم المنفذ وحالة المنفذ (1 أو 0 أو 'عالي' أو 'منخفض')".into()),
+            }
+        }
+        "اقرأ_رقمي" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Number(_) => Ok(Value::Number(0.0)),
+                _ => Err("اقرأ_رقمي تتطلب رقم المنفذ".into()),
+            }
+        }
+        "اكتب_تماثلي" => {
+            require_args(name, &args, 2)?;
+            match (&args[0], &args[1]) {
+                (Value::Number(_pin), Value::Number(val)) => Ok(Value::Number(val.clamp(0.0, 255.0))),
+                _ => Err("اكتب_تماثلي تتطلب رقم المنفذ وقيمة رقمية (0..255)".into()),
+            }
+        }
+        "اقرأ_تماثلي" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Number(_) => Ok(Value::Number(512.0)),
+                _ => Err("اقرأ_تماثلي تتطلب رقم المنفذ".into()),
+            }
+        }
+        "انتظر_ملي" | "تأخير" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Number(ms) if *ms >= 0.0 => Ok(Value::Number(*ms)),
+                _ => Err("انتظر_ملي تتطلب عدداً موجباً بالملي ثانية".into()),
+            }
+        }
+        "انتظر_ميكرو" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Number(us) if *us >= 0.0 => Ok(Value::Number(*us)),
+                _ => Err("انتظر_ميكرو تتطلب عدداً موجباً بالميكرو ثانية".into()),
+            }
+        }
+        "وقت_التشغيل" => {
+            require_args(name, &args, 0)?;
+            Ok(Value::Number(1000.0))
+        }
+        "نبضة_صوت" => {
+            if args.len() != 2 && args.len() != 3 {
+                return Err("نبضة_صوت تتطلب منفذاً وتردداً (ومدة اختيارية)".into());
+            }
+            Ok(Value::Bool(true))
+        }
+        "أوقف_صوت" => {
+            require_args(name, &args, 1)?;
+            Ok(Value::Bool(true))
+        }
+        "تسلسلي_ابدأ" => {
+            require_args(name, &args, 1)?;
+            Ok(Value::Bool(true))
+        }
+        "تسلسلي_اطبع" => {
+            require_args(name, &args, 1)?;
+            Ok(Value::Text(args[0].to_string()))
+        }
+        "تسلسلي_متاح" => {
+            require_args(name, &args, 0)?;
+            Ok(Value::Bool(false))
+        }
+        "تسلسلي_اقرأ" => {
+            require_args(name, &args, 0)?;
+            Ok(Value::Text(String::new()))
+        }
+        "خريطة_قيمة" => {
+            require_args(name, &args, 5)?;
+            match (&args[0], &args[1], &args[2], &args[3], &args[4]) {
+                (
+                    Value::Number(x),
+                    Value::Number(in_min),
+                    Value::Number(in_max),
+                    Value::Number(out_min),
+                    Value::Number(out_max),
+                ) => {
+                    if (in_max - in_min).abs() < f64::EPSILON {
+                        return Err("نطاق الإدخال في خريطة_قيمة لا يمكن أن يكون صفراً".into());
+                    }
+                    let mapped = (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+                    Ok(Value::Number(mapped))
+                }
+                _ => Err("خريطة_قيمة تتطلب 5 أرقام: (القيمة، أدنى_إدخال، أقصى_إدخال، أدنى_إخراج، أقصى_إخراج)".into()),
+            }
+        }
+        "قيد_قيمة" => {
+            require_args(name, &args, 3)?;
+            match (&args[0], &args[1], &args[2]) {
+                (Value::Number(x), Value::Number(low), Value::Number(high)) => {
+                    Ok(Value::Number(x.clamp(*low, *high)))
+                }
+                _ => Err("قيد_قيمة تتطلب 3 أرقام: (القيمة، الحد_الأدنى، الحد_الأعلى)".into()),
+            }
+        }
+        "ترجم_أردوينو" | "ترجم_اردوينو" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(src) => {
+                    let ino = crate::arduino::transpile_arduino(src)?;
+                    Ok(Value::Text(ino))
+                }
+                _ => Err("ترجم_أردوينو تتطلب نص شيفرة لسان".into()),
+            }
+        }
+        _ => unreachable!(),
+    }
+}
+
+#[inline(never)]
+fn eval_ui_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
+    match name {
+        "أيقونة" | "ايقونة" => {
+            if args.is_empty() || args.len() > 3 {
+                return Err("أيقونة تتطلب اسم الأيقونة (وحجمًا ولونًا اختياريين)".into());
+            }
+            let icon_name = match &args[0] {
+                Value::Text(s) => s.as_str(),
+                _ => return Err("اسم الأيقونة يجب أن يكون نصاً".into()),
+            };
+            let size = if args.len() >= 2 {
+                match &args[1] {
+                    Value::Number(n) if *n > 0.0 => *n as u32,
+                    _ => 24,
+                }
+            } else {
+                24
+            };
+            let color = if args.len() == 3 {
+                match &args[2] {
+                    Value::Text(c) => c.as_str(),
+                    _ => "currentColor",
+                }
+            } else {
+                "currentColor"
+            };
+            Ok(Value::Text(crate::ui::get_icon_svg(icon_name, size, color)))
+        }
+        "قائمة_الأيقونات" | "قائمة_الايقونات" => {
+            require_args(name, &args, 0)?;
+            let list = crate::ui::ICON_NAMES
+                .iter()
+                .map(|s| Value::Text((*s).to_string()))
+                .collect();
+            Ok(Value::List(list))
+        }
+        "نسق_تصميم" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(theme) => Ok(Value::Text(crate::ui::get_theme_css(theme).to_string())),
+                _ => Err("نسق_تصميم تتطلب اسم النسق نصاً (مثل 'داكن'، 'فاتح'، 'زمردي'، 'ملكي')".into()),
+            }
+        }
+        "عنصر_بطاقة" => {
+            if args.len() < 2 || args.len() > 3 {
+                return Err("عنصر_بطاقة تتطلب (عنوان، وصف، [أيقونة])".into());
+            }
+            let title = args[0].to_string();
+            let desc = args[1].to_string();
+            let icon_name = if args.len() == 3 { args[2].to_string() } else { "نجمة".into() };
+            let svg = crate::ui::get_icon_svg(&icon_name, 22, "currentColor");
+            let html = format!(
+                r#"<div class="lsn-card"><div class="lsn-card-icon">{svg}</div><div class="lsn-card-body"><h3>{title}</h3><p>{desc}</p></div></div>"#
+            );
+            Ok(Value::Text(html))
+        }
+        "عنصر_زر" => {
+            if args.is_empty() || args.len() > 3 {
+                return Err("عنصر_زر تتطلب (نص_الزر، [أيقونة]، [رسالة])".into());
+            }
+            let label = args[0].to_string();
+            let icon_name = if args.len() >= 2 { args[1].to_string() } else { "تشغيل".into() };
+            let msg = if args.len() == 3 { args[2].to_string() } else { label.clone() };
+            let svg = crate::ui::get_icon_svg(&icon_name, 18, "#ffffff");
+            let html = format!(
+                r#"<button class="lsn-btn" onclick="if(window.showToast)showToast('{msg}')">{svg}<span>{label}</span></button>"#
+            );
+            Ok(Value::Text(html))
+        }
+        "عنصر_إحصائية" | "عنصر_احصائية" => {
+            if args.len() < 2 || args.len() > 3 {
+                return Err("عنصر_إحصائية تتطلب (عنوان، قيمة، [أيقونة])".into());
+            }
+            let title = args[0].to_string();
+            let val = args[1].to_string();
+            let icon_name = if args.len() == 3 { args[2].to_string() } else { "حرارة".into() };
+            let svg = crate::ui::get_icon_svg(&icon_name, 18, "currentColor");
+            let html = format!(
+                r#"<div class="lsn-stat"><div class="lsn-stat-top"><span>{title}</span>{svg}</div><div class="lsn-stat-val">{val}</div></div>"#
+            );
+            Ok(Value::Text(html))
+        }
+        "عنصر_مفتاح" => {
+            if args.len() < 2 || args.len() > 3 {
+                return Err("عنصر_مفتاح تتطلب (عنوان، أيقونة، [مفعّل])".into());
+            }
+            let title = args[0].to_string();
+            let icon_name = args[1].to_string();
+            let is_on = if args.len() == 3 {
+                matches!(args[2], Value::Bool(true) | Value::Number(1.0))
+            } else {
+                true
+            };
+            let on_cls = if is_on { "on" } else { "" };
+            let svg = crate::ui::get_icon_svg(&icon_name, 20, "var(--primary)");
+            let html = format!(
+                r#"<div class="lsn-switch-row"><div class="lsn-switch-label">{svg}<span>{title}</span></div><button class="lsn-toggle {on_cls}" onclick="toggleSwitch(this, '{title}')"></button></div>"#
+            );
+            Ok(Value::Text(html))
+        }
+        "عنصر_تنبيه" => {
+            require_args(name, &args, 2)?;
+            let text = args[0].to_string();
+            let kind = args[1].to_string();
+            let svg = crate::ui::get_icon_svg(&kind, 20, "currentColor");
+            let html = format!(
+                r#"<div class="lsn-card" style="border-color:var(--primary)"><div class="lsn-card-icon">{svg}</div><div class="lsn-card-body"><p>{text}</p></div></div>"#
+            );
+            Ok(Value::Text(html))
+        }
+        "عنصر_شارة" => {
+            require_args(name, &args, 1)?;
+            let text = args[0].to_string();
+            let html = format!(
+                r#"<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:var(--surface-2);color:var(--primary);font-size:12px;font-weight:700">{text}</span>"#
+            );
+            Ok(Value::Text(html))
+        }
+        "عنصر_حقل" => {
+            require_args(name, &args, 2)?;
+            let label = args[0].to_string();
+            let placeholder = args[1].to_string();
+            let html = format!(
+                r#"<div style="display:flex;flex-direction:column;gap:6px"><label style="font-size:13px;color:var(--muted)">{label}</label><input placeholder="{placeholder}" style="padding:11px 14px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text)"/></div>"#
+            );
+            Ok(Value::Text(html))
+        }
+        "عنصر_شريط_تقدم" => {
+            require_args(name, &args, 2)?;
+            let label = args[0].to_string();
+            let pct = match &args[1] {
+                Value::Number(n) => n.clamp(0.0, 100.0),
+                _ => 50.0,
+            };
+            let html = format!(
+                r#"<div class="lsn-card" style="flex-direction:column;align-items:stretch;gap:8px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>{label}</span><span>{pct}%</span></div><div style="height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:{pct}%;height:100%;background:var(--primary)"></div></div></div>"#
+            );
+            Ok(Value::Text(html))
+        }
+        "بناء_تطبيق_هاتف" => {
+            if args.len() < 3 || args.len() > 4 {
+                return Err("بناء_تطبيق_هاتف تتطلب (اسم_التطبيق، النسق، الأيقونة، [قائمة_العناصر])".into());
+            }
+            let app_name = args[0].to_string();
+            let theme = args[1].to_string();
+            let icon = args[2].to_string();
+            let mut items = Vec::new();
+            if args.len() == 4 {
+                if let Value::List(list) = &args[3] {
+                    for item in list {
+                        items.push(item.to_string());
+                    }
+                }
+            }
+            let html = crate::ui::build_mobile_app_html(&app_name, &theme, &icon, &items, &[]);
+            Ok(Value::Text(html))
+        }
+        "تصدير_تطبيق_هاتف" => {
+            require_args(name, &args, 3)?;
+            let app_name = args[0].to_string();
+            let html = args[1].to_string();
+            let out_dir = args[2].to_string();
+            let path = crate::ui::export_mobile_pwa(&app_name, &html, std::path::Path::new(&out_dir))?;
+            Ok(Value::Text(path.to_string_lossy().into_owned()))
+        }
+        "بناء_صفحة_ويب" => {
+            require_args(name, &args, 3)?;
+            let title = args[0].to_string();
+            let theme = args[1].to_string();
+            let mut sections = Vec::new();
+            if let Value::List(list) = &args[2] {
+                for item in list {
+                    sections.push(item.to_string());
+                }
+            }
+            Ok(Value::Text(crate::ui::build_web_page_html(&title, &theme, &sections)))
+        }
+        _ => unreachable!(),
     }
 }
 

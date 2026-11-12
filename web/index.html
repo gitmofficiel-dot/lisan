@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منصة لسان التفاعلية | Lisan Playground (WebAssembly)</title>
+    <title>منصة لسان الشاملة | أردوينو • هواتف • أيقونات • تصميمات • ويب</title>
     <style>
         :root {
             --primary: #0284c7;
@@ -65,8 +65,9 @@
 
         .actions {
             display: flex;
-            gap: 0.75rem;
+            gap: 0.65rem;
             align-items: center;
+            flex-wrap: wrap;
         }
 
         select {
@@ -84,14 +85,14 @@
             background-color: var(--success);
             color: white;
             border: none;
-            padding: 0.55rem 1.4rem;
+            padding: 0.55rem 1.2rem;
             border-radius: 6px;
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             font-weight: bold;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
             transition: background 0.2s;
         }
 
@@ -99,14 +100,29 @@
             background-color: #059669;
         }
 
+        button.ino-btn {
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            padding: 0.55rem 1.1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button.ino-btn:hover {
+            background-color: #0369a1;
+        }
+
         .main-container {
             display: flex;
             flex: 1;
-            padding: 1.5rem;
-            gap: 1.5rem;
+            padding: 1.25rem;
+            gap: 1.25rem;
         }
 
-        @media (max-width: 850px) {
+        @media (max-width: 900px) {
             .main-container {
                 flex-direction: column;
             }
@@ -141,13 +157,13 @@
             border: none;
             padding: 1rem 1.25rem;
             font-family: 'Courier New', Courier, monospace;
-            font-size: 1.05rem;
+            font-size: 1.02rem;
             line-height: 1.6;
             resize: none;
             outline: none;
             direction: rtl;
             tab-size: 4;
-            min-height: 380px;
+            min-height: 440px;
         }
 
         pre#outputConsole {
@@ -156,17 +172,25 @@
             color: #38bdf8;
             padding: 1rem 1.25rem;
             font-family: 'Courier New', Courier, monospace;
-            font-size: 1rem;
+            font-size: 0.98rem;
             line-height: 1.6;
             overflow-y: auto;
             white-space: pre-wrap;
             direction: rtl;
-            min-height: 380px;
+            min-height: 440px;
+        }
+
+        iframe#visualPreview {
+            flex: 1;
+            border: none;
+            background-color: #0f172a;
+            min-height: 480px;
+            display: none;
         }
 
         footer {
             text-align: center;
-            padding: 1rem;
+            padding: 0.9rem;
             color: var(--text-muted);
             font-size: 0.85rem;
             border-top: 1px solid var(--border);
@@ -186,21 +210,25 @@
 
     <header>
         <div class="logo">
-            <span>لسان</span> 0.9.1
-            <span class="tagline">لغة برمجة عربية عصرية تعمل في المتصفح عبر WebAssembly</span>
+            <span>لسان</span> 1.0.0
+            <span class="tagline">أردوينو ومتحكمات • تطبيقات هواتف • أيقونات وتصميمات • ويب</span>
         </div>
         <div class="actions">
             <select id="exampleSelector">
-                <option value="welcome">مرحباً بلغة لسان (بدون فواصل)</option>
-                <option value="oop">الكائنات والأصناف (صنف / هيكل)</option>
-                <option value="json">تحليل وترميز JSON</option>
-                <option value="math">الرياضيات والإحصاء</option>
-                <option value="exceptions">معالجة الاستثناءات (حاول/التقط)</option>
-                <option value="match">مطابقة الأنماط (اختر/حالة)</option>
-                <option value="diagnostics">مصحح الأخطاء الذكي</option>
+                <option value="mobile">📱 تطبيق هاتف ذكي وأيقونات (موبايل)</option>
+                <option value="arduino">🤖 برمجة أردوينو ومتحكمات (المنزل الذكي)</option>
+                <option value="web_ui">🌐 بناء موقع ويب وتصميمات عصرية</option>
+                <option value="welcome">👋 مرحباً بلغة لسان (بدون فواصل)</option>
+                <option value="oop">🏛️ الكائنات والوراثة والدوال العليا</option>
+                <option value="json">📦 تحليل وترميز JSON</option>
+                <option value="exceptions">🛡️ معالجة الاستثناءات (حاول/التقط)</option>
+                <option value="diagnostics">🔍 مصحح الأخطاء الذكي</option>
             </select>
             <button class="run-btn" id="runButton">
-                <span>▶ تشغيل (Ctrl + Enter)</span>
+                <span>▶ تشغيل ومعاينة (Ctrl+Enter)</span>
+            </button>
+            <button class="ino-btn" id="arduinoBtn">
+                <span>⚡ توليد كود أردوينو (.ino)</span>
             </button>
         </div>
     </header>
@@ -216,136 +244,141 @@
 
         <div class="output-pane">
             <div class="pane-header">
-                <span>شاشة المخرجات</span>
-                <button id="clearBtn" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.8rem;">مسح الشاشة</button>
+                <span id="outputTitle">شاشة المخرجات والمعاينة الحية</span>
+                <div style="display:flex;gap:10px;">
+                    <button id="toggleViewBtn" style="background:none; border:none; color:#38bdf8; cursor:pointer; font-size:0.82rem; display:none;">التبديل بين الكود والمعاينة</button>
+                    <button id="clearBtn" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.8rem;">مسح الشاشة</button>
+                </div>
             </div>
-            <pre id="outputConsole">مرحباً بك في لسان! اضغط "تشغيل" لتنفيذ الكود.</pre>
+            <pre id="outputConsole">مرحباً بك في لسان! اضغط "تشغيل ومعاينة" لتنفيذ الكود.</pre>
+            <iframe id="visualPreview"></iframe>
         </div>
     </div>
 
     <footer>
-        لسان — لغة برمجة عربية عصرية وسريعة مفتوحة المصدر | تعمل بالكامل على جهازك بلا خوادم خارجية
+        لسان — لغة برمجة عربية شاملة للمتحكمات الدقيقة والهواتف الذكية والويب وسطح المكتب
     </footer>
 
     <script src="lisan.js"></script>
     <script>
         const examples = {
-            welcome: `// مرحباً بك في لغة لسان!
-// كتابة عصرية وسلسة بدون فواصل منقوطة إجبارية
+            mobile: `// تصميم تطبيق هاتف ذكي تفاعلي بالأيقونات والتصميمات
+استورد "هاتف"
 
+دع تطبيقي = جديد تطبيق_هاتف("بيتي الذكي"، "زمردي")
+
+تطبيقي.أضف_إحصائية("درجة الحرارة"، "24°C"، "حرارة")
+تطبيقي.أضف_بطاقة("لوحة الأردوينو متصلة"، "ESP32 متصلة عبر الواي فاي بنجاح"، "أردوينو")
+تطبيقي.أضف_مفتاح_تحكم("إضاءة غرفة المعيشة"، "شمس"، صحيح)
+تطبيقي.أضف_مفتاح_تحكم("قفل الباب الذكي"، "قفل"، صحيح)
+تطبيقي.أضف_مفتاح_تحكم("تكييف الهواء"، "واي_فاي"، خطأ)
+تطبيقي.أضف_زر("تشغيل وضع الأمان الشامل"، "درع"، "تم تفعيل الحماية الذكية!")
+
+اطبع(تطبيقي.بناء_واجهة())
+`,
+            arduino: `// برمجة أردوينو ومتحكمات دقيقة (تعمل كمحاكي وتُترجم إلى C++ .ino)
+استورد "اردوينو"
+
+دع منفذ_مصباح = 13
+دع منفذ_مروحة = 9
+
+دالة إعداد() {
+    تسلسلي_ابدأ(9600)
+    وضع_المنفذ(منفذ_مصباح، "مخرج")
+    وضع_المنفذ(منفذ_مروحة، "مخرج")
+    تسلسلي_اطبع("بدأ تشغيل نظام المنزل الذكي بلغة لسان")
+}
+
+دالة تكرار() {
+    دع قراءة_حساس = اقرأ_تماثلي(0)
+    إذا (قراءة_حساس > 500) {
+        اكتب_رقمي(منفذ_مصباح، 1)
+        اكتب_تماثلي(منفذ_مروحة، 200)
+    } وإلا {
+        اكتب_رقمي(منفذ_مصباح، 0)
+        اكتب_تماثلي(منفذ_مروحة، 0)
+    }
+    انتظر_ملي(500)
+}
+
+// اختبار المحاكاة المباشرة للمكتبات:
+دع سيرفو = جديد محرك_سيرفو(10)
+اطبع("زاوية السيرفو بعد التحريك: " + نص(سيرفو.حرك(135)))
+
+دع حساس = جديد حساس_مسافة(5، 6)
+اطبع("المسافة المقاسة بالسنتيمتر: " + نص(حساس.اقرأ_سم()))
+`,
+            web_ui: `// بناء موقع ويب متجاوب بالكامل مع الأيقونات والنسق الملكي
+استورد "ويب"
+
+دع موقعي = جديد موقع_ويب("منصة لسان السحابية"، "ملكي")
+
+موقعي.قسم_رئيسي(
+    "برمج كل شيء بلغتك العربية"،
+    "من شرائح الأردوينو والمتحكمات الدقيقة إلى تطبيقات الهواتف الذكية ومواقع الويب الحديثة"،
+    "ابدأ مشروعك الآن"،
+    "روبوت"
+)
+
+موقعي.أضف_بطاقة("برمجة المتحكمات والأردوينو"، "تحويل فوري إلى C++ مع مكتبات السيرفو والحساسات والواي فاي"، "أردوينو")
+موقعي.أضف_بطاقة("تطبيقات الهواتف الذكية"، "واجهات جوال عصرية مع دعم التثبيت المباشر PWA وأيقونات متجهة"، "هاتف")
+موقعي.أضف_بطاقة("سرعة وأمان Rust"، "تعمل محلياً وعلى الويب عبر WebAssembly بصفر اعتماديات خارجية"، "درع")
+
+اطبع(موقعي.بناء_html())
+`,
+            welcome: `// مرحباً بك في لغة لسان!
 دالة ترحيب(اسم) {
     أرجع "أهلاً بك يا " + اسم + " في لغة لسان العربية!"
 }
 
-ليكن طلاب = ["سارة", "أحمد", "يوسف"]
+دع طلاب = ["سارة"، "أحمد"، "يوسف"]
 لكل (طالب في طلاب) {
     اطبع(ترحيب(طالب))
 }
 `,
-            oop: `// البرمجة كائنية التوجه (OOP) في لسان
-// صنف / هيكل مع دالة بناء وخصائص وطرق
-
-صنف سيارة {
-    دالة بناء(النوع، السرعة_القصوى) {
+            oop: `// الوراثة والدوال المجهولة والدوال العليا في لسان 1.0
+صنف مركبة {
+    دالة بناء(النوع) {
         هذا.النوع = النوع
-        هذا.السرعة_القصوى = السرعة_القصوى
-        هذا.السرعة = 0
     }
-
-    دالة تسارع(مقدار) {
-        هذا.السرعة = هذا.السرعة + مقدار
-        إذا (هذا.السرعة > هذا.السرعة_القصوى) {
-            هذا.السرعة = هذا.السرعة_القصوى
-        }
-        أرجع هذا.السرعة
-    }
-
-    دالة تقرير() {
-        أرجع "سيارة " + هذا.النوع + " تسير الآن بسرعة: " + نص(هذا.السرعة) + " كم/س"
+    دالة وصف() {
+        أرجع "مركبة: " + هذا.النوع
     }
 }
 
-دع س = جديد سيارة("تسلا", 260)
-اطبع("نوع الكائن: " + نوع(س))
-س.تسارع(90)
-اطبع(س.تقرير())
-س.تسارع(150)
-اطبع(س.تقرير())
+صنف سيارة_كهربائية يرث مركبة {
+    دالة بناء(النوع، المدى) {
+        أصل.بناء(النوع)
+        هذا.المدى = المدى
+    }
+}
 
-// تصدير الكائن مباشرة إلى JSON!
-اطبع("تصدير JSON: " + ترميز_json(س))
+دع س = جديد سيارة_كهربائية("لوسيد"، 800)
+اطبع(س.وصف() + " بمدى " + نص(س.المدى) + " كم")
+
+دع أرقام = [1، 2، 3، 4، 5]
+اطبع("المربعات: " + نص(أرقام.طبق(دالة(ن) => ن * ن)))
 `,
             json: `// التعامل الكامل مع JSON في لسان
-
-ليكن بيانات_النظام = {
-    "الاسم": "نواة لسان",
-    "الإصدار": 0.9,
-    "المميزات": ["خفيفة", "عربية", "سريعة"],
-    "جاهز": صحيح
+دع بيانات = {
+    "الاسم": "نواة لسان"،
+    "الإصدار": 1.0،
+    "المميزات": ["أردوينو"، "هواتف"، "ويب"، "أيقونات"]
 }
-
-// تحويل كائن لسان إلى نص JSON
-ليكن نص_json = ترميز_json(بيانات_النظام)
-اطبع("النص بعد الترميز: " + نص_json)
-
-// استرجاع الكائن من نص JSON
-ليكن مسترجع = تحليل_json(نص_json)
-اطبع("الميزة الأولى: " + مسترجع["المميزات"][0])
-`,
-            math: `// العمليات الرياضية والإحصائية المدمجة
-
-ليكن درجات = [85, 92, 78, 96, 88]
-
-اطبع("مجموع الدرجات: " + مجموع(درجات))
-اطبع("المتوسط الحسابي: " + متوسط(درجات))
-اطبع("الدرجات مرتبة: " + فرز(درجات))
-اطبع("الدرجات معكوسة: " + عكس(درجات))
-اطبع("الأس 2 ** 8 = " + (2 ** 8))
+دع نص_json = ترميز_json(بيانات)
+اطبع("JSON: " + نص_json)
 `,
             exceptions: `// معالجة الأخطاء والاستثناءات بأمان
-
-دالة فحص_السن(عمر) {
-    إذا (عمر < 18) {
-        ارمِ "عذراً، يجب أن يكون العمر 18 عاماً فأكثر!"
-    }
-    أرجع "تم قبول التسجيل بنجاح."
-}
-
 حاول {
-    اطبع(فحص_السن(15))
-} التقط (خطأ) {
-    اطبع("تحذير تم اعتراضه: " + خطأ)
+    ارمِ "تنبيه تجريبي من النظام"
+} التقط (خ) {
+    اطبع("تم الإمساك بالاستثناء: " + خ)
 } أخيرًا {
-    اطبع("اكتملت عملية المعالجة.")
+    اطبع("اكتمل التنفيذ بأمان.")
 }
-`,
-            match: `// مطابقة الأنماط (اختر / حالة)
-
-دالة تصنيف_الطقس(الحالة) {
-    اختر (الحالة) {
-        حالة "مشمس": {
-            أرجع "الجو دافئ وجميل اليوم"
-        }
-        حالة "ماطر": {
-            أرجع "لا تنسَ أخذ المظلة معك"
-        }
-        افتراضي: {
-            أرجع "حالة طقس اعتيادية"
-        }
-    }
-}
-
-اطبع(تصنيف_الطقس("مشمس"))
-اطبع(تصنيف_الطقس("ماطر"))
-اطبع(تصنيف_الطقس("غائم"))
 `,
             diagnostics: `// تجربة مصحح الأخطاء الذكي
-// لاحظ الخطأ الإملائي المتعمد في اسم الدالة والمتغير
-
-ليكن النتيجة = 100
-
-// بدلاً من 'اطبع' كتبنا 'اطببع'، وبدلاً من 'النتيجة' كتبنا 'النتيجه'
-// شاهد كيف يرشدك المصحح بدقة:
+دع النتيجة = 100
 اطببع("مرحبا")
 `
         };
@@ -353,19 +386,23 @@
         let runtime = null;
         const editor = document.getElementById('codeEditor');
         const consoleEl = document.getElementById('outputConsole');
+        const previewEl = document.getElementById('visualPreview');
+        const toggleViewBtn = document.getElementById('toggleViewBtn');
         const statusEl = document.getElementById('wasmStatus');
         const runBtn = document.getElementById('runButton');
+        const arduinoBtn = document.getElementById('arduinoBtn');
         const selector = document.getElementById('exampleSelector');
         const clearBtn = document.getElementById('clearBtn');
 
-        editor.value = examples.welcome;
+        editor.value = examples.mobile;
 
         async function initWasm() {
             try {
                 runtime = new LisanRuntime();
                 await runtime.init('./lisan.wasm');
-                statusEl.textContent = 'محرك WebAssembly جاهز (36 KB)';
+                statusEl.textContent = 'محرك WebAssembly جاهز (v1.0)';
                 statusEl.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
+                runCode();
             } catch (err) {
                 statusEl.textContent = 'تعذر تحميل WebAssembly: ' + err.message;
                 statusEl.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
@@ -373,23 +410,58 @@
             }
         }
 
+        function showVisualPreview(htmlContent) {
+            previewEl.style.display = 'block';
+            consoleEl.style.display = 'none';
+            toggleViewBtn.style.display = 'inline';
+            previewEl.srcdoc = htmlContent;
+        }
+
+        function showConsoleOutput(text, isError = false) {
+            previewEl.style.display = 'none';
+            consoleEl.style.display = 'block';
+            consoleEl.style.direction = text.includes('#include <Arduino.h>') ? 'ltr' : 'rtl';
+            consoleEl.textContent = text || '(تم التنفيذ بنجاح بلا مخرجات)';
+            consoleEl.style.color = isError ? '#ef4444' : '#38bdf8';
+        }
+
         function runCode() {
-            if (!runtime) {
-                consoleEl.textContent = 'محرك لسان لم يكتمل تحميله بعد، يرجى الانتظار ثوانٍ معدودة...';
-                return;
-            }
+            if (!runtime) return;
             const source = editor.value;
             try {
-                const start = performance.now();
                 const output = runtime.eval(source);
-                const end = performance.now();
-                consoleEl.textContent = output || '(تم التنفيذ بنجاح بلا مخرجات)';
-                consoleEl.style.color = output.startsWith('خطأ:') ? '#ef4444' : '#38bdf8';
+                if (output.includes('<!DOCTYPE html>') || output.includes('<svg ')) {
+                    consoleEl.textContent = output;
+                    showVisualPreview(output);
+                } else {
+                    toggleViewBtn.style.display = 'none';
+                    showConsoleOutput(output, output.startsWith('خطأ:'));
+                }
             } catch (err) {
-                consoleEl.textContent = 'خطأ تشغيل: ' + err.message;
-                consoleEl.style.color = '#ef4444';
+                showConsoleOutput('خطأ تشغيل: ' + err.message, true);
             }
         }
+
+        arduinoBtn.addEventListener('click', () => {
+            if (!runtime) return;
+            try {
+                const ino = runtime.arduino(editor.value);
+                toggleViewBtn.style.display = 'none';
+                showConsoleOutput(ino, ino.startsWith('خطأ:'));
+            } catch (err) {
+                showConsoleOutput('خطأ ترجمة أردوينو: ' + err.message, true);
+            }
+        });
+
+        toggleViewBtn.addEventListener('click', () => {
+            if (previewEl.style.display === 'none') {
+                previewEl.style.display = 'block';
+                consoleEl.style.display = 'none';
+            } else {
+                previewEl.style.display = 'none';
+                consoleEl.style.display = 'block';
+            }
+        });
 
         runBtn.addEventListener('click', runCode);
 
@@ -397,11 +469,12 @@
             const key = selector.value;
             if (examples[key]) {
                 editor.value = examples[key];
+                runCode();
             }
         });
 
         clearBtn.addEventListener('click', () => {
-            consoleEl.textContent = '';
+            showConsoleOutput('');
         });
 
         document.addEventListener('keydown', (e) => {

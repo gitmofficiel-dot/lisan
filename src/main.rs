@@ -4,11 +4,47 @@ use std::env;
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
+        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات دقيقة C++\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
         return;
     }
     if args.len() == 1 && (args[0] == "-V" || args[0] == "--version") {
         println!("لسان 1.0.0");
+        return;
+    }
+    if !args.is_empty() && args[0] == "--arduino" {
+        if args.len() != 2 && !(args.len() == 4 && args[2] == "--output") {
+            eprintln!("الاستخدام: lisan --arduino ملف.lsn [--output sketch.ino]");
+            std::process::exit(2);
+        }
+        let input = std::path::Path::new(&args[1]);
+        let target = if args.len() == 4 { Some(std::path::Path::new(&args[3])) } else { None };
+        match lisan::arduino::build_arduino_file(input, target) {
+            Ok(path) => println!("تم توليد كود الأردوينو والمتحكمات بنجاح: {}", path.display()),
+            Err(err) => { eprintln!("خطأ في ترجمة الأردوينو: {}", err); std::process::exit(1); }
+        }
+        return;
+    }
+    if !args.is_empty() && args[0] == "--mobile" {
+        if args.len() != 2 && !(args.len() == 4 && args[2] == "--output") {
+            eprintln!("الاستخدام: lisan --mobile ملف.lsn [--output مجلد_التطبيق]");
+            std::process::exit(2);
+        }
+        match Interpreter::default().run_file(&args[1]) {
+            Ok(lines) => {
+                for line in &lines {
+                    println!("{}", line);
+                }
+                if args.len() == 4 {
+                    if let Some(last_html) = lines.iter().rev().find(|l| l.contains("<!DOCTYPE html>")) {
+                        match lisan::ui::export_mobile_pwa("تطبيق لسان", last_html, std::path::Path::new(&args[3])) {
+                            Ok(p) => println!("تم تصدير تطبيق الهاتف إلى: {}", p.display()),
+                            Err(e) => { eprintln!("خطأ في تصدير تطبيق الهاتف: {}", e); std::process::exit(1); }
+                        }
+                    }
+                }
+            }
+            Err(err) => { eprintln!("خطأ في تطبيق الهاتف: {}", err); std::process::exit(1); }
+        }
         return;
     }
     if !args.is_empty() && args[0] == "--init" {

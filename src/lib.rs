@@ -1,3 +1,4 @@
+pub mod arduino;
 pub mod ast;
 pub mod bundle;
 pub mod bytecode;
@@ -8,6 +9,7 @@ pub mod modules;
 pub mod native;
 pub mod parser;
 pub mod runtime;
+pub mod ui;
 pub mod vm;
 pub mod wasm;
 

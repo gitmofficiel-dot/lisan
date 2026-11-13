@@ -230,7 +230,7 @@ fn transpile_statements_to_ino(statements: &[Stmt], raw_source: &str) -> Result<
     let mut has_loop = false;
 
     for stmt in statements {
-        match stmt {
+        match stmt.unwrap_spanned() {
             Stmt::Import(_) => {}
             Stmt::Function(func) => {
                 if func.name == "إعداد" || func.name == "اعداد" || func.name == "setup" {
@@ -353,7 +353,7 @@ fn emit_cpp_function(func: &Function) -> String {
 
 fn body_has_return(stmts: &[Stmt]) -> bool {
     for stmt in stmts {
-        match stmt {
+        match stmt.unwrap_spanned() {
             Stmt::Return(Some(_)) => return true,
             Stmt::If(_, yes, no) => {
                 if body_has_return(yes) {
@@ -379,6 +379,7 @@ fn body_has_return(stmts: &[Stmt]) -> bool {
 fn emit_cpp_stmt(stmt: &Stmt, indent: usize) -> String {
     let pad = "  ".repeat(indent);
     match stmt {
+        Stmt::Spanned(inner, _, _) => emit_cpp_stmt(inner, indent),
         Stmt::Let(name, expr) => {
             let c_type = infer_cpp_type(expr);
             format!("{}{} {} = {};\n", pad, c_type, sanitize_ident(name), emit_cpp_expr(expr))
@@ -444,6 +445,7 @@ fn emit_cpp_stmt(stmt: &Stmt, indent: usize) -> String {
 
 fn infer_cpp_type(expr: &Expr) -> &'static str {
     match expr {
+        Expr::Spanned(inner, _, _) => infer_cpp_type(inner),
         Expr::Number(n) => {
             if n.fract() == 0.0 {
                 "int"
@@ -459,6 +461,7 @@ fn infer_cpp_type(expr: &Expr) -> &'static str {
 
 fn emit_cpp_expr(expr: &Expr) -> String {
     match expr {
+        Expr::Spanned(inner, _, _) => emit_cpp_expr(inner),
         Expr::Number(n) => {
             if n.fract() == 0.0 {
                 format!("{}", *n as i64)
@@ -560,7 +563,7 @@ fn emit_cpp_call(name: &str, args: &[Expr]) -> String {
     let c_args: Vec<String> = args.iter().map(emit_cpp_expr).collect();
     match name {
         "وضع_المنفذ" if args.len() == 2 => {
-            let mode = match &args[1] {
+            let mode = match args[1].unwrap_spanned() {
                 Expr::Text(s) => match s.as_str() {
                     "مخرج" | "OUTPUT" => "OUTPUT".to_string(),
                     "مدخل" | "INPUT" => "INPUT".to_string(),
@@ -572,7 +575,7 @@ fn emit_cpp_call(name: &str, args: &[Expr]) -> String {
             format!("pinMode({}, {})", c_args[0], mode)
         }
         "اكتب_رقمي" if args.len() == 2 => {
-            let state = match &args[1] {
+            let state = match args[1].unwrap_spanned() {
                 Expr::Number(n) => {
                     if *n != 0.0 {
                         "HIGH".to_string()

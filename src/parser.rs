@@ -52,6 +52,13 @@ impl Parser {
         Ok(statements)
     }
     fn statement(&mut self) -> Result<Stmt, String> {
+        let line = self.current().line;
+        let col = self.current().column;
+        let stmt = self.raw_statement()?;
+        Ok(Stmt::Spanned(Box::new(stmt), line, col))
+    }
+
+    fn raw_statement(&mut self) -> Result<Stmt, String> {
         if self.take(&TokenKind::Import) {
             let path = match self.current().kind.clone() {
                 TokenKind::String(path) => { self.cursor += 1; path },
@@ -269,16 +276,21 @@ impl Parser {
         }
         Err(self.error("متوقع ';' أو '؛' أو سطر جديد لإنهاء التعليمة"))
     }
-    fn expression(&mut self) -> Result<Expr, String> { self.assignment() }
+    fn expression(&mut self) -> Result<Expr, String> {
+        let line = self.current().line;
+        let col = self.current().column;
+        let expr = self.assignment()?;
+        Ok(Expr::Spanned(Box::new(expr), line, col))
+    }
     fn assignment(&mut self) -> Result<Expr, String> {
         let lhs = self.or()?;
         if self.take(&TokenKind::Equal) {
             let rhs = self.assignment()?;
-            match lhs {
-                Expr::Variable(name) => Ok(Expr::Assign(name, Box::new(rhs))),
-                Expr::GetProperty(target, prop) => Ok(Expr::SetProperty(target, prop, Box::new(rhs))),
-                Expr::Index(target, index) => match *target {
-                    Expr::Variable(name) => Ok(Expr::AssignIndex(name, index, Box::new(rhs))),
+            match lhs.unwrap_spanned() {
+                Expr::Variable(name) => Ok(Expr::Assign(name.clone(), Box::new(rhs))),
+                Expr::GetProperty(target, prop) => Ok(Expr::SetProperty(target.clone(), prop.clone(), Box::new(rhs))),
+                Expr::Index(target, index) => match target.unwrap_spanned() {
+                    Expr::Variable(name) => Ok(Expr::AssignIndex(name.clone(), index.clone(), Box::new(rhs))),
                     _ => Err(self.error("إسناد عناصر القائمة أو القاموس يتطلب متغيرًا مباشرًا")),
                 },
                 _ => Err(self.error("الطرف الأيسر للإسناد يجب أن يكون اسم متغير أو خاصية")),
@@ -390,8 +402,8 @@ impl Parser {
                 }
             }
             self.expect(&TokenKind::RightParen, "متوقع ')' بعد وسائط الاستدعاء")?;
-            expr = match expr {
-                Expr::Variable(name) => Expr::Call(name, args),
+            expr = match expr.unwrap_spanned() {
+                Expr::Variable(name) => Expr::Call(name.clone(), args),
                 _ => return Err(self.error("الاستدعاء يحتاج إلى اسم دالة")),
             };
         }

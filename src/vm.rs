@@ -437,6 +437,7 @@ impl Compiler {
 
     fn compile_stmt(&mut self, stmt: &Stmt) -> Result<(), String> {
         match stmt {
+            Stmt::Spanned(inner, _, _) => return self.compile_stmt(inner),
             Stmt::Let(name, expr) => {
                 self.compile_expr(expr)?;
                 self.chunk.emit(OpCode::DefineGlobal(name.clone()), 0);
@@ -512,6 +513,7 @@ impl Compiler {
 
     fn compile_expr(&mut self, expr: &Expr) -> Result<(), String> {
         match expr {
+            Expr::Spanned(inner, _, _) => return self.compile_expr(inner),
             Expr::Number(n) => {
                 let idx = self.chunk.add_constant(Value::Number(*n));
                 self.chunk.emit(OpCode::Constant(idx), 0);

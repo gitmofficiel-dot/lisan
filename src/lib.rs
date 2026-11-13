@@ -13,7 +13,7 @@ pub mod ui;
 pub mod vm;
 pub mod wasm;
 
-pub use runtime::{Interpreter, Value};
+pub use runtime::{Interpreter, Limits, Value};
 
 pub fn run_file(path: impl AsRef<std::path::Path>) -> Result<Vec<String>, String> {
     Interpreter::default().run_file(path)

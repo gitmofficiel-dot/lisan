@@ -122,7 +122,7 @@ impl<'a> FunctionWriter<'a> {
         Ok(Value{ty:Type::NumberList,operand:second})
     }
     fn for_each(&mut self,name:&str,iterable:&Expr,body:&[Stmt])->Result<(),String> {
-        if let Expr::Call(function,args)=iterable {
+        if let Expr::Call(function,args)=iterable.unwrap_spanned() {
             if function=="مدى" {return self.for_range(name,args,body);}
         }
         let list=self.generate_expr(iterable)?;
@@ -180,6 +180,7 @@ impl<'a> FunctionWriter<'a> {
     }
     fn generate_expr(&mut self, e:&Expr)->Result<Value,String> {
         match e {
+            Expr::Spanned(inner, _, _) => self.generate_expr(inner),
             Expr::Number(n) => {
                 if !n.is_finite() {return Err("الأرقام غير المنتهية غير مدعومة".into());}
                 Ok(Value { ty:Type::Number, operand:format!("{:.17e}",n) })
@@ -445,6 +446,7 @@ impl<'a> FunctionWriter<'a> {
     }
     fn statement(&mut self,stmt:&Stmt)->Result<(),String>{
         match stmt {
+            Stmt::Spanned(inner, _, _) => self.statement(inner),
             Stmt::Let(n,e)=>{let v=self.generate_expr(e)?;self.register(n,v)},
             Stmt::Expr(e)=>{self.generate_expr(e)?;Ok(())},
             Stmt::Print(e)=>{
@@ -558,13 +560,13 @@ pub fn generate_llvm(stmts:&[Stmt])->Result<String,String>{
     let mut module=Module::new();
     let mut functions=Vec::<Function>::new();let mut main_stmts=Vec::new();
     for stmt in stmts {
-        match stmt {
+        match stmt.unwrap_spanned() {
             Stmt::Function(f)=>{
                 if module.functions.contains_key(&f.name){return Err(format!("تعريف مكرر للدالة '{}'",f.name));}
                 let symbol=format!("lisan_fn_{}",functions.len());
                 module.functions.insert(f.name.clone(),(symbol,f.params.len()));functions.push(f.clone());
             }
-            other=>main_stmts.push(other.clone()),
+            _ => main_stmts.push(stmt.clone()),
         }
     }
     let mut function_ir=Vec::new();

@@ -8,14 +8,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_GENERATED_SOURCE: usize = 12_000_000;
 const RUNTIME_SOURCES: &[(&str, &str)] = &[
+    ("arduino.rs", include_str!("arduino.rs")),
     ("ast.rs", include_str!("ast.rs")),
+    ("bytecode.rs", include_str!("bytecode.rs")),
+    ("diagnostics.rs", include_str!("diagnostics.rs")),
+    ("json.rs", include_str!("json.rs")),
     ("lexer.rs", include_str!("lexer.rs")),
+    ("modules.rs", include_str!("modules.rs")),
     ("parser.rs", include_str!("parser.rs")),
     ("runtime.rs", include_str!("runtime.rs")),
-    ("modules.rs", include_str!("modules.rs")),
-    ("json.rs", include_str!("json.rs")),
-    ("diagnostics.rs", include_str!("diagnostics.rs")),
-    ("bytecode.rs", include_str!("bytecode.rs")),
+    ("ui.rs", include_str!("ui.rs")),
     ("vm.rs", include_str!("vm.rs")),
 ];
 
@@ -52,6 +54,7 @@ fn emit_expr(expr: &Expr) -> String {
         Expr::SetProperty(target, prop, expr) => format!("Expr::SetProperty({}, {}, {})", boxed(target), str_value(prop), boxed(expr)),
         Expr::MethodCall(target, method, args) => format!("Expr::MethodCall({}, {}, {})", boxed(target), str_value(method), vec_expr(args, emit_expr)),
         Expr::Lambda(params, body) => format!("Expr::Lambda({}, {})", vec_expr(params, |s| str_value(s)), vec_expr(body, emit_stmt)),
+        Expr::Spanned(inner, line, col) => format!("Expr::Spanned(Box::new({}), {}, {})", emit_expr(inner), line, col),
     }
 }
 fn emit_function(f: &Function) -> String {
@@ -93,13 +96,15 @@ fn emit_stmt(stmt: &Stmt) -> String {
             let def = match default_case { None => "None".to_string(), Some(d) => format!("Some({})", vec_expr(d, emit_stmt)) };
             format!("Stmt::Match {{ target: {}, cases: {}, default_case: {} }}", emit_expr(target), c, def)
         }
+        Stmt::Spanned(inner, line, col) => format!("Stmt::Spanned(Box::new({}), {}, {})", emit_stmt(inner), line, col),
     }
 }
 
 /// Emit a standalone Rust main that carries both the program's resolved AST and the runtime.
 pub fn generate_rust_main(program: &[Stmt]) -> Result<String, String> {
     let ast = vec_expr(program, emit_stmt);
-    let source = format!(r#"mod ast;
+    let source = format!(r#"mod arduino;
+mod ast;
 mod bytecode;
 mod diagnostics;
 mod json;
@@ -107,6 +112,7 @@ mod lexer;
 mod modules;
 mod parser;
 mod runtime;
+mod ui;
 mod vm;
 use ast::{{ClassDef, Expr, Function, Op, Stmt}};
 fn main() {{

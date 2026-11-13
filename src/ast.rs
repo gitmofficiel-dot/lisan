@@ -17,6 +17,17 @@ pub enum Expr {
     SetProperty(Box<Expr>, String, Box<Expr>),
     MethodCall(Box<Expr>, String, Vec<Expr>),
     Lambda(Vec<String>, Vec<Stmt>),
+    Spanned(Box<Expr>, usize, usize),
+}
+
+impl Expr {
+    pub fn unwrap_spanned(&self) -> &Expr {
+        let mut curr = self;
+        while let Expr::Spanned(inner, _, _) = curr {
+            curr = inner;
+        }
+        curr
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -67,4 +78,15 @@ pub enum Stmt {
         cases: Vec<(Expr, Vec<Stmt>)>,
         default_case: Option<Vec<Stmt>>,
     },
+    Spanned(Box<Stmt>, usize, usize),
+}
+
+impl Stmt {
+    pub fn unwrap_spanned(&self) -> &Stmt {
+        let mut curr = self;
+        while let Stmt::Spanned(inner, _, _) = curr {
+            curr = inner;
+        }
+        curr
+    }
 }

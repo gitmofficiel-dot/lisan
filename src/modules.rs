@@ -52,24 +52,24 @@ fn load_recursive(path: &Path, visited: &mut HashSet<PathBuf>, active: &mut Vec<
     active.push(path.clone());
     let mut merged = Vec::new();
     for statement in statements {
-        match statement {
+        match statement.unwrap_spanned() {
             Stmt::Import(relative) => {
-                if let Some(builtin_src) = resolve_builtin_module(&relative) {
+                if let Some(builtin_src) = resolve_builtin_module(relative) {
                     let b_tokens = crate::lexer::tokenize(builtin_src)?;
                     let b_stmts = crate::parser::parse(b_tokens)?;
                     merged.extend(b_stmts);
                     continue;
                 }
-                let imported = Path::new(&relative);
+                let imported = Path::new(relative);
                 if relative.is_empty() || imported.is_absolute() {
                     return Err("استورد تقبل مسارًا نسبيًا غير فارغ فقط".into());
                 }
                 let imported = path.parent().expect("canonical file has parent").join(imported);
                 merged.extend(load_recursive(&imported, visited, active)?);
             }
-            other => {
-                validate_no_nested_imports(&other)?;
-                merged.push(other);
+            _ => {
+                validate_no_nested_imports(&statement)?;
+                merged.push(statement);
             }
         }
     }
@@ -79,7 +79,7 @@ fn load_recursive(path: &Path, visited: &mut HashSet<PathBuf>, active: &mut Vec<
 }
 
 fn validate_no_nested_imports(stmt: &Stmt) -> Result<(), String> {
-    let nested: &[Stmt] = match stmt {
+    let nested: &[Stmt] = match stmt.unwrap_spanned() {
         Stmt::Import(_) => return Err("استورد مسموحة في المستوى الأعلى للملف فقط".into()),
         Stmt::Block(body) | Stmt::While(_, body) | Stmt::ForEach(_, _, body) => body,
         Stmt::Function(function) => &function.body,

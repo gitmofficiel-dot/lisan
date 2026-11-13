@@ -2,9 +2,57 @@ use crate::ast::{Expr, Function, Op, Stmt};
 use std::collections::HashMap;
 use std::fmt;
 
-const MAX_STEPS: usize = 250_000;
-const MAX_CALL_DEPTH: usize = 64;
-const MAX_LIST_SIZE: usize = 10_000;
+/// حدود التنفيذ. وضع «الصندوق الآمن» يحمي المتصفح والاختبارات من البرامج اللانهائية،
+/// أما الوضع الكامل فيشغّل البرامج الحقيقية بلا حد للخطوات كما في بايثون.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Limits {
+    /// أقصى عدد لخطوات التنفيذ؛ `None` تعني بلا حد.
+    pub max_steps: Option<usize>,
+    /// أقصى عمق لاستدعاء الدوال (بايثون: 1000).
+    pub max_call_depth: usize,
+    /// أقصى عدد لعناصر القائمة أو القاموس.
+    pub max_list_size: usize,
+}
+
+impl Limits {
+    /// حدود آمنة للمتصفح (WebAssembly) والاختبارات وتنفيذ الشيفرة غير الموثوقة.
+    pub const fn sandbox() -> Self {
+        Self { max_steps: Some(250_000), max_call_depth: 32, max_list_size: 10_000 }
+    }
+
+    /// حدود البرامج الحقيقية من سطر الأوامر: بلا حد للخطوات، وعمق استدعاء مثل بايثون.
+    /// تتطلب تشغيل المفسّر على خيط بمكدس كبير (انظر `run_with_large_stack`).
+    pub const fn full() -> Self {
+        Self { max_steps: None, max_call_depth: 1000, max_list_size: 50_000_000 }
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self { Self::sandbox() }
+}
+
+/// حجم المكدس اللازم لتشغيل عمق استدعاء 1000 في المفسّر الشجري.
+pub const LARGE_STACK_BYTES: usize = 512 * 1024 * 1024;
+
+/// تشغيل دالة على خيط بمكدس كبير حتى يتسع للاستدعاءات العودية العميقة.
+pub fn run_with_large_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+    std::thread::Builder::new()
+        .name("lisan-main".into())
+        .stack_size(LARGE_STACK_BYTES)
+        .spawn(f)
+        .expect("تعذّر إنشاء خيط التنفيذ")
+        .join()
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+}
+
+thread_local! {
+    /// حد حجم القوائم للخيط الحالي؛ تستخدمه الدوال المدمجة التي لا تملك وصولًا للمفسّر.
+    static LIST_LIMIT: std::cell::Cell<usize> = std::cell::Cell::new(Limits::sandbox().max_list_size);
+}
+
+fn max_list_size() -> usize {
+    LIST_LIMIT.with(|limit| limit.get())
+}
 
 /// Flow through nested statements; loops consume Break/Continue, functions consume Return.
 #[derive(Debug, PartialEq)]
@@ -86,10 +134,22 @@ pub struct Interpreter {
     output: Vec<String>,
     steps: usize,
     call_depth: usize,
+    limits: Limits,
+    /// عند التفعيل تُطبع المخرجات فورًا على الشاشة بدل تجميعها حتى نهاية البرنامج.
+    stream_output: bool,
+    pub current_span: Option<(usize, usize)>,
+    pub call_stack: Vec<(String, Option<(usize, usize)>)>,
 }
 
 impl Default for Interpreter {
     fn default() -> Self {
+        Self::with_limits(Limits::sandbox())
+    }
+}
+
+impl Interpreter {
+    /// مفسّر بحدود تنفيذ محددة.
+    pub fn with_limits(limits: Limits) -> Self {
         Self {
             scopes: vec![HashMap::new()],
             functions: HashMap::new(),
@@ -97,11 +157,37 @@ impl Default for Interpreter {
             output: Vec::new(),
             steps: 0,
             call_depth: 0,
+            limits,
+            stream_output: false,
+            current_span: None,
+            call_stack: Vec::new(),
         }
     }
-}
 
-impl Interpreter {
+    /// مفسّر للبرامج الحقيقية من سطر الأوامر: بلا حد للخطوات، وطباعة فورية للمخرجات.
+    /// يجب تشغيله داخل `run_with_large_stack`.
+    pub fn for_cli() -> Self {
+        let mut interpreter = Self::with_limits(Limits::full());
+        interpreter.stream_output = true;
+        interpreter
+    }
+
+    pub fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    fn emit(&mut self, line: String) {
+        if self.stream_output {
+            use std::io::Write;
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+            let _ = writeln!(handle, "{}", line);
+            let _ = handle.flush();
+        } else {
+            self.output.push(line);
+        }
+    }
+
     pub fn run_source(&mut self, source: &str) -> Result<Vec<String>, String> {
         let tokens = crate::lexer::tokenize(source)?;
         let statements = crate::parser::parse(tokens)?;
@@ -118,19 +204,67 @@ impl Interpreter {
     pub fn run_program(&mut self, statements: &[Stmt]) -> Result<Vec<String>, String> {
         self.output.clear();
         self.steps = 0;
-        match self.execute_statements(&statements, false)? {
-            Flow::Next => {},
-            Flow::Return(_) => return Err("لا يجوز استخدام أرجع خارج الدالة".into()),
-            Flow::Break | Flow::Continue => return Err("لا يجوز استخدام تحكم حلقة خارج الحلقة".into()),
+        self.current_span = None;
+        self.call_stack.clear();
+        let list_limit = self.limits.max_list_size;
+        let previous_limit = LIST_LIMIT.with(|limit| limit.replace(list_limit));
+        let result = self.execute_statements(&statements, false);
+        LIST_LIMIT.with(|limit| limit.set(previous_limit));
+        match result {
+            Ok(Flow::Next) => {},
+            Ok(Flow::Return(_)) => {
+                let err = self.format_runtime_error("لا يجوز استخدام أرجع خارج الدالة");
+                self.current_span = None;
+                self.call_stack.clear();
+                return Err(err);
+            }
+            Ok(Flow::Break) | Ok(Flow::Continue) => {
+                let err = self.format_runtime_error("لا يجوز استخدام تحكم حلقة خارج الحلقة");
+                self.current_span = None;
+                self.call_stack.clear();
+                return Err(err);
+            }
+            Err(err) => {
+                let formatted = self.format_runtime_error(&err);
+                self.current_span = None;
+                self.call_stack.clear();
+                return Err(formatted);
+            }
         }
         Ok(std::mem::take(&mut self.output))
     }
 
+    /// صياغة خطأ التشغيل مع تتبع مسار الاستدعاء وأرقام السطور (Traceback).
+    pub fn format_runtime_error(&self, message: &str) -> String {
+        if message.starts_with("تتبع مسار التنفيذ") || message.starts_with("خطأ تشغيل") {
+            return message.to_string();
+        }
+        let mut out = String::new();
+        if !self.call_stack.is_empty() {
+            out.push_str("تتبع مسار التنفيذ (آخر استدعاء هو الأحدث):\n");
+            for (fn_name, span) in &self.call_stack {
+                match span {
+                    Some((l, c)) => out.push_str(&format!("  السطر {}، العمود {}: في «{}»\n", l, c, fn_name)),
+                    None => out.push_str(&format!("  في «{}»\n", fn_name)),
+                }
+            }
+        }
+        let location = match self.current_span {
+            Some((l, c)) => format!("السطر {}، العمود {}: ", l, c),
+            None => String::new(),
+        };
+        out.push_str(&format!("خطأ تشغيل: {}{}", location, message));
+        out
+    }
+
     fn tick(&mut self) -> Result<(), String> {
         self.steps += 1;
-        if self.steps > MAX_STEPS {
-            Err("تجاوز البرنامج الحد الآمن لعدد خطوات التنفيذ".into())
-        } else { Ok(()) }
+        match self.limits.max_steps {
+            Some(max) if self.steps > max => {
+                Err("تجاوز البرنامج الحد الآمن لعدد خطوات التنفيذ".into())
+            }
+            _ => Ok(()),
+        }
     }
 
     fn execute_statements(&mut self, stmts: &[Stmt], scoped: bool) -> Result<Flow, String> {
@@ -148,15 +282,33 @@ impl Interpreter {
         result
     }
 
-    fn execute(&mut self, stmt: &Stmt) -> Result<Flow, String> {
+    fn execute(&mut self, mut stmt: &Stmt) -> Result<Flow, String> {
         self.tick()?;
+        let mut prev_span = None;
+        while let Stmt::Spanned(inner, line, col) = stmt {
+            if prev_span.is_none() {
+                prev_span = Some(self.current_span);
+            }
+            self.current_span = Some((*line, *col));
+            stmt = inner;
+        }
+        let res = self.execute_unspanned(stmt);
+        if res.is_ok() {
+            if let Some(prev) = prev_span {
+                self.current_span = prev;
+            }
+        }
+        res
+    }
+
+    fn execute_unspanned(&mut self, stmt: &Stmt) -> Result<Flow, String> {
         match stmt {
             Stmt::Import(name) => {
                 if let Some(builtin_src) = crate::modules::resolve_builtin_module(name) {
                     let tokens = crate::lexer::tokenize(builtin_src)?;
                     let stmts = crate::parser::parse(tokens)?;
                     for s in &stmts {
-                        match s {
+                        match s.unwrap_spanned() {
                             Stmt::Let(var_name, expr) => {
                                 let val = self.eval(expr)?;
                                 self.scopes[0].insert(var_name.clone(), val);
@@ -186,7 +338,7 @@ impl Interpreter {
             }
             Stmt::Print(expr) => {
                 let value = self.eval(expr)?;
-                self.output.push(value.to_string());
+                self.emit(value.to_string());
             }
             Stmt::Expr(expr) => { self.eval(expr)?; }
             Stmt::Block(stmts) => { return self.execute_statements(stmts, true); }
@@ -241,10 +393,14 @@ impl Interpreter {
                 return Err(value.to_string());
             }
             Stmt::TryCatch { try_body, catch_var, catch_body, finally_body } => {
+                let stack_len = self.call_stack.len();
+                let prev_span = self.current_span;
                 let try_res = self.execute_statements(try_body, true);
                 let mut flow = match try_res {
                     Ok(signal) => signal,
                     Err(err_msg) => {
+                        self.call_stack.truncate(stack_len);
+                        self.current_span = prev_span;
                         self.scopes.push(HashMap::new());
                         if let Some(var) = catch_var {
                             self.scopes.last_mut().unwrap().insert(var.clone(), Value::Text(err_msg));
@@ -281,6 +437,7 @@ impl Interpreter {
                     }
                 }
             }
+            Stmt::Spanned(_, _, _) => unreachable!(),
         }
         Ok(Flow::Next)
     }
@@ -318,21 +475,39 @@ impl Interpreter {
         }
     }
 
-    fn eval(&mut self, expr: &Expr) -> Result<Value, String> {
+    fn eval(&mut self, mut expr: &Expr) -> Result<Value, String> {
         self.tick()?;
+        let mut prev_span = None;
+        while let Expr::Spanned(inner, line, col) = expr {
+            if prev_span.is_none() {
+                prev_span = Some(self.current_span);
+            }
+            self.current_span = Some((*line, *col));
+            expr = inner;
+        }
+        let res = self.eval_unspanned(expr);
+        if res.is_ok() {
+            if let Some(prev) = prev_span {
+                self.current_span = prev;
+            }
+        }
+        res
+    }
+
+    fn eval_unspanned(&mut self, expr: &Expr) -> Result<Value, String> {
         match expr {
             Expr::Number(n) => Ok(Value::Number(*n)),
             Expr::Text(s) => Ok(Value::Text(s.clone())),
             Expr::Bool(b) => Ok(Value::Bool(*b)),
             Expr::Null => Ok(Value::Null),
             Expr::List(items) => {
-                if items.len() > MAX_LIST_SIZE { return Err("القائمة تجاوزت الحد الأقصى".into()); }
+                if items.len() > max_list_size() { return Err("القائمة تجاوزت الحد الأقصى".into()); }
                 let mut values = Vec::with_capacity(items.len());
                 for item in items { values.push(self.eval(item)?); }
                 Ok(Value::List(values))
             }
             Expr::Map(pairs) => {
-                if pairs.len() > MAX_LIST_SIZE { return Err("القاموس تجاوز الحد الأقصى".into()); }
+                if pairs.len() > max_list_size() { return Err("القاموس تجاوز الحد الأقصى".into()); }
                 let mut result: Vec<(String, Value)> = Vec::new();
                 for (key, item) in pairs {
                     if result.iter().any(|(existing, _)| existing == key) {
@@ -409,7 +584,7 @@ impl Interpreter {
                                 if let Some((_, existing)) = items.iter_mut().find(|(name, _)| name == &key) {
                                     *existing = value.clone();
                                 } else {
-                                    if items.len() >= MAX_LIST_SIZE { return Err("القاموس تجاوز الحد الأقصى".into()); }
+                                    if items.len() >= max_list_size() { return Err("القاموس تجاوز الحد الأقصى".into()); }
                                     items.push((key, value.clone()));
                                 }
                                 Ok(value)
@@ -474,6 +649,7 @@ impl Interpreter {
                     captured,
                 })
             }
+            Expr::Spanned(_, _, _) => unreachable!(),
         }
     }
 
@@ -538,7 +714,7 @@ impl Interpreter {
             return Err(format!("الطريقة '{}.{}' تتوقع {} معاملات، استلمت {}",
                 owner_class, method.name, method.params.len(), evaluated_args.len()));
         }
-        if self.call_depth >= MAX_CALL_DEPTH {
+        if self.call_depth >= self.limits.max_call_depth {
             return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
         }
         let mut local = HashMap::new();
@@ -568,7 +744,7 @@ impl Interpreter {
         if params.len() != evaluated_args.len() {
             return Err(format!("الدالة تتوقع {} معاملات، استلمت {}", params.len(), evaluated_args.len()));
         }
-        if self.call_depth >= MAX_CALL_DEPTH {
+        if self.call_depth >= self.limits.max_call_depth {
             return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
         }
         let mut local = HashMap::new();
@@ -641,7 +817,7 @@ impl Interpreter {
 
     #[inline(never)]
     fn eval_method_call(&mut self, target: &Expr, method_name: &str, args: &[Expr]) -> Result<Value, String> {
-        if let Expr::Variable(v) = target {
+        if let Expr::Variable(v) = target.unwrap_spanned() {
             if v == "أصل" || v == "الأصل" {
                 let self_val = self.get_variable("هذا").map_err(|_| "لا يمكن استخدام 'أصل' خارج طريقة صنف".to_string())?;
                 let owner_class = match self.get_variable("__class_owner") {
@@ -662,7 +838,13 @@ impl Interpreter {
                 } else {
                     self.find_class_method(&parent_name, method_name)?.ok_or_else(|| format!("الطريقة '{}' غير معرفة في الصنف الأب '{}'", method_name, parent_name))?
                 };
-                return self.invoke_method(self_val, &found_owner, &method, evaluated_args);
+                let span = self.current_span;
+                self.call_stack.push((format!("{}.{}", found_owner, method.name), span));
+                let res = self.invoke_method(self_val, &found_owner, &method, evaluated_args);
+                if res.is_ok() {
+                    self.call_stack.pop();
+                }
+                return res;
             }
         }
 
@@ -683,7 +865,13 @@ impl Interpreter {
                     }
                 };
                 let self_val = Value::Instance { class_name, fields };
-                self.invoke_method(self_val, &owner_class, &method, evaluated_args)
+                let span = self.current_span;
+                self.call_stack.push((format!("{}.{}", owner_class, method.name), span));
+                let res = self.invoke_method(self_val, &owner_class, &method, evaluated_args);
+                if res.is_ok() {
+                    self.call_stack.pop();
+                }
+                res
             }
             Value::Text(text) => {
                 match method_name {
@@ -803,7 +991,7 @@ impl Interpreter {
                     (Value::Number(a), Value::Number(b)) => finite_number(a + b),
                     (Value::Text(a), b) => Ok(Value::Text(a + &b.to_string())),
                     (a, Value::Text(b)) => Ok(Value::Text(a.to_string() + &b)),
-                    (Value::List(mut a), Value::List(b)) if a.len() + b.len() <= MAX_LIST_SIZE => {
+                    (Value::List(mut a), Value::List(b)) if a.len() + b.len() <= max_list_size() => {
                         a.extend(b);
                         Ok(Value::List(a))
                     }
@@ -848,7 +1036,13 @@ impl Interpreter {
                 for arg in args {
                     evaluated_args.push(self.eval(arg)?);
                 }
-                self.invoke_method(instance.clone(), &owner_class, &ctor, evaluated_args)?;
+                let span = self.current_span;
+                self.call_stack.push((format!("{}.بناء", owner_class), span));
+                let res = self.invoke_method(instance.clone(), &owner_class, &ctor, evaluated_args);
+                if res.is_ok() {
+                    self.call_stack.pop();
+                }
+                res?;
             } else if !args.is_empty() {
                 return Err(format!("الصنف '{}' ليس له دالة بناء تقبل معاملات", name));
             }
@@ -859,7 +1053,13 @@ impl Interpreter {
             for arg in args {
                 evaluated_args.push(self.eval(arg)?);
             }
-            return self.invoke_lambda(&params, &body, &captured, evaluated_args);
+            let span = self.current_span;
+            self.call_stack.push((name.to_string(), span));
+            let res = self.invoke_lambda(&params, &body, &captured, evaluated_args);
+            if res.is_ok() {
+                self.call_stack.pop();
+            }
+            return res;
         }
         if !self.functions.contains_key(name) && is_builtin(name) {
             let mut values = Vec::with_capacity(args.len());
@@ -880,7 +1080,13 @@ impl Interpreter {
         for arg in args {
             evaluated_args.push(self.eval(arg)?);
         }
-        self.invoke_lambda(&function.params, &function.body, &[], evaluated_args)
+        let span = self.current_span;
+        self.call_stack.push((name.to_string(), span));
+        let res = self.invoke_lambda(&function.params, &function.body, &[], evaluated_args);
+        if res.is_ok() {
+            self.call_stack.pop();
+        }
+        res
     }
 }
 
@@ -1041,7 +1247,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 Value::List(items) => items.clone(),
                 _ => return Err("أضف تتطلب قائمة كمعامل أول".into()),
             };
-            if items.len() >= MAX_LIST_SIZE { return Err("القائمة تجاوزت الحد الأقصى".into()); }
+            if items.len() >= max_list_size() { return Err("القائمة تجاوزت الحد الأقصى".into()); }
             items.push(args[1].clone());
             Ok(Value::List(items))
         }
@@ -1091,7 +1297,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             match (&args[0], &args[1]) {
                 (Value::Text(text), Value::Text(sep)) => {
                     let items: Vec<_> = text.split(sep).map(|v| Value::Text(v.to_owned())).collect();
-                    if items.len() > MAX_LIST_SIZE { return Err("القائمة تجاوزت الحد الأقصى".into()); }
+                    if items.len() > max_list_size() { return Err("القائمة تجاوزت الحد الأقصى".into()); }
                     Ok(Value::List(items))
                 }
                 _ => Err("قسّم تتطلب نصين".into()),
@@ -1197,7 +1403,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             if step == 0.0 { return Err("خطوة مدى لا يجوز أن تكون صفرًا".into()); }
             let raw_length = (end - start) / step;
             let length = if raw_length <= 0.0 { 0.0 } else { raw_length.ceil() };
-            if !length.is_finite() || length > MAX_LIST_SIZE as f64 {
+            if !length.is_finite() || length > max_list_size() as f64 {
                 return Err("مدى تجاوز الحد الأقصى للقائمة".into());
             }
             let mut out = Vec::with_capacity(length as usize);

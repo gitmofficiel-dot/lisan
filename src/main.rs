@@ -2,9 +2,14 @@ use lisan::{check_file, Interpreter};
 use std::env;
 
 fn main() {
+    // نشغّل البرنامج على خيط بمكدس كبير ليتسع لعمق استدعاء مثل بايثون (1000).
+    lisan::runtime::run_with_large_stack(real_main);
+}
+
+fn real_main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات دقيقة C++\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
+        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات دقيقة C++\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
         return;
     }
     if args.len() == 1 && (args[0] == "-V" || args[0] == "--version") {
@@ -29,7 +34,7 @@ fn main() {
             eprintln!("الاستخدام: lisan --mobile ملف.lsn [--output مجلد_التطبيق]");
             std::process::exit(2);
         }
-        match Interpreter::default().run_file(&args[1]) {
+        match Interpreter::with_limits(lisan::runtime::Limits::full()).run_file(&args[1]) {
             Ok(lines) => {
                 for line in &lines {
                     println!("{}", line);
@@ -126,7 +131,7 @@ fn main() {
         return;
     }
     if args.len() == 2 && args[0] == "--test" {
-        match Interpreter::default().run_file(&args[1]) {
+        match Interpreter::for_cli().run_file(&args[1]) {
             Ok(_) => println!("نجحت اختبارات لسان"),
             Err(err) => { eprintln!("فشلت اختبارات لسان: {}", err); std::process::exit(1); }
         }
@@ -140,7 +145,7 @@ fn main() {
         return;
     }
     if args.len() == 2 && args[0] == "-e" {
-        execute(&mut Interpreter::default(), &args[1]);
+        execute(&mut Interpreter::for_cli(), &args[1]);
         return;
     }
     if args.len() == 2 && args[0] == "--vm" {
@@ -156,6 +161,14 @@ fn main() {
         return;
     }
     if args.len() == 2 && args[0] == "--interpret" {
+        if let Err(err) = Interpreter::for_cli().run_file(&args[1]) {
+            eprintln!("خطأ: {}", err);
+            std::process::exit(1);
+        }
+        return;
+    }
+    if args.len() == 2 && args[0] == "--sandbox" {
+        // تشغيل آمن بحدود المتصفح: مفيد للشيفرة غير الموثوقة.
         match Interpreter::default().run_file(&args[1]) {
             Ok(lines) => for output in lines { println!("{}", output); },
             Err(err) => { eprintln!("خطأ: {}", err); std::process::exit(1); }
@@ -185,7 +198,7 @@ fn start_repl() {
     println!("اكتب تعليماتك البرمجية بالعربية واضغط Enter للتنفيذ.");
     println!("اكتب 'خروج' أو 'exit' للإنهاء، أو 'مسح' لإعادة تهيئة المتغيرات.\n");
 
-    let mut interpreter = Interpreter::default();
+    let mut interpreter = Interpreter::for_cli();
     let stdin = io::stdin();
     let mut line = String::new();
 
@@ -205,7 +218,7 @@ fn start_repl() {
             break;
         }
         if trimmed == "مسح" || trimmed == "clear" {
-            interpreter = Interpreter::default();
+            interpreter = Interpreter::for_cli();
             println!("تمت إعادة ضبط المتغيرات بنجاح.");
             continue;
         }

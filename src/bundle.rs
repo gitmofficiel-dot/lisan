@@ -33,6 +33,13 @@ fn emit_op(op: Op) -> &'static str {
         Op::NotEqual => "Op::NotEqual", Op::Less => "Op::Less", Op::LessEqual => "Op::LessEqual",
         Op::Greater => "Op::Greater", Op::GreaterEqual => "Op::GreaterEqual", Op::And => "Op::And",
         Op::Or => "Op::Or", Op::Not => "Op::Not", Op::Negate => "Op::Negate",
+        Op::In => "Op::In", Op::NotIn => "Op::NotIn",
+    }
+}
+fn emit_opt_boxed(opt: &Option<Box<Expr>>) -> String {
+    match opt {
+        None => "None".to_string(),
+        Some(e) => format!("Some({})", boxed(e)),
     }
 }
 fn emit_expr(expr: &Expr) -> String {
@@ -47,6 +54,8 @@ fn emit_expr(expr: &Expr) -> String {
         Expr::Assign(n, expr) => format!("Expr::Assign({}, {})", str_value(n), boxed(expr)),
         Expr::AssignIndex(n, index, expr) => format!("Expr::AssignIndex({}, {}, {})", str_value(n), boxed(index), boxed(expr)),
         Expr::Index(base, index) => format!("Expr::Index({}, {})", boxed(base), boxed(index)),
+        Expr::Slice(target, start, end, step) => format!("Expr::Slice({}, {}, {}, {})", boxed(target), emit_opt_boxed(start), emit_opt_boxed(end), emit_opt_boxed(step)),
+        Expr::ListComprehension { expr, var, iterable, condition } => format!("Expr::ListComprehension {{ expr: {}, var: {}, iterable: {}, condition: {} }}", boxed(expr), str_value(var), boxed(iterable), emit_opt_boxed(condition)),
         Expr::Unary(op, expr) => format!("Expr::Unary({}, {})", emit_op(*op), boxed(expr)),
         Expr::Binary(left, op, right) => format!("Expr::Binary({}, {}, {})", boxed(left), emit_op(*op), boxed(right)),
         Expr::Call(name, args) => format!("Expr::Call({}, {})", str_value(name), vec_expr(args, emit_expr)),
@@ -58,7 +67,11 @@ fn emit_expr(expr: &Expr) -> String {
     }
 }
 fn emit_function(f: &Function) -> String {
-    format!("Function {{name: {}, params: {}, body: {}}}", str_value(&f.name), vec_expr(&f.params, |s| str_value(s)), vec_expr(&f.body, emit_stmt))
+    let defs = vec_expr(&f.defaults, |opt| match opt {
+        None => "None".to_string(),
+        Some(e) => format!("Some({})", emit_expr(e)),
+    });
+    format!("Function {{name: {}, params: {}, defaults: {}, body: {}}}", str_value(&f.name), vec_expr(&f.params, |s| str_value(s)), defs, vec_expr(&f.body, emit_stmt))
 }
 fn emit_stmt(stmt: &Stmt) -> String {
     match stmt {

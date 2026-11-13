@@ -613,8 +613,8 @@ impl Compiler {
                 }
                 self.chunk.emit(OpCode::CallBuiltin(name.clone(), args.len()), 0);
             }
-            Expr::GetProperty(..) | Expr::SetProperty(..) | Expr::MethodCall(..) | Expr::Lambda(..) => {
-                return Err("الخصائص والطرق الكائنية والدوال المجهولة تعمل حالياً عبر المفسّر".into());
+            Expr::GetProperty(..) | Expr::SetProperty(..) | Expr::MethodCall(..) | Expr::Lambda(..) | Expr::Slice(..) | Expr::ListComprehension { .. } => {
+                return Err("الخصائص والطرق الكائنية والدوال المجهولة والتقطيع تعمل حالياً عبر المفسّر".into());
             }
         }
         Ok(())

@@ -15,6 +15,7 @@ struct Parser {
 
 impl Parser {
     fn current(&self) -> &Token { &self.tokens[self.cursor] }
+    fn peek_next(&self) -> Option<&Token> { self.tokens.get(self.cursor + 1) }
     fn is(&self, kind: &TokenKind) -> bool {
         discriminant(&self.current().kind) == discriminant(kind)
     }
@@ -212,11 +213,23 @@ impl Parser {
         let name = self.identifier()?;
         self.expect(&TokenKind::LeftParen, "متوقع '(' بعد اسم الدالة")?;
         let mut params = Vec::new();
+        let mut defaults = Vec::new();
+        let mut seen_default = false;
         if !self.is(&TokenKind::RightParen) {
             loop {
-                let name = self.identifier()?;
-                if params.contains(&name) { return Err(self.error("معامل مكرر في الدالة")); }
-                params.push(name);
+                let param_name = self.identifier()?;
+                if params.contains(&param_name) { return Err(self.error("معامل مكرر في الدالة")); }
+                params.push(param_name);
+                if self.take(&TokenKind::Equal) {
+                    seen_default = true;
+                    let default_expr = self.expression()?;
+                    defaults.push(Some(default_expr));
+                } else {
+                    if seen_default {
+                        return Err(self.error("لا يمكن وضع معامل بدون قيمة افتراضية بعد معامل ذي قيمة افتراضية"));
+                    }
+                    defaults.push(None);
+                }
                 if !self.take(&TokenKind::Comma) { break; }
             }
         }
@@ -233,7 +246,7 @@ impl Parser {
         };
         self.function_depth -= 1;
         self.loop_depth = enclosing_loop_depth;
-        Ok(Function { name, params, body: body? })
+        Ok(Function { name, params, defaults, body: body? })
     }
 
     fn class_declaration(&mut self) -> Result<Stmt, String> {
@@ -328,6 +341,11 @@ impl Parser {
                 else if self.take(&TokenKind::LessEqual) { Op::LessEqual }
                 else if self.take(&TokenKind::Greater) { Op::Greater }
                 else if self.take(&TokenKind::GreaterEqual) { Op::GreaterEqual }
+                else if self.take(&TokenKind::In) { Op::In }
+                else if self.is(&TokenKind::Bang) && self.peek_next().map(|t| &t.kind) == Some(&TokenKind::In) {
+                    self.cursor += 2;
+                    Op::NotIn
+                }
                 else { break };
             expr = Expr::Binary(Box::new(expr), op, Box::new(self.term()?));
         }
@@ -388,9 +406,47 @@ impl Parser {
                 continue;
             }
             if self.take(&TokenKind::LeftBracket) {
-                let index = self.expression()?;
+                if self.take(&TokenKind::Colon) {
+                    let end = if !self.is(&TokenKind::RightBracket) && !self.is(&TokenKind::Colon) {
+                        Some(Box::new(self.expression()?))
+                    } else {
+                        None
+                    };
+                    let step = if self.take(&TokenKind::Colon) {
+                        if !self.is(&TokenKind::RightBracket) {
+                            Some(Box::new(self.expression()?))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    self.expect(&TokenKind::RightBracket, "متوقع ']' بعد التقطيع")?;
+                    expr = Expr::Slice(Box::new(expr), None, end, step);
+                    continue;
+                }
+                let first_expr = self.expression()?;
+                if self.take(&TokenKind::Colon) {
+                    let end = if !self.is(&TokenKind::RightBracket) && !self.is(&TokenKind::Colon) {
+                        Some(Box::new(self.expression()?))
+                    } else {
+                        None
+                    };
+                    let step = if self.take(&TokenKind::Colon) {
+                        if !self.is(&TokenKind::RightBracket) {
+                            Some(Box::new(self.expression()?))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    self.expect(&TokenKind::RightBracket, "متوقع ']' بعد التقطيع")?;
+                    expr = Expr::Slice(Box::new(expr), Some(Box::new(first_expr)), end, step);
+                    continue;
+                }
                 self.expect(&TokenKind::RightBracket, "متوقع ']' بعد الفهرس")?;
-                expr = Expr::Index(Box::new(expr), Box::new(index));
+                expr = Expr::Index(Box::new(expr), Box::new(first_expr));
                 continue;
             }
             if !self.take(&TokenKind::LeftParen) { break; }
@@ -459,12 +515,31 @@ impl Parser {
             }
             TokenKind::LeftBracket => {
                 self.cursor += 1;
-                let mut items = Vec::new();
-                if !self.is(&TokenKind::RightBracket) {
-                    loop {
-                        items.push(self.expression()?);
-                        if !self.take(&TokenKind::Comma) { break; }
-                    }
+                if self.take(&TokenKind::RightBracket) {
+                    return Ok(Expr::List(Vec::new()));
+                }
+                let first = self.expression()?;
+                if self.take(&TokenKind::ForEach) {
+                    let var = self.identifier()?;
+                    self.expect(&TokenKind::In, "متوقع 'في' بعد اسم المتغير في التوليد المختصر")?;
+                    let iterable = self.expression()?;
+                    let condition = if self.take(&TokenKind::If) {
+                        Some(Box::new(self.expression()?))
+                    } else {
+                        None
+                    };
+                    self.expect(&TokenKind::RightBracket, "متوقع ']' لإغلاق التوليد المختصر")?;
+                    return Ok(Expr::ListComprehension {
+                        expr: Box::new(first),
+                        var,
+                        iterable: Box::new(iterable),
+                        condition,
+                    });
+                }
+                let mut items = vec![first];
+                while self.take(&TokenKind::Comma) {
+                    if self.is(&TokenKind::RightBracket) { break; }
+                    items.push(self.expression()?);
                 }
                 self.expect(&TokenKind::RightBracket, "متوقع ']' لإنهاء القائمة")?;
                 Ok(Expr::List(items))

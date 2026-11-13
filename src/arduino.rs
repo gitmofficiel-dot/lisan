@@ -508,6 +508,7 @@ fn emit_cpp_expr(expr: &Expr) -> String {
                 Op::Or => "||",
                 Op::Not => "!",
                 Op::Negate => "-",
+                _ => "==",
             };
             format!("({} {} {})", l, op_str, r)
         }

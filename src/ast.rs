@@ -17,6 +17,13 @@ pub enum Expr {
     SetProperty(Box<Expr>, String, Box<Expr>),
     MethodCall(Box<Expr>, String, Vec<Expr>),
     Lambda(Vec<String>, Vec<Stmt>),
+    Slice(Box<Expr>, Option<Box<Expr>>, Option<Box<Expr>>, Option<Box<Expr>>),
+    ListComprehension {
+        expr: Box<Expr>,
+        var: String,
+        iterable: Box<Expr>,
+        condition: Option<Box<Expr>>,
+    },
     Spanned(Box<Expr>, usize, usize),
 }
 
@@ -35,12 +42,14 @@ pub enum Op {
     Add, Subtract, Multiply, Divide, Modulo, Power,
     Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual,
     And, Or, Not, Negate,
+    In, NotIn,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
     pub params: Vec<String>,
+    pub defaults: Vec<Option<Expr>>,
     pub body: Vec<Stmt>,
 }
 

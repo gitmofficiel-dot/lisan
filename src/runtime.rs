@@ -102,6 +102,20 @@ impl Value {
         }
         Value::Set(std::rc::Rc::new(std::cell::RefCell::new(unique)))
     }
+
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Value::Bool(b) => *b,
+            Value::Number(n) => *n != 0.0 && !n.is_nan(),
+            Value::Text(s) => !s.is_empty(),
+            Value::Null => false,
+            Value::List(l) => !l.borrow().is_empty(),
+            Value::Tuple(t) => !t.is_empty(),
+            Value::Set(s) => !s.borrow().is_empty(),
+            Value::Map(m) => !m.borrow().is_empty(),
+            Value::Instance { .. } | Value::Lambda { .. } => true,
+        }
+    }
 }
 
 impl fmt::Display for Value {
@@ -619,6 +633,81 @@ impl Interpreter {
                     _ => Err("الفهرسة تتطلب قائمة أو صفًا أو نصًا أو قاموسًا أو كائنًا".into()),
                 }
             }
+            Expr::Slice(target, start, end, step) => {
+                let target_val = self.eval(target)?;
+                let start_idx = match start {
+                    Some(s) => Some(checked_int(&self.eval(s)?, "تقطيع")?),
+                    None => None,
+                };
+                let end_idx = match end {
+                    Some(e) => Some(checked_int(&self.eval(e)?, "تقطيع")?),
+                    None => None,
+                };
+                let step_val = match step {
+                    Some(st) => Some(checked_int(&self.eval(st)?, "تقطيع")?),
+                    None => None,
+                };
+                match target_val {
+                    Value::List(items) => {
+                        let borrowed = items.borrow();
+                        let indices = compute_slice_indices(borrowed.len(), start_idx, end_idx, step_val)?;
+                        let sliced: Vec<Value> = indices.iter().map(|&i| borrowed[i].clone()).collect();
+                        Ok(Value::list(sliced))
+                    }
+                    Value::Tuple(items) => {
+                        let indices = compute_slice_indices(items.len(), start_idx, end_idx, step_val)?;
+                        let sliced: Vec<Value> = indices.iter().map(|&i| items[i].clone()).collect();
+                        Ok(Value::Tuple(sliced))
+                    }
+                    Value::Text(text) => {
+                        let chars: Vec<char> = text.chars().collect();
+                        let indices = compute_slice_indices(chars.len(), start_idx, end_idx, step_val)?;
+                        let sliced: String = indices.iter().map(|&i| chars[i]).collect();
+                        Ok(Value::Text(sliced))
+                    }
+                    _ => Err("التقطيع مدعوم فقط للقوائم والصفوف والنصوص".into()),
+                }
+            }
+            Expr::ListComprehension { expr, var, iterable, condition } => {
+                let iter_val = self.eval(iterable)?;
+                let items: Vec<Value> = match iter_val {
+                    Value::List(l) => l.borrow().clone(),
+                    Value::Tuple(t) => t,
+                    Value::Set(s) => s.borrow().clone(),
+                    Value::Text(t) => t.chars().map(|c| Value::Text(c.to_string())).collect(),
+                    _ => return Err("التوليد المختصر يتطلب قائمة أو صفًا أو مجموعة أو نصًا للتكرار".into()),
+                };
+
+                let mut result = Vec::new();
+                for item in items {
+                    self.tick()?;
+                    self.scopes.push(HashMap::from([(var.clone(), item)]));
+
+                    let include = if let Some(cond) = condition {
+                        match self.eval(cond)? {
+                            Value::Bool(b) => b,
+                            _ => {
+                                self.scopes.pop();
+                                return Err("شرط التوليد المختصر يجب أن يكون قيمة منطقية".into());
+                            }
+                        }
+                    } else {
+                        true
+                    };
+
+                    if include {
+                        let val = self.eval(expr)?;
+                        result.push(val);
+                        if result.len() > max_list_size() {
+                            self.scopes.pop();
+                            return Err("القائمة الناتجة عن التوليد المختصر تجاوزت الحد الأقصى".into());
+                        }
+                    }
+
+                    self.scopes.pop();
+                }
+                Ok(Value::list(result))
+            }
             Expr::AssignIndex(name, index, expr) => {
                 let key = self.eval(index)?;
                 let value = self.eval(expr)?;
@@ -763,9 +852,23 @@ impl Interpreter {
 
     #[inline(never)]
     fn invoke_method(&mut self, self_val: Value, owner_class: &str, method: &Function, evaluated_args: Vec<Value>) -> Result<Value, String> {
-        if method.params.len() != evaluated_args.len() {
-            return Err(format!("الطريقة '{}.{}' تتوقع {} معاملات، استلمت {}",
-                owner_class, method.name, method.params.len(), evaluated_args.len()));
+        let min_params = method.defaults.iter().filter(|d| d.is_none()).count();
+        let max_params = method.params.len();
+        if evaluated_args.len() < min_params || evaluated_args.len() > max_params {
+            if min_params == max_params {
+                return Err(format!("الطريقة '{}.{}' تتوقع {} معاملات، استلمت {}",
+                    owner_class, method.name, method.params.len(), evaluated_args.len()));
+            } else {
+                return Err(format!("الطريقة '{}.{}' تتوقع ما بين {} و {} معاملات، استلمت {}",
+                    owner_class, method.name, min_params, max_params, evaluated_args.len()));
+            }
+        }
+        let mut full_args = evaluated_args;
+        for i in full_args.len()..max_params {
+            if let Some(Some(default_expr)) = method.defaults.get(i) {
+                let default_val = self.eval(default_expr)?;
+                full_args.push(default_val);
+            }
         }
         if self.call_depth >= self.limits.max_call_depth {
             return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
@@ -774,7 +877,7 @@ impl Interpreter {
         local.insert("هذا".to_string(), self_val.clone());
         local.insert("ذاتي".to_string(), self_val);
         local.insert("__class_owner".to_string(), Value::Text(owner_class.to_string()));
-        for (param, arg) in method.params.iter().zip(evaluated_args) {
+        for (param, arg) in method.params.iter().zip(full_args) {
             local.insert(param.clone(), arg);
         }
         let globals = self.scopes[0].clone();
@@ -1206,6 +1309,23 @@ impl Interpreter {
         match op {
             Op::Equal => return Ok(Value::Bool(lhs == rhs)),
             Op::NotEqual => return Ok(Value::Bool(lhs != rhs)),
+            Op::In | Op::NotIn => {
+                let contains = match &rhs {
+                    Value::List(items) => items.borrow().contains(&lhs),
+                    Value::Tuple(items) => items.contains(&lhs),
+                    Value::Set(items) => items.borrow().contains(&lhs),
+                    Value::Text(text) => match &lhs {
+                        Value::Text(sub) => text.contains(sub),
+                        _ => return Err("التحقق من الوجود في نص يتطلب نصًا فرعيًا".into()),
+                    },
+                    Value::Map(pairs) => match &lhs {
+                        Value::Text(key) => pairs.borrow().iter().any(|(k, _)| k == key),
+                        _ => return Err("التحقق من وجود مفتاح في قاموس يتطلب نصًا".into()),
+                    },
+                    _ => return Err("المعامل 'في' يتطلب قائمة أو صفًا أو مجموعة أو قاموسًا أو نصًا".into()),
+                };
+                return Ok(Value::Bool(if op == Op::In { contains } else { !contains }));
+            }
             Op::Add => {
                 return match (lhs, rhs) {
                     (Value::Number(a), Value::Number(b)) => finite_number(a + b),
@@ -1253,13 +1373,26 @@ impl Interpreter {
                 fields: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
             };
             if let Some((owner_class, ctor)) = self.find_class_constructor(name)? {
-                if args.len() != ctor.params.len() {
-                    return Err(format!("دالة بناء الصنف '{}' تتوقع {} معاملات، استلمت {}",
-                        name, ctor.params.len(), args.len()));
+                let min_params = ctor.defaults.iter().filter(|d| d.is_none()).count();
+                let max_params = ctor.params.len();
+                if args.len() < min_params || args.len() > max_params {
+                    if min_params == max_params {
+                        return Err(format!("دالة بناء الصنف '{}' تتوقع {} معاملات، استلمت {}",
+                            name, ctor.params.len(), args.len()));
+                    } else {
+                        return Err(format!("دالة بناء الصنف '{}' تتوقع ما بين {} و {} معاملات، استلمت {}",
+                            name, min_params, max_params, args.len()));
+                    }
                 }
-                let mut evaluated_args = Vec::with_capacity(args.len());
+                let mut evaluated_args = Vec::with_capacity(max_params);
                 for arg in args {
                     evaluated_args.push(self.eval(arg)?);
+                }
+                for i in evaluated_args.len()..max_params {
+                    if let Some(Some(default_expr)) = ctor.defaults.get(i) {
+                        let default_val = self.eval(default_expr)?;
+                        evaluated_args.push(default_val);
+                    }
                 }
                 let span = self.current_span;
                 self.call_stack.push((format!("{}.بناء", owner_class), span));
@@ -1301,9 +1434,24 @@ impl Interpreter {
                 return Err(crate::diagnostics::suggest_function_error(name, &func_names));
             }
         };
-        let mut evaluated_args = Vec::with_capacity(args.len());
+        let min_params = function.defaults.iter().filter(|d| d.is_none()).count();
+        let max_params = function.params.len();
+        if args.len() < min_params || args.len() > max_params {
+            if min_params == max_params {
+                return Err(format!("الدالة '{}' تتوقع {} معاملات، استلمت {}", name, max_params, args.len()));
+            } else {
+                return Err(format!("الدالة '{}' تتوقع ما بين {} و {} معاملات، استلمت {}", name, min_params, max_params, args.len()));
+            }
+        }
+        let mut evaluated_args = Vec::with_capacity(max_params);
         for arg in args {
             evaluated_args.push(self.eval(arg)?);
+        }
+        for i in evaluated_args.len()..max_params {
+            if let Some(Some(default_expr)) = function.defaults.get(i) {
+                let default_val = self.eval(default_expr)?;
+                evaluated_args.push(default_val);
+            }
         }
         let span = self.current_span;
         self.call_stack.push((name.to_string(), span));
@@ -1327,6 +1475,58 @@ fn checked_index(index: Value) -> Result<usize, String> {
     }
 }
 
+fn compute_slice_indices(len: usize, start: Option<i64>, end: Option<i64>, step: Option<i64>) -> Result<Vec<usize>, String> {
+    let step_val = step.unwrap_or(1);
+    if step_val == 0 {
+        return Err("خطوة التقطيع لا يمكن أن تكون صفرًا".into());
+    }
+    let len_i = len as i64;
+    let (start_idx, end_idx) = if step_val > 0 {
+        let s = match start {
+            Some(s) if s < 0 => (len_i + s).max(0),
+            Some(s) => s.min(len_i),
+            None => 0,
+        };
+        let e = match end {
+            Some(e) if e < 0 => (len_i + e).max(0),
+            Some(e) => e.min(len_i),
+            None => len_i,
+        };
+        (s, e)
+    } else {
+        let s = match start {
+            Some(s) if s < 0 => (len_i + s).max(-1),
+            Some(s) => s.min(len_i - 1),
+            None => len_i - 1,
+        };
+        let e = match end {
+            Some(e) if e < 0 => (len_i + e).max(-1),
+            Some(e) => e.min(len_i),
+            None => -1,
+        };
+        (s, e)
+    };
+
+    let mut indices = Vec::new();
+    let mut curr = start_idx;
+    if step_val > 0 {
+        while curr < end_idx {
+            if curr >= 0 && curr < len_i {
+                indices.push(curr as usize);
+            }
+            curr += step_val;
+        }
+    } else {
+        while curr > end_idx {
+            if curr >= 0 && curr < len_i {
+                indices.push(curr as usize);
+            }
+            curr += step_val;
+        }
+    }
+    Ok(indices)
+}
+
 fn checked_key(key: Value) -> Result<String, String> {
     match key {
         Value::Text(s) => Ok(s),
@@ -1338,6 +1538,7 @@ fn is_builtin(name: &str) -> bool {
     matches!(name,
         "طول" | "نوع" | "نص" | "عدد" | "أضف" | "اضف" | "مدى" | "يحتوي" |
         "صف" | "مجموعة" |
+        "أي" | "اي" | "كل" | "مرقم" | "سحاب" |
         "مفاتيح" | "قيم" | "احذف" | "قسّم" | "قسم" | "ادمج" | "استبدل" |
         "اقتطع" | "نظّف" | "نظف" | "مطلق" | "جذر" | "قرّب" | "قرب" |
         "أرضية" | "ارضية" | "سقف" | "قوة" |
@@ -1446,6 +1647,63 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 Value::Bool(true) => Err("فشل التحقق: المتوقع خطأ ولكن وجد صحيح".into()),
                 _ => Err("تحقق_خطأ تتطلب قيمة منطقية".into()),
             }
+        }
+        "أي" | "اي" => {
+            require_args(name, &args, 1)?;
+            let has_any = match &args[0] {
+                Value::List(items) => items.borrow().iter().any(|v| v.is_truthy()),
+                Value::Tuple(items) => items.iter().any(|v| v.is_truthy()),
+                Value::Set(items) => items.borrow().iter().any(|v| v.is_truthy()),
+                Value::Text(text) => !text.is_empty(),
+                _ => return Err("أي تتطلب قائمة أو صفًا أو مجموعة أو نصًا".into()),
+            };
+            Ok(Value::Bool(has_any))
+        }
+        "كل" => {
+            require_args(name, &args, 1)?;
+            let all = match &args[0] {
+                Value::List(items) => items.borrow().iter().all(|v| v.is_truthy()),
+                Value::Tuple(items) => items.iter().all(|v| v.is_truthy()),
+                Value::Set(items) => items.borrow().iter().all(|v| v.is_truthy()),
+                Value::Text(text) => !text.is_empty(),
+                _ => return Err("كل تتطلب قائمة أو صفًا أو مجموعة أو نصًا".into()),
+            };
+            Ok(Value::Bool(all))
+        }
+        "مرقم" => {
+            require_args(name, &args, 1)?;
+            let pairs: Vec<Value> = match &args[0] {
+                Value::List(items) => items.borrow().iter().enumerate()
+                    .map(|(i, v)| Value::Tuple(vec![Value::Number(i as f64), v.clone()]))
+                    .collect(),
+                Value::Tuple(items) => items.iter().enumerate()
+                    .map(|(i, v)| Value::Tuple(vec![Value::Number(i as f64), v.clone()]))
+                    .collect(),
+                Value::Text(text) => text.chars().enumerate()
+                    .map(|(i, c)| Value::Tuple(vec![Value::Number(i as f64), Value::Text(c.to_string())]))
+                    .collect(),
+                _ => return Err("مرقم تتطلب قائمة أو صفًا أو نصًا".into()),
+            };
+            Ok(Value::list(pairs))
+        }
+        "سحاب" => {
+            require_args(name, &args, 2)?;
+            let items1: Vec<Value> = match &args[0] {
+                Value::List(items) => items.borrow().clone(),
+                Value::Tuple(items) => items.clone(),
+                Value::Text(text) => text.chars().map(|c| Value::Text(c.to_string())).collect(),
+                _ => return Err("سحاب تتطلب قائمتين أو صفين أو نصين".into()),
+            };
+            let items2: Vec<Value> = match &args[1] {
+                Value::List(items) => items.borrow().clone(),
+                Value::Tuple(items) => items.clone(),
+                Value::Text(text) => text.chars().map(|c| Value::Text(c.to_string())).collect(),
+                _ => return Err("سحاب تتطلب قائمتين أو صفين أو نصين".into()),
+            };
+            let zipped: Vec<Value> = items1.into_iter().zip(items2.into_iter())
+                .map(|(a, b)| Value::Tuple(vec![a, b]))
+                .collect();
+            Ok(Value::list(zipped))
         }
         "طول" => {
             require_args(name, &args, 1)?;

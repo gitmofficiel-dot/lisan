@@ -503,9 +503,7 @@ impl Compiler {
                 self.chunk.patch_jump(iter_next, loop_end);
                 self.chunk.emit(OpCode::IterPop, 0);
             }
-            _ => {
-                // لبقية الجمل المتقدمة، تظل شجرة التفسير أو تضاف لاحقاً
-            }
+            _ => return Err(format!("الجملة غير مدعومة بعد في محرك البايت كود: {:?}", stmt)),
         }
         Ok(())
     }
@@ -622,5 +620,12 @@ mod tests {
 "#;
         let out = vm.run_source(src).unwrap();
         assert_eq!(out, ["60", "20", "3"]);
+    }
+
+    #[test]
+    fn test_vm_rejects_unsupported_statements_instead_of_silent_drop() {
+        let mut vm = VM::new();
+        let err = vm.run_source("دالة اجمع(أ، ب) { أرجع أ + ب } اطبع(اجمع(2، 3))").unwrap_err();
+        assert!(err.contains("الجملة غير مدعومة بعد في محرك البايت كود"));
     }
 }

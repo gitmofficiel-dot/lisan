@@ -521,6 +521,7 @@ impl<'a> FunctionWriter<'a> {
             }
             Stmt::TryCatch { .. } | Stmt::Throw(_) => Err("معالجة الاستثناءات (حاول/التقط/أخيرًا/ارمِ) غير مدعومة بعد في المترجم الأصلي AOT، وتعمل مع المفسّر".into()),
             Stmt::Class(_) => Err("الأصناف وهياكل البيانات الكائنية غير مدعومة بعد في مترجم الآلة الأصلي AOT، وتعمل مع المفسّر وآلة البايت كود".into()),
+            Stmt::ImportModule { .. } | Stmt::FromImport { .. } | Stmt::LetUnpack(..) | Stmt::ForEachUnpack(..) | Stmt::With { .. } => Err("هذه البنية غير مدعومة بعد في المترجم الأصلي AOT، وتعمل مع المفسّر".into()),
         }
     }
     fn compare_equality(&mut self, a: &Value, b: &Value) -> Result<Value, String> {

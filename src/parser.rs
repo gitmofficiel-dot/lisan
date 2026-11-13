@@ -22,6 +22,18 @@ impl Parser {
     fn take(&mut self, kind: &TokenKind) -> bool {
         if self.is(kind) { self.cursor += 1; true } else { false }
     }
+    fn take_as(&mut self) -> bool {
+        if self.take(&TokenKind::As) {
+            return true;
+        }
+        if let TokenKind::Identifier(ref name) = self.current().kind {
+            if name == "ك" {
+                self.cursor += 1;
+                return true;
+            }
+        }
+        false
+    }
     fn error(&self, reason: &str) -> String {
         format!("السطر {}، العمود {}: {}", self.current().line, self.current().column, reason)
     }
@@ -61,12 +73,51 @@ impl Parser {
 
     fn raw_statement(&mut self) -> Result<Stmt, String> {
         if self.take(&TokenKind::Import) {
-            let path = match self.current().kind.clone() {
-                TokenKind::String(path) => { self.cursor += 1; path },
-                _ => return Err(self.error("استورد تتطلب مسار ملف بين علامتي اقتباس")),
+            let (module, is_string) = match self.current().kind.clone() {
+                TokenKind::String(path) => { self.cursor += 1; (path, true) }
+                TokenKind::Identifier(name) => { self.cursor += 1; (name, false) }
+                _ => return Err(self.error("استورد تتطلب اسم وحدة أو مسار ملف")),
+            };
+            let alias = if self.take_as() {
+                Some(self.identifier()?)
+            } else {
+                None
             };
             self.semicolon()?;
-            return Ok(Stmt::Import(path));
+            if is_string && alias.is_none() {
+                return Ok(Stmt::Import(module));
+            } else {
+                return Ok(Stmt::ImportModule { module, alias });
+            }
+        }
+        if self.take(&TokenKind::From) {
+            let module = match self.current().kind.clone() {
+                TokenKind::String(path) => { self.cursor += 1; path }
+                TokenKind::Identifier(name) => { self.cursor += 1; name }
+                _ => return Err(self.error("من تتطلب اسم وحدة أو مسار ملف")),
+            };
+            self.expect(&TokenKind::Import, "متوقع 'استورد' بعد اسم الوحدة في تعليمة 'من'")?;
+            let mut items = Vec::new();
+            loop {
+                items.push(self.identifier()?);
+                if !self.take(&TokenKind::Comma) { break; }
+            }
+            self.semicolon()?;
+            return Ok(Stmt::FromImport { module, items });
+        }
+        if self.take(&TokenKind::With) {
+            let has_paren = self.take(&TokenKind::LeftParen);
+            let expr = self.expression()?;
+            let alias = if self.take_as() {
+                Some(self.identifier()?)
+            } else {
+                None
+            };
+            if has_paren {
+                self.expect(&TokenKind::RightParen, "متوقع ')' بعد تعبير مع")?;
+            }
+            let body = self.block()?;
+            return Ok(Stmt::With { expr, alias, body });
         }
 
         if self.take(&TokenKind::Function) {
@@ -79,10 +130,18 @@ impl Parser {
         }
         if self.take(&TokenKind::Let) {
             let name = self.identifier()?;
+            let mut names = vec![name];
+            while self.take(&TokenKind::Comma) {
+                names.push(self.identifier()?);
+            }
             self.expect(&TokenKind::Equal, "متوقع '=' لتعريف المتغير")?;
             let value = self.expression()?;
             self.semicolon()?;
-            return Ok(Stmt::Let(name, value));
+            if names.len() == 1 {
+                return Ok(Stmt::Let(names.pop().unwrap(), value));
+            } else {
+                return Ok(Stmt::LetUnpack(names, value));
+            }
         }
         if self.take(&TokenKind::Print) {
             self.expect(&TokenKind::LeftParen, "متوقع '(' بعد اطبع")?;
@@ -100,15 +159,25 @@ impl Parser {
             return Ok(Stmt::If(cond, yes, no));
         }
         if self.take(&TokenKind::ForEach) {
-            self.expect(&TokenKind::LeftParen, "متوقع '(' بعد لكل")?;
-            let name = self.identifier()?;
+            let has_paren = self.take(&TokenKind::LeftParen);
+            let first_name = self.identifier()?;
+            let mut names = vec![first_name];
+            while self.take(&TokenKind::Comma) {
+                names.push(self.identifier()?);
+            }
             self.expect(&TokenKind::In, "متوقع 'في' داخل حلقة لكل")?;
             let iterable = self.expression()?;
-            self.expect(&TokenKind::RightParen, "متوقع ')' بعد تعبير لكل")?;
+            if has_paren {
+                self.expect(&TokenKind::RightParen, "متوقع ')' بعد تعبير لكل")?;
+            }
             self.loop_depth += 1;
             let body = self.block();
             self.loop_depth -= 1;
-            return Ok(Stmt::ForEach(name, iterable, body?));
+            if names.len() == 1 {
+                return Ok(Stmt::ForEach(names.pop().unwrap(), iterable, body?));
+            } else {
+                return Ok(Stmt::ForEachUnpack(names, iterable, body?));
+            }
         }
         if self.take(&TokenKind::While) {
             self.expect(&TokenKind::LeftParen, "متوقع '(' بعد طالما")?;
@@ -214,9 +283,20 @@ impl Parser {
         self.expect(&TokenKind::LeftParen, "متوقع '(' بعد اسم الدالة")?;
         let mut params = Vec::new();
         let mut defaults = Vec::new();
+        let mut vararg = None;
         let mut seen_default = false;
         if !self.is(&TokenKind::RightParen) {
             loop {
+                if self.take(&TokenKind::Star) {
+                    let vname = self.identifier()?;
+                    vararg = Some(vname);
+                    if self.take(&TokenKind::Comma) {
+                        if !self.is(&TokenKind::RightParen) {
+                            return Err(self.error("معامل المتغيرات *يجب أن يكون في نهاية قائمة المعاملات"));
+                        }
+                    }
+                    break;
+                }
                 let param_name = self.identifier()?;
                 if params.contains(&param_name) { return Err(self.error("معامل مكرر في الدالة")); }
                 params.push(param_name);
@@ -246,7 +326,7 @@ impl Parser {
         };
         self.function_depth -= 1;
         self.loop_depth = enclosing_loop_depth;
-        Ok(Function { name, params, defaults, body: body? })
+        Ok(Function { name, params, defaults, vararg, body: body? })
     }
 
     fn class_declaration(&mut self) -> Result<Stmt, String> {
@@ -297,6 +377,27 @@ impl Parser {
     }
     fn assignment(&mut self) -> Result<Expr, String> {
         let lhs = self.or()?;
+        if let Expr::Variable(first_name) = lhs.unwrap_spanned().clone() {
+            if self.is(&TokenKind::Comma) {
+                let saved_cursor = self.cursor;
+                let mut names = vec![first_name];
+                let mut is_unpack = true;
+                while self.take(&TokenKind::Comma) {
+                    if let Ok(next_name) = self.identifier() {
+                        names.push(next_name);
+                    } else {
+                        is_unpack = false;
+                        break;
+                    }
+                }
+                if is_unpack && self.take(&TokenKind::Equal) {
+                    let rhs = self.assignment()?;
+                    return Ok(Expr::AssignUnpack(names, Box::new(rhs)));
+                } else {
+                    self.cursor = saved_cursor;
+                }
+            }
+        }
         if self.take(&TokenKind::Equal) {
             let rhs = self.assignment()?;
             match lhs.unwrap_spanned() {
@@ -470,6 +571,11 @@ impl Parser {
         match kind {
             TokenKind::Number(n) => { self.cursor += 1; Ok(Expr::Number(n)) }
             TokenKind::String(s) => { self.cursor += 1; Ok(Expr::Text(s)) }
+            TokenKind::FString(s) => {
+                self.cursor += 1;
+                let segments = self.parse_fstring(&s)?;
+                Ok(Expr::FString(segments))
+            }
             TokenKind::True => { self.cursor += 1; Ok(Expr::Bool(true)) }
             TokenKind::False => { self.cursor += 1; Ok(Expr::Bool(false)) }
             TokenKind::Null => { self.cursor += 1; Ok(Expr::Null) }
@@ -571,5 +677,79 @@ impl Parser {
             }
             _ => Err(self.error("تعبير غير مكتمل أو رمز غير متوقع")),
         }
+    }
+
+    fn parse_fstring(&self, raw: &str) -> Result<Vec<Expr>, String> {
+        let mut segments = Vec::new();
+        let chars: Vec<char> = raw.chars().collect();
+        let mut i = 0;
+        let mut current_lit = String::new();
+        while i < chars.len() {
+            if chars[i] == '{' {
+                if i + 1 < chars.len() && chars[i + 1] == '{' {
+                    current_lit.push('{');
+                    i += 2;
+                    continue;
+                }
+                if !current_lit.is_empty() {
+                    segments.push(Expr::Text(current_lit.clone()));
+                    current_lit.clear();
+                }
+                i += 1; // skip '{'
+                let mut expr_str = String::new();
+                let mut depth = 1;
+                while i < chars.len() {
+                    let c = chars[i];
+                    if c == '"' {
+                        expr_str.push(c);
+                        i += 1;
+                        while i < chars.len() {
+                            let sc = chars[i];
+                            expr_str.push(sc);
+                            if sc == '"' { i += 1; break; }
+                            if sc == '\\' && i + 1 < chars.len() {
+                                i += 1;
+                                expr_str.push(chars[i]);
+                            }
+                            i += 1;
+                        }
+                        continue;
+                    }
+                    if c == '{' { depth += 1; }
+                    else if c == '}' {
+                        depth -= 1;
+                        if depth == 0 {
+                            i += 1;
+                            break;
+                        }
+                    }
+                    expr_str.push(c);
+                    i += 1;
+                }
+                if depth != 0 {
+                    return Err(self.error("قوس '{' غير مغلق داخل نص f-string"));
+                }
+                let tokens = crate::lexer::tokenize(&expr_str)
+                    .map_err(|e| format!("خطأ في تعبير داخل f-string: {}", e))?;
+                let mut sub_parser = Parser { tokens, cursor: 0, loop_depth: self.loop_depth, function_depth: self.function_depth };
+                let parsed_expr = sub_parser.expression()
+                    .map_err(|e| format!("خطأ في تعبير داخل f-string: {}", e))?;
+                segments.push(parsed_expr);
+            } else if chars[i] == '}' {
+                if i + 1 < chars.len() && chars[i + 1] == '}' {
+                    current_lit.push('}');
+                    i += 2;
+                    continue;
+                }
+                return Err(self.error("قوس '}' غير متوقع في f-string"));
+            } else {
+                current_lit.push(chars[i]);
+                i += 1;
+            }
+        }
+        if !current_lit.is_empty() {
+            segments.push(Expr::Text(current_lit));
+        }
+        Ok(segments)
     }
 }

@@ -77,6 +77,10 @@ pub enum Value {
         class_name: String,
         fields: std::rc::Rc<std::cell::RefCell<Vec<(String, Value)>>>,
     },
+    Module {
+        name: String,
+        exports: std::rc::Rc<std::cell::RefCell<Vec<(String, Value)>>>,
+    },
     Lambda {
         params: Vec<String>,
         body: Vec<Stmt>,
@@ -113,7 +117,7 @@ impl Value {
             Value::Tuple(t) => !t.is_empty(),
             Value::Set(s) => !s.borrow().is_empty(),
             Value::Map(m) => !m.borrow().is_empty(),
-            Value::Instance { .. } | Value::Lambda { .. } => true,
+            Value::Instance { .. } | Value::Module { .. } | Value::Lambda { .. } => true,
         }
     }
 }
@@ -126,6 +130,7 @@ impl fmt::Display for Value {
             Value::Bool(true) => write!(f, "صحيح"),
             Value::Bool(false) => write!(f, "خطأ"),
             Value::Null => write!(f, "لاشيء"),
+            Value::Module { name, .. } => write!(f, "<وحدة '{}'>", name),
             Value::Lambda { params, .. } => write!(f, "<دالة({})>", params.join("، ")),
             Value::Instance { class_name, fields } => {
                 write!(f, "{} {{", class_name)?;
@@ -389,6 +394,145 @@ impl Interpreter {
                 }
                 return Err("استورد تعمل فقط عند تشغيل ملف .lsn وليس من النص التفاعلي".into());
             }
+            Stmt::ImportModule { module, alias } => {
+                let target_name = alias.clone().unwrap_or_else(|| {
+                    if module.ends_with(".lsn") {
+                        std::path::Path::new(module)
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or(module)
+                            .to_string()
+                    } else {
+                        module.clone()
+                    }
+                });
+                let norm = crate::diagnostics::normalize_arabic(module);
+                let is_math = matches!(norm.as_str(), "رياضيات" | "math");
+                let is_sys = matches!(norm.as_str(), "نظام" | "sys" | "os");
+                let is_fs = matches!(norm.as_str(), "ملفات" | "io" | "fs");
+                let is_time = matches!(norm.as_str(), "وقت" | "time");
+                let is_rand = matches!(norm.as_str(), "عشوائي" | "random");
+                let is_json = matches!(norm.as_str(), "جيسون" | "json");
+
+                if is_math || is_sys || is_fs || is_time || is_rand || is_json {
+                    let mut initial_exports = Vec::new();
+                    if is_math {
+                        initial_exports.push(("ط".to_string(), Value::Number(std::f64::consts::PI)));
+                        initial_exports.push(("قيمة_ط".to_string(), Value::Number(std::f64::consts::PI)));
+                        initial_exports.push(("هـ".to_string(), Value::Number(std::f64::consts::E)));
+                        initial_exports.push(("قيمة_هـ".to_string(), Value::Number(std::f64::consts::E)));
+                    }
+                    let mod_val = Value::Module {
+                        name: module.clone(),
+                        exports: std::rc::Rc::new(std::cell::RefCell::new(initial_exports)),
+                    };
+                    self.scopes.last_mut().expect("scope exists").insert(target_name, mod_val);
+                    return Ok(Flow::Next);
+                }
+
+                if let Some(builtin_src) = crate::modules::resolve_builtin_module(module) {
+                    let tokens = crate::lexer::tokenize(builtin_src)?;
+                    let stmts = crate::parser::parse(tokens)?;
+                    let mut child = Interpreter::for_cli();
+                    child.run_program(&stmts)?;
+                    let mut exports = Vec::new();
+                    for (k, v) in &child.scopes[0] {
+                        exports.push((k.clone(), v.clone()));
+                    }
+                    for (fname, func) in &child.functions {
+                        exports.push((fname.clone(), Value::Lambda {
+                            params: func.params.clone(),
+                            body: func.body.clone(),
+                            captured: Vec::new(),
+                        }));
+                    }
+                    let mod_val = Value::Module {
+                        name: module.clone(),
+                        exports: std::rc::Rc::new(std::cell::RefCell::new(exports)),
+                    };
+                    self.scopes.last_mut().expect("scope exists").insert(target_name, mod_val);
+                    return Ok(Flow::Next);
+                }
+
+                let p = std::path::Path::new(module);
+                if p.exists() || module.ends_with(".lsn") {
+                    let stmts = crate::modules::load_file(p)?;
+                    let mut child = Interpreter::for_cli();
+                    child.run_program(&stmts)?;
+                    let mut exports = Vec::new();
+                    for (k, v) in &child.scopes[0] {
+                        exports.push((k.clone(), v.clone()));
+                    }
+                    for (fname, func) in &child.functions {
+                        exports.push((fname.clone(), Value::Lambda {
+                            params: func.params.clone(),
+                            body: func.body.clone(),
+                            captured: Vec::new(),
+                        }));
+                    }
+                    let mod_val = Value::Module {
+                        name: module.clone(),
+                        exports: std::rc::Rc::new(std::cell::RefCell::new(exports)),
+                    };
+                    self.scopes.last_mut().expect("scope exists").insert(target_name, mod_val);
+                    return Ok(Flow::Next);
+                }
+
+                return Err(format!("الوحدة '{}' غير معروفة ولا يمكن العثور عليها", module));
+            }
+            Stmt::FromImport { module, items } => {
+                let norm = crate::diagnostics::normalize_arabic(module);
+                let is_math = matches!(norm.as_str(), "رياضيات" | "math");
+                let is_sys = matches!(norm.as_str(), "نظام" | "sys" | "os");
+                let is_fs = matches!(norm.as_str(), "ملفات" | "io" | "fs");
+                let is_time = matches!(norm.as_str(), "وقت" | "time");
+                let is_rand = matches!(norm.as_str(), "عشوائي" | "random");
+                let is_json = matches!(norm.as_str(), "جيسون" | "json");
+
+                if is_math || is_sys || is_fs || is_time || is_rand || is_json {
+                    for item in items {
+                        if (item == "ط" || item == "قيمة_ط") && is_math {
+                            self.scopes.last_mut().expect("scope exists").insert(item.clone(), Value::Number(std::f64::consts::PI));
+                        } else if (item == "هـ" || item == "قيمة_هـ") && is_math {
+                            self.scopes.last_mut().expect("scope exists").insert(item.clone(), Value::Number(std::f64::consts::E));
+                        } else if is_builtin(item) {
+                            // Function is built-in; already available via call_builtin
+                        } else {
+                            return Err(format!("العنصر '{}' غير موجود في الوحدة القياسية '{}'", item, module));
+                        }
+                    }
+                    return Ok(Flow::Next);
+                }
+
+                let stmts = if let Some(builtin_src) = crate::modules::resolve_builtin_module(module) {
+                    let tokens = crate::lexer::tokenize(builtin_src)?;
+                    crate::parser::parse(tokens)?
+                } else {
+                    let p = std::path::Path::new(module);
+                    crate::modules::load_file(p)?
+                };
+                let mut child = Interpreter::for_cli();
+                child.run_program(&stmts)?;
+                for item in items {
+                    let mut found = false;
+                    if let Some(val) = child.scopes[0].get(item) {
+                        self.scopes.last_mut().expect("scope exists").insert(item.clone(), val.clone());
+                        found = true;
+                    }
+                    if let Some(func) = child.functions.get(item) {
+                        self.functions.insert(item.clone(), func.clone());
+                        found = true;
+                    }
+                    if let Some(cls) = child.classes.get(item) {
+                        self.classes.insert(item.clone(), cls.clone());
+                        found = true;
+                    }
+                    if !found {
+                        return Err(format!("العنصر '{}' غير موجود في الوحدة '{}'", item, module));
+                    }
+                }
+                return Ok(Flow::Next);
+            }
             Stmt::Let(name, expr) => {
                 let value = self.eval(expr)?;
                 let scope = self.scopes.last_mut().expect("scope exists");
@@ -396,6 +540,24 @@ impl Interpreter {
                     return Err(format!("المتغير '{}' معرّف من قبل في هذا النطاق", name));
                 }
                 scope.insert(name.clone(), value);
+            }
+            Stmt::LetUnpack(names, expr) => {
+                let value = self.eval(expr)?;
+                let items: Vec<Value> = match value {
+                    Value::List(l) => l.borrow().clone(),
+                    Value::Tuple(t) => t,
+                    _ => return Err("فك التعبئة يتطلب قائمة أو صفًا".into()),
+                };
+                if items.len() != names.len() {
+                    return Err(format!("فشل فك التعبئة: عدد المتغيرات ({}) لا يطابق عدد العناصر ({})", names.len(), items.len()));
+                }
+                let scope = self.scopes.last_mut().expect("scope exists");
+                for (name, item) in names.iter().zip(items) {
+                    if scope.contains_key(name) {
+                        return Err(format!("المتغير '{}' معرّف من قبل في هذا النطاق", name));
+                    }
+                    scope.insert(name.clone(), item);
+                }
             }
             Stmt::Print(expr) => {
                 let value = self.eval(expr)?;
@@ -437,6 +599,74 @@ impl Interpreter {
                         signal @ Flow::Return(_) => return Ok(signal),
                     }
                 }
+            }
+            Stmt::ForEachUnpack(names, iterable, stmts) => {
+                let values = match self.eval(iterable)? {
+                    Value::List(items) => items.borrow().clone(),
+                    Value::Tuple(items) => items,
+                    Value::Set(items) => items.borrow().clone(),
+                    _ => return Err("حلقة لكل مع فك التعبئة تتطلب قائمة أو صفًا أو مجموعة من العناصر".into()),
+                };
+                for element in values {
+                    self.tick()?;
+                    let sub_items: Vec<Value> = match element {
+                        Value::List(items) => items.borrow().clone(),
+                        Value::Tuple(items) => items,
+                        _ => return Err("كل عنصر في حلقة فك التعبئة يجب أن يكون قائمة أو صفًا".into()),
+                    };
+                    if sub_items.len() != names.len() {
+                        return Err(format!("فشل فك التعبئة في حلقة لكل: عدد المتغيرات ({}) لا يطابق عدد العناصر ({})", names.len(), sub_items.len()));
+                    }
+                    let mut scope = HashMap::new();
+                    for (name, val) in names.iter().zip(sub_items) {
+                        scope.insert(name.clone(), val);
+                    }
+                    self.scopes.push(scope);
+                    let result = self.execute_statements(stmts, false);
+                    self.scopes.pop();
+                    match result? {
+                        Flow::Next | Flow::Continue => {},
+                        Flow::Break => break,
+                        signal @ Flow::Return(_) => return Ok(signal),
+                    }
+                }
+            }
+            Stmt::With { expr, alias, body } => {
+                let target_obj = self.eval(expr)?;
+                let enter_val = match &target_obj {
+                    Value::Instance { class_name, .. } => {
+                        if let Ok(Some((owner_class, enter_method))) = self.find_class_method(class_name, "ادخل") {
+                            let span = self.current_span;
+                            self.call_stack.push((format!("{}.ادخل", owner_class), span));
+                            let res = self.invoke_method(target_obj.clone(), &owner_class, &enter_method, vec![]);
+                            if res.is_ok() { self.call_stack.pop(); }
+                            res?
+                        } else {
+                            target_obj.clone()
+                        }
+                    }
+                    _ => target_obj.clone(),
+                };
+
+                let mut scope = HashMap::new();
+                if let Some(alias_name) = alias {
+                    scope.insert(alias_name.clone(), enter_val);
+                }
+                self.scopes.push(scope);
+                let body_result = self.execute_statements(body, false);
+                self.scopes.pop();
+
+                if let Value::Instance { class_name, .. } = &target_obj {
+                    if let Ok(Some((owner_class, exit_method))) = self.find_class_method(class_name, "اخرج") {
+                        let span = self.current_span;
+                        self.call_stack.push((format!("{}.اخرج", owner_class), span));
+                        let exit_res = self.invoke_method(target_obj.clone(), &owner_class, &exit_method, vec![]);
+                        if exit_res.is_ok() { self.call_stack.pop(); }
+                        let _ = exit_res;
+                    }
+                }
+
+                return body_result;
             }
             Stmt::Function(f) => { self.functions.insert(f.name.clone(), f.clone()); }
             Stmt::Class(c) => {
@@ -509,6 +739,12 @@ impl Interpreter {
         if let Some(val) = self.scopes.iter().rev().find_map(|scope| scope.get(name)) {
             return Ok(val.clone());
         }
+        if name == "ط" || name == "قيمة_ط" {
+            return Ok(Value::Number(std::f64::consts::PI));
+        }
+        if name == "هـ" || name == "قيمة_هـ" {
+            return Ok(Value::Number(std::f64::consts::E));
+        }
         if let Some(f) = self.functions.get(name) {
             return Ok(Value::Lambda {
                 params: f.params.clone(),
@@ -529,6 +765,16 @@ impl Interpreter {
             available.push(c.as_str());
         }
         Err(crate::diagnostics::suggest_variable_error(name, &available))
+    }
+
+    fn assign_variable(&mut self, name: &str, value: Value) -> Result<Value, String> {
+        for scope in self.scopes.iter_mut().rev() {
+            if scope.contains_key(name) {
+                scope.insert(name.to_string(), value.clone());
+                return Ok(value);
+            }
+        }
+        Err(format!("لا يمكن الإسناد لمتغير غير معرّف: '{}'", name))
     }
 
     fn eval_bool(&mut self, expr: &Expr) -> Result<bool, String> {
@@ -584,13 +830,33 @@ impl Interpreter {
             Expr::Variable(name) => self.get_variable(name),
             Expr::Assign(name, expr) => {
                 let value = self.eval(expr)?;
-                for scope in self.scopes.iter_mut().rev() {
-                    if scope.contains_key(name) {
-                        scope.insert(name.clone(), value.clone());
-                        return Ok(value);
+                self.assign_variable(name, value)
+            }
+            Expr::AssignUnpack(names, expr) => {
+                let val = self.eval(expr)?;
+                let items: Vec<Value> = match &val {
+                    Value::List(l) => l.borrow().clone(),
+                    Value::Tuple(t) => t.clone(),
+                    _ => return Err("فك التعبئة يتطلب قائمة أو صفًا".into()),
+                };
+                if items.len() != names.len() {
+                    return Err(format!("فشل فك التعبئة: عدد المتغيرات ({}) لا يطابق عدد العناصر ({})", names.len(), items.len()));
+                }
+                for (name, item) in names.iter().zip(items) {
+                    self.assign_variable(name, item)?;
+                }
+                Ok(val)
+            }
+            Expr::FString(parts) => {
+                let mut out = String::new();
+                for part in parts {
+                    let val = self.eval(part)?;
+                    match val {
+                        Value::Text(s) => out.push_str(&s),
+                        other => out.push_str(&other.to_string()),
                     }
                 }
-                Err(format!("لا يمكن الإسناد لمتغير غير معرّف: '{}'", name))
+                Ok(Value::Text(out))
             }
             Expr::Index(target, index) => {
                 let value = self.eval(target)?;
@@ -853,21 +1119,26 @@ impl Interpreter {
     #[inline(never)]
     fn invoke_method(&mut self, self_val: Value, owner_class: &str, method: &Function, evaluated_args: Vec<Value>) -> Result<Value, String> {
         let min_params = method.defaults.iter().filter(|d| d.is_none()).count();
-        let max_params = method.params.len();
+        let max_params = if method.vararg.is_some() { usize::MAX } else { method.params.len() };
         if evaluated_args.len() < min_params || evaluated_args.len() > max_params {
-            if min_params == max_params {
+            if min_params == method.params.len() && method.vararg.is_none() {
                 return Err(format!("الطريقة '{}.{}' تتوقع {} معاملات، استلمت {}",
                     owner_class, method.name, method.params.len(), evaluated_args.len()));
+            } else if method.vararg.is_some() {
+                return Err(format!("الطريقة '{}.{}' تتوقع على الأقل {} معاملات، استلمت {}",
+                    owner_class, method.name, min_params, evaluated_args.len()));
             } else {
                 return Err(format!("الطريقة '{}.{}' تتوقع ما بين {} و {} معاملات، استلمت {}",
-                    owner_class, method.name, min_params, max_params, evaluated_args.len()));
+                    owner_class, method.name, min_params, method.params.len(), evaluated_args.len()));
             }
         }
         let mut full_args = evaluated_args;
-        for i in full_args.len()..max_params {
-            if let Some(Some(default_expr)) = method.defaults.get(i) {
-                let default_val = self.eval(default_expr)?;
-                full_args.push(default_val);
+        if full_args.len() < method.params.len() {
+            for i in full_args.len()..method.params.len() {
+                if let Some(Some(default_expr)) = method.defaults.get(i) {
+                    let default_val = self.eval(default_expr)?;
+                    full_args.push(default_val);
+                }
             }
         }
         if self.call_depth >= self.limits.max_call_depth {
@@ -877,8 +1148,17 @@ impl Interpreter {
         local.insert("هذا".to_string(), self_val.clone());
         local.insert("ذاتي".to_string(), self_val);
         local.insert("__class_owner".to_string(), Value::Text(owner_class.to_string()));
-        for (param, arg) in method.params.iter().zip(full_args) {
-            local.insert(param.clone(), arg);
+        let positional_count = method.params.len().min(full_args.len());
+        for i in 0..positional_count {
+            local.insert(method.params[i].clone(), full_args[i].clone());
+        }
+        if let Some(ref vname) = method.vararg {
+            let varargs = if full_args.len() > method.params.len() {
+                full_args[method.params.len()..].to_vec()
+            } else {
+                Vec::new()
+            };
+            local.insert(vname.clone(), Value::list(varargs));
         }
         let globals = self.scopes[0].clone();
         let previous_scopes = std::mem::replace(&mut self.scopes, vec![globals, local]);
@@ -896,9 +1176,13 @@ impl Interpreter {
     }
 
     #[inline(never)]
-    fn invoke_lambda(&mut self, params: &[String], body: &[Stmt], captured: &[(String, Value)], evaluated_args: Vec<Value>) -> Result<Value, String> {
-        if params.len() != evaluated_args.len() {
-            return Err(format!("الدالة تتوقع {} معاملات، استلمت {}", params.len(), evaluated_args.len()));
+    fn invoke_lambda(&mut self, params: &[String], vararg: Option<&str>, body: &[Stmt], captured: &[(String, Value)], evaluated_args: Vec<Value>) -> Result<Value, String> {
+        let min_params = params.len();
+        if vararg.is_none() && evaluated_args.len() != min_params {
+            return Err(format!("الدالة تتوقع {} معاملات، استلمت {}", min_params, evaluated_args.len()));
+        }
+        if vararg.is_some() && evaluated_args.len() < min_params {
+            return Err(format!("الدالة تتوقع على الأقل {} معاملات، استلمت {}", min_params, evaluated_args.len()));
         }
         if self.call_depth >= self.limits.max_call_depth {
             return Err("تجاوز الحد الآمن لعمق استدعاء الدوال".into());
@@ -907,8 +1191,17 @@ impl Interpreter {
         for (k, v) in captured {
             local.insert(k.clone(), v.clone());
         }
-        for (param, arg) in params.iter().zip(evaluated_args) {
-            local.insert(param.clone(), arg);
+        let positional_count = params.len().min(evaluated_args.len());
+        for i in 0..positional_count {
+            local.insert(params[i].clone(), evaluated_args[i].clone());
+        }
+        if let Some(vname) = vararg {
+            let varargs = if evaluated_args.len() > params.len() {
+                evaluated_args[params.len()..].to_vec()
+            } else {
+                Vec::new()
+            };
+            local.insert(vname.to_string(), Value::list(varargs));
         }
         let globals = self.scopes[0].clone();
         let previous_scopes = std::mem::replace(&mut self.scopes, vec![globals, local]);
@@ -957,6 +1250,22 @@ impl Interpreter {
                 "طول" | "حجم" => Ok(Value::Number(pairs.borrow().len() as f64)),
                 _ => Err(format!("خاصية '{}' غير معروفة للقواميس", prop)),
             },
+            Value::Module { ref name, ref exports } => {
+                let borrowed = exports.borrow();
+                if let Some((_, val)) = borrowed.iter().find(|(k, _)| k == prop) {
+                    return Ok(val.clone());
+                }
+                let norm = crate::diagnostics::normalize_arabic(name);
+                if matches!(norm.as_str(), "رياضيات" | "math") {
+                    if prop == "ط" || prop == "قيمة_ط" {
+                        return Ok(Value::Number(std::f64::consts::PI));
+                    }
+                    if prop == "هـ" || prop == "قيمة_هـ" {
+                        return Ok(Value::Number(std::f64::consts::E));
+                    }
+                }
+                Err(format!("الخاصية '{}' غير موجودة في الوحدة '{}'", prop, name))
+            }
             _ => Err("الوصول للخصائص عبر '.' يتطلب كائنًا أو بنية بيانات".into()),
         }
     }
@@ -1020,6 +1329,56 @@ impl Interpreter {
 
         match obj {
             Value::Instance { class_name, fields } => {
+                if class_name == "ملف" {
+                    let path = fields.borrow().iter().find(|(k, _)| k == "مسار").map(|(_, v)| v.clone());
+                    let path_str = match path {
+                        Some(Value::Text(ref s)) => s.clone(),
+                        _ => return Err("ملف غير صالح: لا يوجد مسار".into()),
+                    };
+                    return match method_name {
+                        "اقرأ" | "اقرا" | "read" => {
+                            let contents = std::fs::read_to_string(&path_str)
+                                .map_err(|e| format!("فشل قراءة الملف '{}': {}", path_str, e))?;
+                            Ok(Value::Text(contents))
+                        }
+                        "اكتب" | "write" if evaluated_args.len() == 1 => {
+                            let text = match &evaluated_args[0] {
+                                Value::Text(s) => s.clone(),
+                                other => other.to_string(),
+                            };
+                            std::fs::write(&path_str, text)
+                                .map_err(|e| format!("فشل الكتابة إلى الملف '{}': {}", path_str, e))?;
+                            Ok(Value::Bool(true))
+                        }
+                        "ألحق" | "الحق" | "append" if evaluated_args.len() == 1 => {
+                            use std::io::Write;
+                            let text = match &evaluated_args[0] {
+                                Value::Text(s) => s.clone(),
+                                other => other.to_string(),
+                            };
+                            let mut file = std::fs::OpenOptions::new()
+                                .create(true).append(true).open(&path_str)
+                                .map_err(|e| format!("فشل فتح الملف للإلحاق '{}': {}", path_str, e))?;
+                            file.write_all(text.as_bytes())
+                                .map_err(|e| format!("فشل الإلحاق بالملف '{}': {}", path_str, e))?;
+                            Ok(Value::Bool(true))
+                        }
+                        "أغلق" | "اغلاق" | "close" => {
+                            if let Some((_, v)) = fields.borrow_mut().iter_mut().find(|(k, _)| k == "مفتوح") {
+                                *v = Value::Bool(false);
+                            }
+                            Ok(Value::Null)
+                        }
+                        "ادخل" | "__enter__" => Ok(Value::Instance { class_name, fields }),
+                        "اخرج" | "__exit__" => {
+                            if let Some((_, v)) = fields.borrow_mut().iter_mut().find(|(k, _)| k == "مفتوح") {
+                                *v = Value::Bool(false);
+                            }
+                            Ok(Value::Null)
+                        }
+                        _ => Err(format!("الطريقة '{}' غير معروفة لكائن الملف", method_name)),
+                    };
+                }
                 let (owner_class, method) = match self.find_class_method(&class_name, method_name)? {
                     Some(found) => found,
                     None => {
@@ -1064,7 +1423,7 @@ impl Interpreter {
             Value::List(items) => {
                 match method_name {
                     "طول" if evaluated_args.is_empty() => Ok(Value::Number(items.borrow().len() as f64)),
-                    "أضف" | "اضف" if evaluated_args.len() == 1 => {
+                    "أضف" | "اضف" | "ألحق" | "الحق" if evaluated_args.len() == 1 => {
                         let mut borrowed = items.borrow_mut();
                         if borrowed.len() >= max_list_size() {
                             return Err("القائمة تجاوزت الحد الأقصى".into());
@@ -1132,7 +1491,7 @@ impl Interpreter {
                             let snapshot = items.borrow().clone();
                             let mut mapped = Vec::with_capacity(snapshot.len());
                             for item in snapshot {
-                                mapped.push(self.invoke_lambda(params, body, captured, vec![item])?);
+                                mapped.push(self.invoke_lambda(params, None, body, captured, vec![item])?);
                             }
                             Ok(Value::list(mapped))
                         }
@@ -1143,7 +1502,7 @@ impl Interpreter {
                             let snapshot = items.borrow().clone();
                             let mut filtered = Vec::new();
                             for item in snapshot {
-                                match self.invoke_lambda(params, body, captured, vec![item.clone()])? {
+                                match self.invoke_lambda(params, None, body, captured, vec![item.clone()])? {
                                     Value::Bool(true) => filtered.push(item),
                                     Value::Bool(false) => {}
                                     _ => return Err("دالة الترشيح في رشّح يجب أن ترجع قيمة منطقية".into()),
@@ -1158,7 +1517,7 @@ impl Interpreter {
                             let snapshot = items.borrow().clone();
                             let mut acc = evaluated_args[0].clone();
                             for item in snapshot {
-                                acc = self.invoke_lambda(params, body, captured, vec![acc, item])?;
+                                acc = self.invoke_lambda(params, None, body, captured, vec![acc, item])?;
                             }
                             Ok(acc)
                         }
@@ -1247,7 +1606,87 @@ impl Interpreter {
                         };
                         Ok(Value::Bool(pairs.borrow().iter().any(|(k, _)| k == key)))
                     }
+                    "عناصر" if evaluated_args.is_empty() => {
+                        let items: Vec<Value> = pairs.borrow().iter()
+                            .map(|(k, v)| Value::Tuple(vec![Value::Text(k.clone()), v.clone()]))
+                            .collect();
+                        Ok(Value::list(items))
+                    }
                     _ => Err(format!("الطريقة '{}' غير مدعومة للقواميس", method_name)),
+                }
+            }
+            Value::Module { ref name, ref exports } => {
+                let borrowed = exports.borrow();
+                if let Some((_, val)) = borrowed.iter().find(|(k, _)| k == method_name) {
+                    if let Value::Lambda { params, body, captured } = val {
+                        let span = self.current_span;
+                        self.call_stack.push((format!("{}.{}", name, method_name), span));
+                        let res = self.invoke_lambda(params, None, body, captured, evaluated_args);
+                        if res.is_ok() { self.call_stack.pop(); }
+                        return res;
+                    }
+                }
+                let norm = crate::diagnostics::normalize_arabic(name);
+                match norm.as_str() {
+                    "رياضيات" | "math" => {
+                        let m = crate::diagnostics::normalize_arabic(method_name);
+                        match m.as_str() {
+                            "جذر" | "مطلق" | "قرب" | "قرّب" | "ارضية" | "أرضية" | "سقف" | "قوة"
+                            | "اعلى" | "أعلى" | "ادنى" | "أدنى" | "مجموع" | "متوسط"
+                            | "جا" | "جتا" | "ظا" | "لوغاريتم" | "لوغ" | "اسي" | "أسي" => {
+                                call_builtin(method_name, evaluated_args)
+                            }
+                            _ => Err(format!("الدالة الرياضية '{}' غير معروفة في وحدة الرياضيات", method_name)),
+                        }
+                    }
+                    "ملفات" | "io" | "fs" => {
+                        match method_name {
+                            "اقرأ_ملف" | "اكتب_ملف" | "ألحق_ملف" | "الحق_ملف"
+                            | "ملف_موجود" | "مجلد_موجود" | "أنشئ_مجلد" | "انشئ_مجلد"
+                            | "احذف_ملف" | "قائمة_ملفات" | "افتح" => {
+                                call_builtin(method_name, evaluated_args)
+                            }
+                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة الملفات", method_name)),
+                        }
+                    }
+                    "نظام" | "sys" | "os" => {
+                        match method_name {
+                            "بيئة" | "وسائط" | "مسار_حالي" | "نظام_تشغيل" | "خروج" => {
+                                call_builtin(method_name, evaluated_args)
+                            }
+                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة النظام", method_name)),
+                        }
+                    }
+                    "وقت" | "time" => {
+                        match method_name {
+                            "الآن" | "الان" | "طابع_زمني" | "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" => {
+                                call_builtin(method_name, evaluated_args)
+                            }
+                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة الوقت", method_name)),
+                        }
+                    }
+                    "عشوائي" | "random" => {
+                        match method_name {
+                            "عشوائي" | "عدد_عشوائي" | "عنصر_عشوائي" | "خلط" => {
+                                call_builtin(method_name, evaluated_args)
+                            }
+                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة العشوائي", method_name)),
+                        }
+                    }
+                    "جيسون" | "json" => {
+                        match method_name {
+                            "تحليل" | "تحليل_json" => call_builtin("تحليل_json", evaluated_args),
+                            "ترميز" | "ترميز_json" => call_builtin("ترميز_json", evaluated_args),
+                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة جيسون", method_name)),
+                        }
+                    }
+                    _ => {
+                        if is_builtin(method_name) {
+                            call_builtin(method_name, evaluated_args)
+                        } else {
+                            Err(format!("الطريقة '{}' غير موجودة في الوحدة '{}'", method_name, name))
+                        }
+                    }
                 }
             }
             Value::Set(items) => {
@@ -1256,7 +1695,7 @@ impl Interpreter {
                     "يحتوي" | "تحتوي" if evaluated_args.len() == 1 => {
                         Ok(Value::Bool(items.borrow().contains(&evaluated_args[0])))
                     }
-                    "أضف" | "اضف" if evaluated_args.len() == 1 => {
+                    "أضف" | "اضف" | "ألحق" | "الحق" if evaluated_args.len() == 1 => {
                         let mut borrowed = items.borrow_mut();
                         if !borrowed.contains(&evaluated_args[0]) {
                             if borrowed.len() >= max_list_size() {
@@ -1374,24 +1813,29 @@ impl Interpreter {
             };
             if let Some((owner_class, ctor)) = self.find_class_constructor(name)? {
                 let min_params = ctor.defaults.iter().filter(|d| d.is_none()).count();
-                let max_params = ctor.params.len();
+                let max_params = if ctor.vararg.is_some() { usize::MAX } else { ctor.params.len() };
                 if args.len() < min_params || args.len() > max_params {
-                    if min_params == max_params {
+                    if min_params == ctor.params.len() && ctor.vararg.is_none() {
                         return Err(format!("دالة بناء الصنف '{}' تتوقع {} معاملات، استلمت {}",
                             name, ctor.params.len(), args.len()));
+                    } else if ctor.vararg.is_some() {
+                        return Err(format!("دالة بناء الصنف '{}' تتوقع على الأقل {} معاملات، استلمت {}",
+                            name, min_params, args.len()));
                     } else {
                         return Err(format!("دالة بناء الصنف '{}' تتوقع ما بين {} و {} معاملات، استلمت {}",
-                            name, min_params, max_params, args.len()));
+                            name, min_params, ctor.params.len(), args.len()));
                     }
                 }
-                let mut evaluated_args = Vec::with_capacity(max_params);
+                let mut evaluated_args = Vec::with_capacity(args.len());
                 for arg in args {
                     evaluated_args.push(self.eval(arg)?);
                 }
-                for i in evaluated_args.len()..max_params {
-                    if let Some(Some(default_expr)) = ctor.defaults.get(i) {
-                        let default_val = self.eval(default_expr)?;
-                        evaluated_args.push(default_val);
+                if evaluated_args.len() < ctor.params.len() {
+                    for i in evaluated_args.len()..ctor.params.len() {
+                        if let Some(Some(default_expr)) = ctor.defaults.get(i) {
+                            let default_val = self.eval(default_expr)?;
+                            evaluated_args.push(default_val);
+                        }
                     }
                 }
                 let span = self.current_span;
@@ -1413,7 +1857,7 @@ impl Interpreter {
             }
             let span = self.current_span;
             self.call_stack.push((name.to_string(), span));
-            let res = self.invoke_lambda(&params, &body, &captured, evaluated_args);
+            let res = self.invoke_lambda(&params, None, &body, &captured, evaluated_args);
             if res.is_ok() {
                 self.call_stack.pop();
             }
@@ -1435,27 +1879,31 @@ impl Interpreter {
             }
         };
         let min_params = function.defaults.iter().filter(|d| d.is_none()).count();
-        let max_params = function.params.len();
+        let max_params = if function.vararg.is_some() { usize::MAX } else { function.params.len() };
         if args.len() < min_params || args.len() > max_params {
-            if min_params == max_params {
-                return Err(format!("الدالة '{}' تتوقع {} معاملات، استلمت {}", name, max_params, args.len()));
+            if min_params == function.params.len() && function.vararg.is_none() {
+                return Err(format!("الدالة '{}' تتوقع {} معاملات، استلمت {}", name, function.params.len(), args.len()));
+            } else if function.vararg.is_some() {
+                return Err(format!("الدالة '{}' تتوقع على الأقل {} معاملات، استلمت {}", name, min_params, args.len()));
             } else {
-                return Err(format!("الدالة '{}' تتوقع ما بين {} و {} معاملات، استلمت {}", name, min_params, max_params, args.len()));
+                return Err(format!("الدالة '{}' تتوقع ما بين {} و {} معاملات، استلمت {}", name, min_params, function.params.len(), args.len()));
             }
         }
-        let mut evaluated_args = Vec::with_capacity(max_params);
+        let mut evaluated_args = Vec::with_capacity(args.len());
         for arg in args {
             evaluated_args.push(self.eval(arg)?);
         }
-        for i in evaluated_args.len()..max_params {
-            if let Some(Some(default_expr)) = function.defaults.get(i) {
-                let default_val = self.eval(default_expr)?;
-                evaluated_args.push(default_val);
+        if evaluated_args.len() < function.params.len() {
+            for i in evaluated_args.len()..function.params.len() {
+                if let Some(Some(default_expr)) = function.defaults.get(i) {
+                    let default_val = self.eval(default_expr)?;
+                    evaluated_args.push(default_val);
+                }
             }
         }
         let span = self.current_span;
         self.call_stack.push((name.to_string(), span));
-        let res = self.invoke_lambda(&function.params, &function.body, &[], evaluated_args);
+        let res = self.invoke_lambda(&function.params, function.vararg.as_deref(), &function.body, &[], evaluated_args);
         if res.is_ok() {
             self.call_stack.pop();
         }
@@ -1536,9 +1984,11 @@ fn checked_key(key: Value) -> Result<String, String> {
 
 fn is_builtin(name: &str) -> bool {
     matches!(name,
-        "طول" | "نوع" | "نص" | "عدد" | "أضف" | "اضف" | "مدى" | "يحتوي" |
+        "طول" | "نوع" | "نص" | "عدد" | "أضف" | "اضف" | "ألحق" | "الحق" | "مدى" | "يحتوي" |
         "صف" | "مجموعة" |
         "أي" | "اي" | "كل" | "مرقم" | "سحاب" |
+        "جا" | "جتا" | "ظا" | "لوغاريتم" | "لوغ" | "أسي" | "اسي" |
+        "ط" | "قيمة_ط" | "هـ" | "قيمة_هـ" | "طابع_زمني" | "خلط" | "عناصر" | "نظام_تشغيل" | "افتح" |
         "مفاتيح" | "قيم" | "احذف" | "قسّم" | "قسم" | "ادمج" | "استبدل" |
         "اقتطع" | "نظّف" | "نظف" | "مطلق" | "جذر" | "قرّب" | "قرب" |
         "أرضية" | "ارضية" | "سقف" | "قوة" |
@@ -1729,6 +2179,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 Value::Set(_) => "مجموعة".to_string(),
                 Value::Map(_) => "قاموس".to_string(),
                 Value::Instance { class_name, .. } => class_name.clone(),
+                Value::Module { .. } => "وحدة".to_string(),
                 Value::Lambda { .. } => "دالة".to_string(),
             };
             Ok(Value::Text(kind))
@@ -1773,7 +2224,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 Ok(Value::set(args))
             }
         }
-        "أضف" | "اضف" => {
+        "أضف" | "اضف" | "ألحق" | "الحق" => {
             require_args(name, &args, 2)?;
             match &args[0] {
                 Value::List(items) => {
@@ -1914,7 +2365,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 _ => Err("نظّف تتطلب نصًا".into()),
             }
         }
-        "مطلق" | "جذر" | "قرّب" | "قرب" => {
+        "مطلق" | "جذر" | "قرّب" | "قرب" | "جا" | "جتا" | "ظا" | "لوغاريتم" | "لوغ" | "أسي" | "اسي" => {
             require_args(name, &args, 1)?;
             match args[0] {
                 Value::Number(num) => {
@@ -1922,6 +2373,12 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                         "مطلق" => num.abs(),
                         "جذر" if num >= 0.0 => num.sqrt(),
                         "جذر" => return Err("الجذر التربيعي لعدد سالب غير مدعوم".into()),
+                        "جا" => num.sin(),
+                        "جتا" => num.cos(),
+                        "ظا" => num.tan(),
+                        "لوغاريتم" | "لوغ" if num > 0.0 => num.ln(),
+                        "لوغاريتم" | "لوغ" => return Err("اللوغاريتم يتطلب عددًا موجبًا أكبر من الصفر".into()),
+                        "أسي" | "اسي" => num.exp(),
                         _ => num.round(),
                     };
                     if !result.is_finite() { return Err("الناتج خارج نطاق الأعداد".into()); }
@@ -1929,6 +2386,77 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 }
                 _ => Err("تتطلب الدالة عددًا".into()),
             }
+        }
+        "ط" | "قيمة_ط" => {
+            if !args.is_empty() { return Err("ط لا تقبل معاملات".into()); }
+            Ok(Value::Number(std::f64::consts::PI))
+        }
+        "هـ" | "قيمة_هـ" => {
+            if !args.is_empty() { return Err("هـ لا تقبل معاملات".into()); }
+            Ok(Value::Number(std::f64::consts::E))
+        }
+        "طابع_زمني" => {
+            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+            Ok(Value::Number(now.as_secs_f64()))
+        }
+        "نظام_تشغيل" => {
+            Ok(Value::Text(std::env::consts::OS.to_string()))
+        }
+        "خلط" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::List(items) => {
+                    let mut borrowed = items.borrow_mut();
+                    let len = borrowed.len();
+                    if len > 1 {
+                        for i in (1..len).rev() {
+                            let j = (next_random_u64() as usize) % (i + 1);
+                            borrowed.swap(i, j);
+                        }
+                    }
+                    drop(borrowed);
+                    Ok(Value::List(items.clone()))
+                }
+                _ => Err("خلط تتطلب قائمة".into()),
+            }
+        }
+        "عناصر" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Map(pairs) => {
+                    let items: Vec<Value> = pairs.borrow().iter()
+                        .map(|(k, v)| Value::Tuple(vec![Value::Text(k.clone()), v.clone()]))
+                        .collect();
+                    Ok(Value::list(items))
+                }
+                _ => Err("عناصر تتطلب قاموسًا".into()),
+            }
+        }
+        "افتح" => {
+            if args.is_empty() || args.len() > 2 {
+                return Err("افتح تتطلب مسار الملف ونمط الفتح اختياريًا".into());
+            }
+            let path = match &args[0] {
+                Value::Text(p) => p.clone(),
+                _ => return Err("مسار الملف في افتح يجب أن يكون نصًا".into()),
+            };
+            let mode = if args.len() == 2 {
+                match &args[1] {
+                    Value::Text(m) => m.clone(),
+                    _ => return Err("نمط الفتح في افتح يجب أن يكون نصًا ('ق'، 'ك'، 'لحق')".into()),
+                }
+            } else {
+                "ق".to_string()
+            };
+            let fields = vec![
+                ("مسار".to_string(), Value::Text(path)),
+                ("نمط".to_string(), Value::Text(mode)),
+                ("مفتوح".to_string(), Value::Bool(true)),
+            ];
+            Ok(Value::Instance {
+                class_name: "ملف".to_string(),
+                fields: std::rc::Rc::new(std::cell::RefCell::new(fields)),
+            })
         }
         "أدنى" | "ادنى" | "أعلى" | "اعلى" => {
             require_args(name, &args, 2)?;

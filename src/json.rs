@@ -287,6 +287,9 @@ fn serialize_value(value: &Value, out: &mut String) -> Result<(), String> {
         Value::Lambda { .. } => {
             return Err("لا يمكن تحويل دالة مجهولة إلى JSON".into());
         }
+        Value::Module { name, .. } => {
+            return Err(format!("لا يمكن تحويل الوحدة '{}' إلى JSON", name));
+        }
     }
     Ok(())
 }

@@ -3,7 +3,8 @@ pub enum TokenKind {
     Let, Print, If, Else, While, ForEach, In, Function, Return, Import, Break, Continue, True, False, Null,
     Try, Catch, Finally, Throw, Match, Case, Default,
     Class, New, Extends,
-    Identifier(String), Number(f64), String(String),
+    With, As, From,
+    Identifier(String), Number(f64), String(String), FString(String),
     LeftParen, RightParen, LeftBrace, RightBrace, LeftBracket, RightBracket, Comma, Colon, Semicolon, Dot, FatArrow,
     Plus, Minus, Star, Power, Slash, Percent,
     Equal, EqualEqual, Bang, BangEqual,
@@ -76,6 +77,100 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
             '>' => TokenKind::Greater,
             '&' if chars.get(i + 1) == Some(&'&') => { i += 1; column += 1; TokenKind::AndAnd }
             '|' if chars.get(i + 1) == Some(&'|') => { i += 1; column += 1; TokenKind::OrOr }
+            'ن' | 'f' | 'F' if chars.get(i + 1) == Some(&'"') => {
+                i += 1; // skip prefix 'ن' / 'f'
+                column += 1;
+                i += 1; // skip opening quote '"'
+                column += 1;
+                let mut s = String::new();
+                let mut closed = false;
+                let mut brace_depth: usize = 0;
+                while i < chars.len() {
+                    let x = chars[i];
+                    if brace_depth == 0 && x == '"' {
+                        closed = true;
+                        break;
+                    }
+                    if x == '\n' {
+                        return Err(format!("السطر {}، العمود {}: نص غير مغلق", start_line, start_col));
+                    }
+                    if brace_depth == 0 {
+                        if x == '{' && chars.get(i + 1) == Some(&'{') {
+                            s.push('{');
+                            s.push('{');
+                            i += 2;
+                            column += 2;
+                            continue;
+                        }
+                        if x == '}' && chars.get(i + 1) == Some(&'}') {
+                            s.push('}');
+                            s.push('}');
+                            i += 2;
+                            column += 2;
+                            continue;
+                        }
+                        if x == '{' {
+                            brace_depth += 1;
+                            s.push(x);
+                            i += 1;
+                            column += 1;
+                            continue;
+                        }
+                        if x == '\\' {
+                            i += 1;
+                            column += 1;
+                            let escaped = chars.get(i).ok_or_else(|| format!("السطر {}: تسلسل هروب غير مكتمل", start_line))?;
+                            s.push(match escaped {
+                                'n' => '\n', 't' => '\t', 'r' => '\r', '"' => '"', '\\' => '\\',
+                                _ => return Err(format!("السطر {}: تسلسل هروب غير معروف", start_line)),
+                            });
+                            i += 1;
+                            column += 1;
+                            continue;
+                        }
+                        s.push(x);
+                        i += 1;
+                        column += 1;
+                    } else {
+                        if x == '"' {
+                            s.push(x);
+                            i += 1;
+                            column += 1;
+                            let mut str_closed = false;
+                            while i < chars.len() {
+                                let sx = chars[i];
+                                s.push(sx);
+                                if sx == '"' { str_closed = true; break; }
+                                if sx == '\\' && i + 1 < chars.len() {
+                                    i += 1;
+                                    column += 1;
+                                    s.push(chars[i]);
+                                }
+                                i += 1;
+                                column += 1;
+                            }
+                            if !str_closed {
+                                return Err(format!("السطر {}، العمود {}: نص غير مغلق داخل تعبير f-string", start_line, start_col));
+                            }
+                            i += 1;
+                            column += 1;
+                            continue;
+                        }
+                        if x == '{' {
+                            brace_depth += 1;
+                        } else if x == '}' {
+                            brace_depth -= 1;
+                        }
+                        s.push(x);
+                        i += 1;
+                        column += 1;
+                    }
+                }
+                if !closed {
+                    return Err(format!("السطر {}، العمود {}: نص غير مغلق", start_line, start_col));
+                }
+                TokenKind::FString(s)
+            }
             '"' => {
                 i += 1;
                 column += 1;
@@ -185,6 +280,9 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
                     "صنف" | "فئة" | "هيكل" => TokenKind::Class,
                     "يرث" | "يمتد" => TokenKind::Extends,
                     "جديد" => TokenKind::New,
+                    "مع" => TokenKind::With,
+                    "كـ" | "باسم" | "كاسم" | "as" => TokenKind::As,
+                    "من" | "from" => TokenKind::From,
                     _ => TokenKind::Identifier(word),
                 }
             }

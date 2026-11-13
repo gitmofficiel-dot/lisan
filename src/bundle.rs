@@ -56,6 +56,8 @@ fn emit_expr(expr: &Expr) -> String {
         Expr::Index(base, index) => format!("Expr::Index({}, {})", boxed(base), boxed(index)),
         Expr::Slice(target, start, end, step) => format!("Expr::Slice({}, {}, {}, {})", boxed(target), emit_opt_boxed(start), emit_opt_boxed(end), emit_opt_boxed(step)),
         Expr::ListComprehension { expr, var, iterable, condition } => format!("Expr::ListComprehension {{ expr: {}, var: {}, iterable: {}, condition: {} }}", boxed(expr), str_value(var), boxed(iterable), emit_opt_boxed(condition)),
+        Expr::AssignUnpack(names, expr) => format!("Expr::AssignUnpack({}, {})", vec_expr(names, |s| str_value(s)), boxed(expr)),
+        Expr::FString(parts) => format!("Expr::FString({})", vec_expr(parts, emit_expr)),
         Expr::Unary(op, expr) => format!("Expr::Unary({}, {})", emit_op(*op), boxed(expr)),
         Expr::Binary(left, op, right) => format!("Expr::Binary({}, {}, {})", boxed(left), emit_op(*op), boxed(right)),
         Expr::Call(name, args) => format!("Expr::Call({}, {})", str_value(name), vec_expr(args, emit_expr)),
@@ -71,12 +73,24 @@ fn emit_function(f: &Function) -> String {
         None => "None".to_string(),
         Some(e) => format!("Some({})", emit_expr(e)),
     });
-    format!("Function {{name: {}, params: {}, defaults: {}, body: {}}}", str_value(&f.name), vec_expr(&f.params, |s| str_value(s)), defs, vec_expr(&f.body, emit_stmt))
+    let varg = match &f.vararg {
+        None => "None".to_string(),
+        Some(v) => format!("Some({})", str_value(v)),
+    };
+    format!("Function {{name: {}, params: {}, defaults: {}, vararg: {}, body: {}}}", str_value(&f.name), vec_expr(&f.params, |s| str_value(s)), defs, varg, vec_expr(&f.body, emit_stmt))
 }
 fn emit_stmt(stmt: &Stmt) -> String {
     match stmt {
         Stmt::Import(_) => unreachable!("module loader resolves imports before bundling"),
+        Stmt::ImportModule { module, alias } => {
+            let al = match alias { None => "None".to_string(), Some(a) => format!("Some({})", str_value(a)) };
+            format!("Stmt::ImportModule {{ module: {}, alias: {} }}", str_value(module), al)
+        }
+        Stmt::FromImport { module, items } => {
+            format!("Stmt::FromImport {{ module: {}, items: {} }}", str_value(module), vec_expr(items, |s| str_value(s)))
+        }
         Stmt::Let(name, expr) => format!("Stmt::Let({}, {})", str_value(name), emit_expr(expr)),
+        Stmt::LetUnpack(names, expr) => format!("Stmt::LetUnpack({}, {})", vec_expr(names, |s| str_value(s)), emit_expr(expr)),
         Stmt::Print(expr) => format!("Stmt::Print({})", emit_expr(expr)),
         Stmt::Expr(expr) => format!("Stmt::Expr({})", emit_expr(expr)),
         Stmt::Block(stmts) => format!("Stmt::Block({})", vec_expr(stmts, emit_stmt)),
@@ -86,6 +100,11 @@ fn emit_stmt(stmt: &Stmt) -> String {
         }
         Stmt::While(cond, body) => format!("Stmt::While({}, {})", emit_expr(cond), vec_expr(body, emit_stmt)),
         Stmt::ForEach(name, expr, body) => format!("Stmt::ForEach({}, {}, {})", str_value(name), emit_expr(expr), vec_expr(body, emit_stmt)),
+        Stmt::ForEachUnpack(names, expr, body) => format!("Stmt::ForEachUnpack({}, {}, {})", vec_expr(names, |s| str_value(s)), emit_expr(expr), vec_expr(body, emit_stmt)),
+        Stmt::With { expr, alias, body } => {
+            let al = match alias { None => "None".to_string(), Some(a) => format!("Some({})", str_value(a)) };
+            format!("Stmt::With {{ expr: {}, alias: {}, body: {} }}", emit_expr(expr), al, vec_expr(body, emit_stmt))
+        }
         Stmt::Function(fun) => format!("Stmt::Function({})", emit_function(fun)),
         Stmt::Class(c) => {
             let p = match &c.parent { None => "None".to_string(), Some(parent) => format!("Some({})", str_value(parent)) };

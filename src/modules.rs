@@ -67,6 +67,26 @@ fn load_recursive(path: &Path, visited: &mut HashSet<PathBuf>, active: &mut Vec<
                 let imported = path.parent().expect("canonical file has parent").join(imported);
                 merged.extend(load_recursive(&imported, visited, active)?);
             }
+            Stmt::ImportModule { module, alias } => {
+                validate_no_nested_imports(&statement)?;
+                if module.ends_with(".lsn") || Path::new(module).exists() {
+                    let imported = path.parent().expect("canonical file has parent").join(module);
+                    let can = fs::canonicalize(&imported).map_err(|e| format!("لا يمكن العثور على وحدة '{}': {}", imported.display(), e))?;
+                    merged.push(Stmt::ImportModule { module: can.to_string_lossy().to_string(), alias: alias.clone() });
+                } else {
+                    merged.push(statement);
+                }
+            }
+            Stmt::FromImport { module, items } => {
+                validate_no_nested_imports(&statement)?;
+                if module.ends_with(".lsn") || Path::new(module).exists() {
+                    let imported = path.parent().expect("canonical file has parent").join(module);
+                    let can = fs::canonicalize(&imported).map_err(|e| format!("لا يمكن العثور على وحدة '{}': {}", imported.display(), e))?;
+                    merged.push(Stmt::FromImport { module: can.to_string_lossy().to_string(), items: items.clone() });
+                } else {
+                    merged.push(statement);
+                }
+            }
             _ => {
                 validate_no_nested_imports(&statement)?;
                 merged.push(statement);
@@ -80,8 +100,11 @@ fn load_recursive(path: &Path, visited: &mut HashSet<PathBuf>, active: &mut Vec<
 
 fn validate_no_nested_imports(stmt: &Stmt) -> Result<(), String> {
     let nested: &[Stmt] = match stmt.unwrap_spanned() {
-        Stmt::Import(_) => return Err("استورد مسموحة في المستوى الأعلى للملف فقط".into()),
-        Stmt::Block(body) | Stmt::While(_, body) | Stmt::ForEach(_, _, body) => body,
+        Stmt::Import(_) | Stmt::ImportModule { .. } | Stmt::FromImport { .. } => {
+            return Err("استورد مسموحة في المستوى الأعلى للملف فقط".into());
+        }
+        Stmt::Block(body) | Stmt::While(_, body) | Stmt::ForEach(_, _, body)
+        | Stmt::ForEachUnpack(_, _, body) | Stmt::With { body, .. } => body,
         Stmt::Function(function) => &function.body,
         Stmt::If(_, yes, no) => {
             for entry in yes { validate_no_nested_imports(entry)?; }

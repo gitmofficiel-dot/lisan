@@ -24,6 +24,8 @@ pub enum Expr {
         iterable: Box<Expr>,
         condition: Option<Box<Expr>>,
     },
+    AssignUnpack(Vec<String>, Box<Expr>),
+    FString(Vec<Expr>),
     Spanned(Box<Expr>, usize, usize),
 }
 
@@ -50,6 +52,7 @@ pub struct Function {
     pub name: String,
     pub params: Vec<String>,
     pub defaults: Vec<Option<Expr>>,
+    pub vararg: Option<String>,
     pub body: Vec<Stmt>,
 }
 
@@ -63,13 +66,18 @@ pub struct ClassDef {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Import(String),
+    ImportModule { module: String, alias: Option<String> },
+    FromImport { module: String, items: Vec<String> },
     Let(String, Expr),
+    LetUnpack(Vec<String>, Expr),
     Print(Expr),
     Expr(Expr),
     Block(Vec<Stmt>),
     If(Expr, Vec<Stmt>, Option<Vec<Stmt>>),
     While(Expr, Vec<Stmt>),
     ForEach(String, Expr, Vec<Stmt>),
+    ForEachUnpack(Vec<String>, Expr, Vec<Stmt>),
+    With { expr: Expr, alias: Option<String>, body: Vec<Stmt> },
     Function(Function),
     Class(ClassDef),
     Return(Option<Expr>),

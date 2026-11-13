@@ -328,6 +328,7 @@ impl VM {
                             Value::Null => Value::Text("لاشيء".into()),
                             Value::Instance { class_name, .. } => Value::Text(class_name.clone()),
                             Value::Lambda { .. } => Value::Text("دالة".into()),
+                            Value::Module { .. } => Value::Text("وحدة".into()),
                         },
                         "مجموع" if args.len() == 1 => match &args[0] {
                             Value::List(items) => {
@@ -613,7 +614,7 @@ impl Compiler {
                 }
                 self.chunk.emit(OpCode::CallBuiltin(name.clone(), args.len()), 0);
             }
-            Expr::GetProperty(..) | Expr::SetProperty(..) | Expr::MethodCall(..) | Expr::Lambda(..) | Expr::Slice(..) | Expr::ListComprehension { .. } => {
+            Expr::GetProperty(..) | Expr::SetProperty(..) | Expr::MethodCall(..) | Expr::Lambda(..) | Expr::Slice(..) | Expr::ListComprehension { .. } | Expr::AssignUnpack(..) | Expr::FString(..) => {
                 return Err("الخصائص والطرق الكائنية والدوال المجهولة والتقطيع تعمل حالياً عبر المفسّر".into());
             }
         }

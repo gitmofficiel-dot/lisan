@@ -9,6 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const MAX_GENERATED_SOURCE: usize = 12_000_000;
 const RUNTIME_SOURCES: &[(&str, &str)] = &[
     ("ast.rs", include_str!("ast.rs")),
+    ("arduino.rs", include_str!("arduino.rs")),
     ("lexer.rs", include_str!("lexer.rs")),
     ("parser.rs", include_str!("parser.rs")),
     ("runtime.rs", include_str!("runtime.rs")),
@@ -16,6 +17,7 @@ const RUNTIME_SOURCES: &[(&str, &str)] = &[
     ("json.rs", include_str!("json.rs")),
     ("diagnostics.rs", include_str!("diagnostics.rs")),
     ("bytecode.rs", include_str!("bytecode.rs")),
+    ("ui.rs", include_str!("ui.rs")),
     ("vm.rs", include_str!("vm.rs")),
 ];
 
@@ -100,14 +102,16 @@ fn emit_stmt(stmt: &Stmt) -> String {
 pub fn generate_rust_main(program: &[Stmt]) -> Result<String, String> {
     let ast = vec_expr(program, emit_stmt);
     let source = format!(r#"mod ast;
-mod bytecode;
-mod diagnostics;
-mod json;
-mod lexer;
-mod modules;
-mod parser;
-mod runtime;
-mod vm;
+    mod arduino;
+    mod bytecode;
+    mod diagnostics;
+    mod json;
+    mod lexer;
+    mod modules;
+    mod parser;
+    mod runtime;
+    mod ui;
+    mod vm;
 use ast::{{ClassDef, Expr, Function, Op, Stmt}};
 fn main() {{
     let program: Vec<Stmt> = {ast};

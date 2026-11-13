@@ -181,12 +181,13 @@ impl VM {
                 }
                 OpCode::IterNext(var_name, end_dest) => {
                     let idx_val = self.stack.pop().ok_or("فقدان فهرس التكرار")?;
-                    let list_val = self.stack.last().ok_or("فقدان قائمة التكرار")?;
-                    match (list_val, &idx_val) {
+                    let list_val = self.stack.last().cloned().ok_or("فقدان قائمة التكرار")?;
+                    match (&list_val, &idx_val) {
                         (Value::List(items), Value::Number(n)) => {
                             let idx = *n as usize;
-                            if idx < items.len() {
-                                self.globals.insert(var_name.clone(), items[idx].clone());
+                            let borrowed = items.borrow();
+                            if idx < borrowed.len() {
+                                self.globals.insert(var_name.clone(), borrowed[idx].clone());
                                 self.stack.push(Value::Number((idx + 1) as f64));
                             } else {
                                 self.stack.push(idx_val);
@@ -208,7 +209,7 @@ impl VM {
                         items.push(self.pop()?);
                     }
                     items.reverse();
-                    self.stack.push(Value::List(items));
+                    self.stack.push(Value::list(items));
                 }
                 OpCode::BuildMap(count) => {
                     let mut pairs = Vec::with_capacity(*count);
@@ -221,7 +222,7 @@ impl VM {
                         pairs.push((key, val));
                     }
                     pairs.reverse();
-                    self.stack.push(Value::Map(pairs));
+                    self.stack.push(Value::map(pairs));
                 }
                 OpCode::GetIndex => {
                     let index = self.pop()?;
@@ -230,7 +231,8 @@ impl VM {
                         Value::List(items) => match index {
                             Value::Number(n) if n >= 0.0 && n.fract() == 0.0 => {
                                 let idx = n as usize;
-                                if let Some(item) = items.get(idx) {
+                                let borrowed = items.borrow();
+                                if let Some(item) = borrowed.get(idx) {
                                     self.stack.push(item.clone());
                                 } else {
                                     return Err(format!("الفهرس {} خارج حدود القائمة", idx));
@@ -240,16 +242,28 @@ impl VM {
                         },
                         Value::Map(pairs) => match index {
                             Value::Text(key) => {
-                                if let Some((_, val)) = pairs.iter().find(|(k, _)| k == &key) {
+                                let borrowed = pairs.borrow();
+                                if let Some((_, val)) = borrowed.iter().find(|(k, _)| k == &key) {
                                     self.stack.push(val.clone());
                                 } else {
-                                    let available: Vec<&str> = pairs.iter().map(|(k, _)| k.as_str()).collect();
+                                    let available: Vec<&str> = borrowed.iter().map(|(k, _)| k.as_str()).collect();
                                     return Err(crate::diagnostics::suggest_dict_key_error(&key, &available));
                                 }
                             }
                             _ => return Err("مفتاح القاموس يجب أن يكون نصاً".into()),
                         },
-                        _ => return Err("الفهرسة مدعومة فقط للقوائم والقواميس".into()),
+                        Value::Tuple(items) => match index {
+                            Value::Number(n) if n >= 0.0 && n.fract() == 0.0 => {
+                                let idx = n as usize;
+                                if let Some(item) = items.get(idx) {
+                                    self.stack.push(item.clone());
+                                } else {
+                                    return Err(format!("الفهرس {} خارج حدود الصف", idx));
+                                }
+                            }
+                            _ => return Err("فهرس الصف يجب أن يكون عدداً صحيحاً موجباً".into()),
+                        },
+                        _ => return Err("الفهرسة مدعومة فقط للقوائم والقواميس والصفوف".into()),
                     }
                 }
                 OpCode::SetIndex(var_name) => {
@@ -260,8 +274,9 @@ impl VM {
                             Value::List(items) => match index {
                                 Value::Number(n) if n >= 0.0 && n.fract() == 0.0 => {
                                     let idx = n as usize;
-                                    if idx < items.len() {
-                                        items[idx] = val.clone();
+                                    let mut borrowed = items.borrow_mut();
+                                    if idx < borrowed.len() {
+                                        borrowed[idx] = val.clone();
                                     } else {
                                         return Err(format!("الفهرس {} خارج حدود القائمة", idx));
                                     }
@@ -270,10 +285,11 @@ impl VM {
                             },
                             Value::Map(pairs) => match index {
                                 Value::Text(key) => {
-                                    if let Some((_, v)) = pairs.iter_mut().find(|(k, _)| k == &key) {
+                                    let mut borrowed = pairs.borrow_mut();
+                                    if let Some((_, v)) = borrowed.iter_mut().find(|(k, _)| k == &key) {
                                         *v = val.clone();
                                     } else {
-                                        pairs.push((key, val.clone()));
+                                        borrowed.push((key, val.clone()));
                                     }
                                 }
                                 _ => return Err("مفتاح القاموس يجب أن يكون نصاً".into()),
@@ -293,9 +309,11 @@ impl VM {
                     args.reverse();
                     let res = match name.as_str() {
                         "طول" if args.len() == 1 => match &args[0] {
-                            Value::List(l) => Value::Number(l.len() as f64),
+                            Value::List(l) => Value::Number(l.borrow().len() as f64),
                             Value::Text(t) => Value::Number(t.chars().count() as f64),
-                            Value::Map(m) => Value::Number(m.len() as f64),
+                            Value::Map(m) => Value::Number(m.borrow().len() as f64),
+                            Value::Tuple(t) => Value::Number(t.len() as f64),
+                            Value::Set(s) => Value::Number(s.borrow().len() as f64),
                             Value::Instance { fields, .. } => Value::Number(fields.borrow().len() as f64),
                             _ => return Err("طول تتطلب قائمة أو نصاً أو قاموساً أو كائناً".into()),
                         },
@@ -305,6 +323,8 @@ impl VM {
                             Value::Bool(_) => Value::Text("منطقي".into()),
                             Value::List(_) => Value::Text("قائمة".into()),
                             Value::Map(_) => Value::Text("قاموس".into()),
+                            Value::Tuple(_) => Value::Text("صف".into()),
+                            Value::Set(_) => Value::Text("مجموعة".into()),
                             Value::Null => Value::Text("لاشيء".into()),
                             Value::Instance { class_name, .. } => Value::Text(class_name.clone()),
                             Value::Lambda { .. } => Value::Text("دالة".into()),
@@ -312,7 +332,7 @@ impl VM {
                         "مجموع" if args.len() == 1 => match &args[0] {
                             Value::List(items) => {
                                 let mut sum = 0.0;
-                                for item in items {
+                                for item in items.borrow().iter() {
                                     match item {
                                         Value::Number(n) => sum += *n,
                                         _ => return Err("مجموع تتطلب قائمة من الأرقام فقط".into()),
@@ -323,24 +343,28 @@ impl VM {
                             _ => return Err("مجموع تتطلب قائمة".into()),
                         },
                         "متوسط" if args.len() == 1 => match &args[0] {
-                            Value::List(items) if !items.is_empty() => {
+                            Value::List(items) => {
+                                let borrowed = items.borrow();
+                                if borrowed.is_empty() {
+                                    return Err("متوسط تتطلب قائمة غير فارغة".into());
+                                }
                                 let mut sum = 0.0;
-                                for item in items {
+                                for item in borrowed.iter() {
                                     match item {
                                         Value::Number(n) => sum += *n,
                                         _ => return Err("متوسط تتطلب قائمة من الأرقام فقط".into()),
                                     }
                                 }
-                                Value::Number(sum / (items.len() as f64))
+                                Value::Number(sum / (borrowed.len() as f64))
                             }
-                            _ => return Err("متوسط تتطلب قائمة غير فارغة".into()),
+                            _ => return Err("متوسط تتطلب قائمة".into()),
                         },
                         "مفاتيح" if args.len() == 1 => match &args[0] {
-                            Value::Map(m) => Value::List(m.iter().map(|(k, _)| Value::Text(k.clone())).collect()),
+                            Value::Map(m) => Value::list(m.borrow().iter().map(|(k, _)| Value::Text(k.clone())).collect()),
                             _ => return Err("مفاتيح تتطلب قاموساً".into()),
                         },
                         "قيم" if args.len() == 1 => match &args[0] {
-                            Value::Map(m) => Value::List(m.iter().map(|(_, v)| v.clone()).collect()),
+                            Value::Map(m) => Value::list(m.borrow().iter().map(|(_, v)| v.clone()).collect()),
                             _ => return Err("قيم تتطلب قاموساً".into()),
                         },
                         "أعلى" | "اعلى" if args.len() == 2 => match (&args[0], &args[1]) {
@@ -353,22 +377,22 @@ impl VM {
                         },
                         "عكس" | "اعكس" if args.len() == 1 => match &args[0] {
                             Value::List(l) => {
-                                let mut rev = l.clone();
+                                let mut rev = l.borrow().clone();
                                 rev.reverse();
-                                Value::List(rev)
+                                Value::list(rev)
                             }
                             Value::Text(t) => Value::Text(t.chars().rev().collect()),
                             _ => return Err("عكس تتطلب قائمة أو نصاً".into()),
                         },
                         "فرز" if args.len() == 1 => match &args[0] {
                             Value::List(items) => {
-                                let mut sorted = items.clone();
+                                let mut sorted = items.borrow().clone();
                                 sorted.sort_by(|a, b| match (a, b) {
                                     (Value::Number(x), Value::Number(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
                                     (Value::Text(x), Value::Text(y)) => x.cmp(y),
                                     _ => std::cmp::Ordering::Equal,
                                 });
-                                Value::List(sorted)
+                                Value::list(sorted)
                             }
                             _ => return Err("فرز تتطلب قائمة".into()),
                         },

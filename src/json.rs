@@ -131,7 +131,7 @@ impl<'a> JsonParser<'a> {
         self.skip_whitespace();
         if let Some(&']') = self.chars.peek() {
             self.chars.next();
-            return Ok(Value::List(items));
+            return Ok(Value::list(items));
         }
 
         loop {
@@ -145,7 +145,7 @@ impl<'a> JsonParser<'a> {
                 None => return Err("خطأ في مصفوفة JSON: مصفوفة غير مغلقة بـ ']'".into()),
             }
         }
-        Ok(Value::List(items))
+        Ok(Value::list(items))
     }
 
     fn parse_object(&mut self) -> Result<Value, String> {
@@ -154,7 +154,7 @@ impl<'a> JsonParser<'a> {
         self.skip_whitespace();
         if let Some(&'}') = self.chars.peek() {
             self.chars.next();
-            return Ok(Value::Map(pairs));
+            return Ok(Value::map(pairs));
         }
 
         loop {
@@ -177,7 +177,7 @@ impl<'a> JsonParser<'a> {
                 None => return Err("خطأ في كائن JSON: كائن غير مغلق بـ '}}'".into()),
             }
         }
-        Ok(Value::Map(pairs))
+        Ok(Value::map(pairs))
     }
 }
 
@@ -214,7 +214,29 @@ fn serialize_value(value: &Value, out: &mut String) -> Result<(), String> {
         }
         Value::List(items) => {
             out.push('[');
+            let borrowed = items.borrow();
+            for (i, item) in borrowed.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                serialize_value(item, out)?;
+            }
+            out.push(']');
+        }
+        Value::Tuple(items) => {
+            out.push('[');
             for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                serialize_value(item, out)?;
+            }
+            out.push(']');
+        }
+        Value::Set(items) => {
+            out.push('[');
+            let borrowed = items.borrow();
+            for (i, item) in borrowed.iter().enumerate() {
                 if i > 0 {
                     out.push_str(", ");
                 }
@@ -224,7 +246,8 @@ fn serialize_value(value: &Value, out: &mut String) -> Result<(), String> {
         }
         Value::Map(pairs) => {
             out.push('{');
-            for (i, (key, val)) in pairs.iter().enumerate() {
+            let borrowed = pairs.borrow();
+            for (i, (key, val)) in borrowed.iter().enumerate() {
                 if i > 0 {
                     out.push_str(", ");
                 }

@@ -69,8 +69,10 @@ pub enum Value {
     Text(String),
     Bool(bool),
     Null,
-    List(Vec<Value>),
-    Map(Vec<(String, Value)>),
+    List(std::rc::Rc<std::cell::RefCell<Vec<Value>>>),
+    Map(std::rc::Rc<std::cell::RefCell<Vec<(String, Value)>>>),
+    Tuple(Vec<Value>),
+    Set(std::rc::Rc<std::cell::RefCell<Vec<Value>>>),
     Instance {
         class_name: String,
         fields: std::rc::Rc<std::cell::RefCell<Vec<(String, Value)>>>,
@@ -80,6 +82,26 @@ pub enum Value {
         body: Vec<Stmt>,
         captured: Vec<(String, Value)>,
     },
+}
+
+impl Value {
+    pub fn list(items: Vec<Value>) -> Self {
+        Value::List(std::rc::Rc::new(std::cell::RefCell::new(items)))
+    }
+
+    pub fn map(pairs: Vec<(String, Value)>) -> Self {
+        Value::Map(std::rc::Rc::new(std::cell::RefCell::new(pairs)))
+    }
+
+    pub fn set(items: Vec<Value>) -> Self {
+        let mut unique = Vec::new();
+        for item in items {
+            if !unique.contains(&item) {
+                unique.push(item);
+            }
+        }
+        Value::Set(std::rc::Rc::new(std::cell::RefCell::new(unique)))
+    }
 }
 
 impl fmt::Display for Value {
@@ -100,9 +122,33 @@ impl fmt::Display for Value {
                 }
                 write!(f, "}}")
             }
+            Value::Tuple(items) => {
+                write!(f, "(")?;
+                for (i, item) in items.iter().enumerate() {
+                    if i > 0 { write!(f, "، ")?; }
+                    match item {
+                        Value::Text(s) => write!(f, "{:?}", s)?,
+                        value => write!(f, "{}", value)?,
+                    }
+                }
+                write!(f, ")")
+            }
+            Value::Set(items) => {
+                write!(f, "مجموعة([")?;
+                let borrowed = items.borrow();
+                for (i, item) in borrowed.iter().enumerate() {
+                    if i > 0 { write!(f, "، ")?; }
+                    match item {
+                        Value::Text(s) => write!(f, "{:?}", s)?,
+                        value => write!(f, "{}", value)?,
+                    }
+                }
+                write!(f, "])")
+            }
             Value::Map(pairs) => {
                 write!(f, "{{")?;
-                for (i, (key, value)) in pairs.iter().enumerate() {
+                let borrowed = pairs.borrow();
+                for (i, (key, value)) in borrowed.iter().enumerate() {
                     if i > 0 { write!(f, "، ")?; }
                     write!(f, "{:?}: ", key)?;
                     match value {
@@ -114,7 +160,8 @@ impl fmt::Display for Value {
             }
             Value::List(items) => {
                 write!(f, "[")?;
-                for (i, item) in items.iter().enumerate() {
+                let borrowed = items.borrow();
+                for (i, item) in borrowed.iter().enumerate() {
                     if i > 0 { write!(f, "، ")?; }
                     match item {
                         Value::Text(s) => write!(f, "{:?}", s)?,
@@ -359,9 +406,11 @@ impl Interpreter {
             }
             Stmt::ForEach(name, iterable, stmts) => {
                 let values = match self.eval(iterable)? {
-                    Value::List(items) => items,
+                    Value::List(items) => items.borrow().clone(),
+                    Value::Tuple(items) => items,
+                    Value::Set(items) => items.borrow().clone(),
                     Value::Text(s) => s.chars().map(|c| Value::Text(c.to_string())).collect(),
-                    _ => return Err("حلقة لكل تتطلب قائمة أو نصًا".into()),
+                    _ => return Err("حلقة لكل تتطلب قائمة أو صفًا أو مجموعة أو نصًا".into()),
                 };
                 for value in values {
                     self.tick()?;
@@ -504,7 +553,7 @@ impl Interpreter {
                 if items.len() > max_list_size() { return Err("القائمة تجاوزت الحد الأقصى".into()); }
                 let mut values = Vec::with_capacity(items.len());
                 for item in items { values.push(self.eval(item)?); }
-                Ok(Value::List(values))
+                Ok(Value::list(values))
             }
             Expr::Map(pairs) => {
                 if pairs.len() > max_list_size() { return Err("القاموس تجاوز الحد الأقصى".into()); }
@@ -516,7 +565,7 @@ impl Interpreter {
                     let value = self.eval(item)?;
                     result.push((key.clone(), value));
                 }
-                Ok(Value::Map(result))
+                Ok(Value::map(result))
             }
             Expr::Variable(name) => self.get_variable(name),
             Expr::Assign(name, expr) => {
@@ -535,7 +584,12 @@ impl Interpreter {
                 match value {
                     Value::List(items) => {
                         let idx = checked_index(key)?;
-                        items.get(idx).cloned().ok_or_else(|| format!("الفهرس {} خارج حدود القائمة", idx))
+                        let borrowed = items.borrow();
+                        borrowed.get(idx).cloned().ok_or_else(|| format!("الفهرس {} خارج حدود القائمة", idx))
+                    }
+                    Value::Tuple(items) => {
+                        let idx = checked_index(key)?;
+                        items.get(idx).cloned().ok_or_else(|| format!("الفهرس {} خارج حدود الصف", idx))
                     }
                     Value::Text(text) => {
                         let idx = checked_index(key)?;
@@ -544,10 +598,11 @@ impl Interpreter {
                     }
                     Value::Map(items) => {
                         let key = checked_key(key)?;
-                        if let Some((_, value)) = items.iter().find(|(stored, _)| stored == &key) {
+                        let borrowed = items.borrow();
+                        if let Some((_, value)) = borrowed.iter().find(|(stored, _)| stored == &key) {
                             Ok(value.clone())
                         } else {
-                            let available_keys: Vec<&str> = items.iter().map(|(k, _)| k.as_str()).collect();
+                            let available_keys: Vec<&str> = borrowed.iter().map(|(k, _)| k.as_str()).collect();
                             Err(crate::diagnostics::suggest_dict_key_error(&key, &available_keys))
                         }
                     }
@@ -561,49 +616,47 @@ impl Interpreter {
                             Err(crate::diagnostics::suggest_dict_key_error(&key, &available_keys))
                         }
                     }
-                    _ => Err("الفهرسة تتطلب قائمة أو نصًا أو قاموسًا أو كائنًا".into()),
+                    _ => Err("الفهرسة تتطلب قائمة أو صفًا أو نصًا أو قاموسًا أو كائنًا".into()),
                 }
             }
             Expr::AssignIndex(name, index, expr) => {
                 let key = self.eval(index)?;
                 let value = self.eval(expr)?;
-                for scope in self.scopes.iter_mut().rev() {
-                    if let Some(target) = scope.get_mut(name) {
-                        return match target {
-                            Value::List(items) => {
-                                let idx = checked_index(key)?;
-                                if idx >= items.len() {
-                                    Err(format!("الفهرس {} خارج حدود القائمة", idx))
-                                } else {
-                                    items[idx] = value.clone();
-                                    Ok(value)
-                                }
-                            }
-                            Value::Map(items) => {
-                                let key = checked_key(key)?;
-                                if let Some((_, existing)) = items.iter_mut().find(|(name, _)| name == &key) {
-                                    *existing = value.clone();
-                                } else {
-                                    if items.len() >= max_list_size() { return Err("القاموس تجاوز الحد الأقصى".into()); }
-                                    items.push((key, value.clone()));
-                                }
-                                Ok(value)
-                            }
-                            Value::Instance { fields, .. } => {
-                                let key = checked_key(key)?;
-                                let mut borrowed = fields.borrow_mut();
-                                if let Some((_, existing)) = borrowed.iter_mut().find(|(name, _)| name == &key) {
-                                    *existing = value.clone();
-                                } else {
-                                    borrowed.push((key, value.clone()));
-                                }
-                                Ok(value)
-                            }
-                            _ => Err("إسناد عنصر يتطلب متغير قائمة أو قاموس".into()),
-                        };
+                let target = self.get_variable(name)?;
+                match target {
+                    Value::List(items) => {
+                        let idx = checked_index(key)?;
+                        let mut borrowed = items.borrow_mut();
+                        if idx >= borrowed.len() {
+                            Err(format!("الفهرس {} خارج حدود القائمة", idx))
+                        } else {
+                            borrowed[idx] = value.clone();
+                            Ok(value)
+                        }
                     }
+                    Value::Map(items) => {
+                        let key = checked_key(key)?;
+                        let mut borrowed = items.borrow_mut();
+                        if let Some((_, existing)) = borrowed.iter_mut().find(|(name, _)| name == &key) {
+                            *existing = value.clone();
+                        } else {
+                            if borrowed.len() >= max_list_size() { return Err("القاموس تجاوز الحد الأقصى".into()); }
+                            borrowed.push((key, value.clone()));
+                        }
+                        Ok(value)
+                    }
+                    Value::Instance { fields, .. } => {
+                        let key = checked_key(key)?;
+                        let mut borrowed = fields.borrow_mut();
+                        if let Some((_, existing)) = borrowed.iter_mut().find(|(name, _)| name == &key) {
+                            *existing = value.clone();
+                        } else {
+                            borrowed.push((key, value.clone()));
+                        }
+                        Ok(value)
+                    }
+                    _ => Err("إسناد عنصر يتطلب متغير قائمة أو قاموس".into()),
                 }
-                Err(format!("متغير غير معرّف: '{}'", name))
             }
             Expr::Unary(op, expr) => {
                 let value = self.eval(expr)?;
@@ -786,11 +839,19 @@ impl Interpreter {
                 _ => Err(format!("خاصية '{}' غير معروفة للنصوص", prop)),
             },
             Value::List(ref items) => match prop {
-                "طول" => Ok(Value::Number(items.len() as f64)),
+                "طول" => Ok(Value::Number(items.borrow().len() as f64)),
                 _ => Err(format!("خاصية '{}' غير معروفة للقوائم", prop)),
             },
+            Value::Tuple(ref items) => match prop {
+                "طول" => Ok(Value::Number(items.len() as f64)),
+                _ => Err(format!("خاصية '{}' غير معروفة للصفوف", prop)),
+            },
+            Value::Set(ref items) => match prop {
+                "طول" | "حجم" => Ok(Value::Number(items.borrow().len() as f64)),
+                _ => Err(format!("خاصية '{}' غير معروفة للمجموعات", prop)),
+            },
             Value::Map(ref pairs) => match prop {
-                "طول" | "حجم" => Ok(Value::Number(pairs.len() as f64)),
+                "طول" | "حجم" => Ok(Value::Number(pairs.borrow().len() as f64)),
                 _ => Err(format!("خاصية '{}' غير معروفة للقواميس", prop)),
             },
             _ => Err("الوصول للخصائص عبر '.' يتطلب كائنًا أو بنية بيانات".into()),
@@ -883,7 +944,7 @@ impl Interpreter {
                     "تقسيم" if evaluated_args.len() == 1 => match &evaluated_args[0] {
                         Value::Text(delim) => {
                             let parts: Vec<Value> = text.split(delim).map(|s| Value::Text(s.to_string())).collect();
-                            Ok(Value::List(parts))
+                            Ok(Value::list(parts))
                         }
                         _ => Err("طريقة تقسيم تتطلب فاصلاً نصياً".into()),
                     },
@@ -899,29 +960,63 @@ impl Interpreter {
             }
             Value::List(items) => {
                 match method_name {
-                    "طول" if evaluated_args.is_empty() => Ok(Value::Number(items.len() as f64)),
+                    "طول" if evaluated_args.is_empty() => Ok(Value::Number(items.borrow().len() as f64)),
                     "أضف" | "اضف" if evaluated_args.len() == 1 => {
-                        let mut updated = items.clone();
-                        updated.push(evaluated_args[0].clone());
-                        Ok(Value::List(updated))
+                        let mut borrowed = items.borrow_mut();
+                        if borrowed.len() >= max_list_size() {
+                            return Err("القائمة تجاوزت الحد الأقصى".into());
+                        }
+                        borrowed.push(evaluated_args[0].clone());
+                        drop(borrowed);
+                        Ok(Value::List(items.clone()))
+                    }
+                    "احذف" if evaluated_args.len() == 1 => {
+                        let idx = checked_index(evaluated_args[0].clone())?;
+                        let mut borrowed = items.borrow_mut();
+                        if idx >= borrowed.len() {
+                            return Err(format!("فهرس الحذف {} خارج حدود القائمة", idx));
+                        }
+                        let removed = borrowed.remove(idx);
+                        Ok(removed)
+                    }
+                    "أدرج" | "ادرج" if evaluated_args.len() == 2 => {
+                        let idx = checked_index(evaluated_args[0].clone())?;
+                        let mut borrowed = items.borrow_mut();
+                        if idx > borrowed.len() {
+                            return Err(format!("فهرس الإدراج {} خارج حدود القائمة", idx));
+                        }
+                        if borrowed.len() >= max_list_size() {
+                            return Err("القائمة تجاوزت الحد الأقصى".into());
+                        }
+                        borrowed.insert(idx, evaluated_args[1].clone());
+                        drop(borrowed);
+                        Ok(Value::List(items.clone()))
+                    }
+                    "مسح" if evaluated_args.is_empty() => {
+                        items.borrow_mut().clear();
+                        Ok(Value::List(items.clone()))
+                    }
+                    "نسخ" if evaluated_args.is_empty() => {
+                        let copy = items.borrow().clone();
+                        Ok(Value::list(copy))
                     }
                     "عكس" if evaluated_args.is_empty() => {
-                        let mut rev = items.clone();
+                        let mut rev = items.borrow().clone();
                         rev.reverse();
-                        Ok(Value::List(rev))
+                        Ok(Value::list(rev))
                     }
                     "فرز" if evaluated_args.is_empty() => {
-                        let mut sorted = items.clone();
+                        let mut sorted = items.borrow().clone();
                         sorted.sort_by(|a, b| match (a, b) {
                             (Value::Number(x), Value::Number(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
                             (Value::Text(x), Value::Text(y)) => x.cmp(y),
                             _ => std::cmp::Ordering::Equal,
                         });
-                        Ok(Value::List(sorted))
+                        Ok(Value::list(sorted))
                     }
                     "مجموع" if evaluated_args.is_empty() => {
                         let mut sum = 0.0;
-                        for it in &items {
+                        for it in items.borrow().iter() {
                             match it {
                                 Value::Number(n) => sum += n,
                                 _ => return Err("طريقة مجموع تتطلب قائمة أرقام".into()),
@@ -931,51 +1026,176 @@ impl Interpreter {
                     }
                     "طبّق" | "طبق" if evaluated_args.len() == 1 => match &evaluated_args[0] {
                         Value::Lambda { params, body, captured } => {
-                            let mut mapped = Vec::with_capacity(items.len());
-                            for item in items {
+                            let snapshot = items.borrow().clone();
+                            let mut mapped = Vec::with_capacity(snapshot.len());
+                            for item in snapshot {
                                 mapped.push(self.invoke_lambda(params, body, captured, vec![item])?);
                             }
-                            Ok(Value::List(mapped))
+                            Ok(Value::list(mapped))
                         }
                         _ => Err("طريقة طبّق تتطلب دالة كمعامل".into()),
                     },
                     "رشّح" | "رشح" if evaluated_args.len() == 1 => match &evaluated_args[0] {
                         Value::Lambda { params, body, captured } => {
+                            let snapshot = items.borrow().clone();
                             let mut filtered = Vec::new();
-                            for item in items {
+                            for item in snapshot {
                                 match self.invoke_lambda(params, body, captured, vec![item.clone()])? {
                                     Value::Bool(true) => filtered.push(item),
                                     Value::Bool(false) => {}
                                     _ => return Err("دالة الترشيح في رشّح يجب أن ترجع قيمة منطقية".into()),
                                 }
                             }
-                            Ok(Value::List(filtered))
+                            Ok(Value::list(filtered))
                         }
                         _ => Err("طريقة رشّح تتطلب دالة كمعامل".into()),
                     },
                     "اختزل" if evaluated_args.len() == 2 => match &evaluated_args[1] {
                         Value::Lambda { params, body, captured } => {
+                            let snapshot = items.borrow().clone();
                             let mut acc = evaluated_args[0].clone();
-                            for item in items {
+                            for item in snapshot {
                                 acc = self.invoke_lambda(params, body, captured, vec![acc, item])?;
                             }
                             Ok(acc)
                         }
                         _ => Err("طريقة اختزل تتطلب قيمة ابتدائية ودالة ثنائية".into()),
                     },
+                    "تمديد" if evaluated_args.len() == 1 => match &evaluated_args[0] {
+                        Value::List(other) => {
+                            let other_borrowed = other.borrow();
+                            let mut borrowed = items.borrow_mut();
+                            if borrowed.len() + other_borrowed.len() > max_list_size() {
+                                return Err("القائمة تجاوزت الحد الأقصى".into());
+                            }
+                            borrowed.extend(other_borrowed.clone());
+                            drop(borrowed);
+                            drop(other_borrowed);
+                            Ok(Value::List(items.clone()))
+                        }
+                        _ => Err("طريقة تمديد تتطلب قائمة كمعامل".into()),
+                    },
                     _ => Err(format!("الطريقة '{}' غير مدعومة للقوائم", method_name)),
                 }
             }
             Value::Map(pairs) => {
                 match method_name {
-                    "طول" | "حجم" if evaluated_args.is_empty() => Ok(Value::Number(pairs.len() as f64)),
+                    "طول" | "حجم" if evaluated_args.is_empty() => Ok(Value::Number(pairs.borrow().len() as f64)),
                     "مفاتيح" if evaluated_args.is_empty() => {
-                        Ok(Value::List(pairs.iter().map(|(k, _)| Value::Text(k.clone())).collect()))
+                        let keys = pairs.borrow().iter().map(|(k, _)| Value::Text(k.clone())).collect();
+                        Ok(Value::list(keys))
                     }
                     "قيم" if evaluated_args.is_empty() => {
-                        Ok(Value::List(pairs.iter().map(|(_, v)| v.clone()).collect()))
+                        let vals = pairs.borrow().iter().map(|(_, v)| v.clone()).collect();
+                        Ok(Value::list(vals))
+                    }
+                    "احصل" if evaluated_args.len() == 1 || evaluated_args.len() == 2 => {
+                        let key = match &evaluated_args[0] {
+                            Value::Text(k) => k.clone(),
+                            _ => return Err("طريقة احصل تتطلب مفتاحًا نصيًا".into()),
+                        };
+                        let default_val = if evaluated_args.len() == 2 { evaluated_args[1].clone() } else { Value::Null };
+                        let borrowed = pairs.borrow();
+                        if let Some((_, v)) = borrowed.iter().find(|(k, _)| k == &key) {
+                            Ok(v.clone())
+                        } else {
+                            Ok(default_val)
+                        }
+                    }
+                    "احذف" if evaluated_args.len() == 1 => {
+                        let key = match &evaluated_args[0] {
+                            Value::Text(k) => k.clone(),
+                            _ => return Err("طريقة احذف في القاموس تتطلب مفتاحًا نصيًا".into()),
+                        };
+                        let mut borrowed = pairs.borrow_mut();
+                        if let Some(pos) = borrowed.iter().position(|(k, _)| k == &key) {
+                            let (_, val) = borrowed.remove(pos);
+                            Ok(val)
+                        } else {
+                            Err(format!("المفتاح '{}' غير موجود في القاموس", key))
+                        }
+                    }
+                    "أضف" | "عيّن" if evaluated_args.len() == 2 => {
+                        let key = match &evaluated_args[0] {
+                            Value::Text(k) => k.clone(),
+                            _ => return Err("المفتاح يجب أن يكون نصًا".into()),
+                        };
+                        let mut borrowed = pairs.borrow_mut();
+                        if let Some((_, v)) = borrowed.iter_mut().find(|(k, _)| k == &key) {
+                            *v = evaluated_args[1].clone();
+                        } else {
+                            borrowed.push((key, evaluated_args[1].clone()));
+                        }
+                        drop(borrowed);
+                        Ok(Value::Map(pairs.clone()))
+                    }
+                    "مسح" if evaluated_args.is_empty() => {
+                        pairs.borrow_mut().clear();
+                        Ok(Value::Map(pairs.clone()))
+                    }
+                    "نسخ" if evaluated_args.is_empty() => {
+                        let copy = pairs.borrow().clone();
+                        Ok(Value::map(copy))
+                    }
+                    "يحتوي" | "تحتوي" if evaluated_args.len() == 1 => {
+                        let key = match &evaluated_args[0] {
+                            Value::Text(k) => k,
+                            _ => return Err("طريقة يحتوي في القاموس تتطلب مفتاحًا نصيًا".into()),
+                        };
+                        Ok(Value::Bool(pairs.borrow().iter().any(|(k, _)| k == key)))
                     }
                     _ => Err(format!("الطريقة '{}' غير مدعومة للقواميس", method_name)),
+                }
+            }
+            Value::Set(items) => {
+                match method_name {
+                    "طول" | "حجم" if evaluated_args.is_empty() => Ok(Value::Number(items.borrow().len() as f64)),
+                    "يحتوي" | "تحتوي" if evaluated_args.len() == 1 => {
+                        Ok(Value::Bool(items.borrow().contains(&evaluated_args[0])))
+                    }
+                    "أضف" | "اضف" if evaluated_args.len() == 1 => {
+                        let mut borrowed = items.borrow_mut();
+                        if !borrowed.contains(&evaluated_args[0]) {
+                            if borrowed.len() >= max_list_size() {
+                                return Err("المجموعة تجاوزت الحد الأقصى".into());
+                            }
+                            borrowed.push(evaluated_args[0].clone());
+                        }
+                        drop(borrowed);
+                        Ok(Value::Set(items.clone()))
+                    }
+                    "احذف" if evaluated_args.len() == 1 => {
+                        let mut borrowed = items.borrow_mut();
+                        borrowed.retain(|x| x != &evaluated_args[0]);
+                        drop(borrowed);
+                        Ok(Value::Set(items.clone()))
+                    }
+                    "مسح" if evaluated_args.is_empty() => {
+                        items.borrow_mut().clear();
+                        Ok(Value::Set(items.clone()))
+                    }
+                    "نسخ" if evaluated_args.is_empty() => {
+                        let copy = items.borrow().clone();
+                        Ok(Value::set(copy))
+                    }
+                    "قائمة" if evaluated_args.is_empty() => {
+                        let list = items.borrow().clone();
+                        Ok(Value::list(list))
+                    }
+                    _ => Err(format!("الطريقة '{}' غير مدعومة للمجموعات", method_name)),
+                }
+            }
+            Value::Tuple(items) => {
+                match method_name {
+                    "طول" | "حجم" if evaluated_args.is_empty() => Ok(Value::Number(items.len() as f64)),
+                    "يحتوي" | "تحتوي" if evaluated_args.len() == 1 => {
+                        Ok(Value::Bool(items.contains(&evaluated_args[0])))
+                    }
+                    "ابحث" if evaluated_args.len() == 1 => {
+                        let pos = items.iter().position(|x| x == &evaluated_args[0]).map(|i| i as f64).unwrap_or(-1.0);
+                        Ok(Value::Number(pos))
+                    }
+                    _ => Err(format!("الطريقة '{}' غير مدعومة للصفوف", method_name)),
                 }
             }
             _ => Err(format!("لا يمكن استدعاء الطريقة '{}' على هذا النوع", method_name)),
@@ -991,11 +1211,16 @@ impl Interpreter {
                     (Value::Number(a), Value::Number(b)) => finite_number(a + b),
                     (Value::Text(a), b) => Ok(Value::Text(a + &b.to_string())),
                     (a, Value::Text(b)) => Ok(Value::Text(a.to_string() + &b)),
-                    (Value::List(mut a), Value::List(b)) if a.len() + b.len() <= max_list_size() => {
-                        a.extend(b);
-                        Ok(Value::List(a))
+                    (Value::List(a), Value::List(b)) => {
+                        let a_borrowed = a.borrow();
+                        let b_borrowed = b.borrow();
+                        if a_borrowed.len() + b_borrowed.len() > max_list_size() {
+                            return Err("القائمة تجاوزت الحد الأقصى".into());
+                        }
+                        let mut combined = a_borrowed.clone();
+                        combined.extend(b_borrowed.clone());
+                        Ok(Value::list(combined))
                     }
-                    (Value::List(_), Value::List(_)) => Err("القائمة تجاوزت الحد الأقصى".into()),
                     _ => Err("الجمع يحتاج رقمين أو نصًا أو قائمتين".into()),
                 }
             }
@@ -1112,11 +1337,12 @@ fn checked_key(key: Value) -> Result<String, String> {
 fn is_builtin(name: &str) -> bool {
     matches!(name,
         "طول" | "نوع" | "نص" | "عدد" | "أضف" | "اضف" | "مدى" | "يحتوي" |
+        "صف" | "مجموعة" |
         "مفاتيح" | "قيم" | "احذف" | "قسّم" | "قسم" | "ادمج" | "استبدل" |
         "اقتطع" | "نظّف" | "نظف" | "مطلق" | "جذر" | "قرّب" | "قرب" |
         "أرضية" | "ارضية" | "سقف" | "قوة" |
         "أدنى" | "ادنى" | "أعلى" | "اعلى" | "اقرأ_ملف" | "اكتب_ملف" |
-        "تحقق" | "تحقق_يساوي" |
+        "تحقق" | "تحقق_يساوي" | "تحقق_صحيح" | "تحقق_خطأ" | "تحقق_خطا" |
         "عكس" | "اعكس" | "فرز" | "مجموع" | "متوسط" | "ابحث" |
         "يبدأ_ب" | "يبدا_ب" | "ينتهي_ب" | "كرر" |
         "أحرف_كبيرة" | "احرف_كبيرة" | "أحرف_صغيرة" | "احرف_صغيرة" |
@@ -1205,14 +1431,32 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             if args[0] == args[1] { Ok(Value::Bool(true)) }
             else { Err(format!("فشل التحقق: المتوقع {} لكن الفعلي {}", args[1], args[0])) }
         }
+        "تحقق_صحيح" => {
+            require_args(name, &args, 1)?;
+            match args[0] {
+                Value::Bool(true) => Ok(Value::Bool(true)),
+                Value::Bool(false) => Err("فشل التحقق: المتوقع صحيح ولكن وجد خطأ".into()),
+                _ => Err("تحقق_صحيح تتطلب قيمة منطقية".into()),
+            }
+        }
+        "تحقق_خطأ" | "تحقق_خطا" => {
+            require_args(name, &args, 1)?;
+            match args[0] {
+                Value::Bool(false) => Ok(Value::Bool(true)),
+                Value::Bool(true) => Err("فشل التحقق: المتوقع خطأ ولكن وجد صحيح".into()),
+                _ => Err("تحقق_خطأ تتطلب قيمة منطقية".into()),
+            }
+        }
         "طول" => {
             require_args(name, &args, 1)?;
             match &args[0] {
-                Value::List(items) => Ok(Value::Number(items.len() as f64)),
+                Value::List(items) => Ok(Value::Number(items.borrow().len() as f64)),
+                Value::Tuple(items) => Ok(Value::Number(items.len() as f64)),
+                Value::Set(items) => Ok(Value::Number(items.borrow().len() as f64)),
                 Value::Text(text) => Ok(Value::Number(text.chars().count() as f64)),
-                Value::Map(items) => Ok(Value::Number(items.len() as f64)),
+                Value::Map(items) => Ok(Value::Number(items.borrow().len() as f64)),
                 Value::Instance { fields, .. } => Ok(Value::Number(fields.borrow().len() as f64)),
-                _ => Err("طول يقبل قائمة أو نصًا أو قاموسًا أو كائنًا".into()),
+                _ => Err("طول يقبل قائمة أو نص أو قاموس أو كائن أو صف أو مجموعة".into()),
             }
         }
         "نوع" => {
@@ -1223,6 +1467,8 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 Value::Bool(_) => "منطقي".to_string(),
                 Value::Null => "لاشيء".to_string(),
                 Value::List(_) => "قائمة".to_string(),
+                Value::Tuple(_) => "صف".to_string(),
+                Value::Set(_) => "مجموعة".to_string(),
                 Value::Map(_) => "قاموس".to_string(),
                 Value::Instance { class_name, .. } => class_name.clone(),
                 Value::Lambda { .. } => "دالة".to_string(),
@@ -1241,36 +1487,84 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 _ => Err("عدد يقبل رقمًا أو نصًا رقميًا".into()),
             }
         }
+        "صف" => {
+            if args.is_empty() {
+                Ok(Value::Tuple(Vec::new()))
+            } else if args.len() == 1 {
+                match &args[0] {
+                    Value::List(items) => Ok(Value::Tuple(items.borrow().clone())),
+                    Value::Tuple(items) => Ok(Value::Tuple(items.clone())),
+                    Value::Set(items) => Ok(Value::Tuple(items.borrow().clone())),
+                    other => Ok(Value::Tuple(vec![other.clone()])),
+                }
+            } else {
+                Ok(Value::Tuple(args))
+            }
+        }
+        "مجموعة" => {
+            if args.is_empty() {
+                Ok(Value::set(Vec::new()))
+            } else if args.len() == 1 {
+                match &args[0] {
+                    Value::List(items) => Ok(Value::set(items.borrow().clone())),
+                    Value::Tuple(items) => Ok(Value::set(items.clone())),
+                    Value::Set(items) => Ok(Value::Set(items.clone())),
+                    other => Ok(Value::set(vec![other.clone()])),
+                }
+            } else {
+                Ok(Value::set(args))
+            }
+        }
         "أضف" | "اضف" => {
             require_args(name, &args, 2)?;
-            let mut items = match &args[0] {
-                Value::List(items) => items.clone(),
-                _ => return Err("أضف تتطلب قائمة كمعامل أول".into()),
-            };
-            if items.len() >= max_list_size() { return Err("القائمة تجاوزت الحد الأقصى".into()); }
-            items.push(args[1].clone());
-            Ok(Value::List(items))
+            match &args[0] {
+                Value::List(items) => {
+                    let mut borrowed = items.borrow_mut();
+                    if borrowed.len() >= max_list_size() { return Err("القائمة تجاوزت الحد الأقصى".into()); }
+                    borrowed.push(args[1].clone());
+                    drop(borrowed);
+                    Ok(Value::List(items.clone()))
+                }
+                Value::Set(items) => {
+                    let mut borrowed = items.borrow_mut();
+                    if !borrowed.contains(&args[1]) {
+                        if borrowed.len() >= max_list_size() { return Err("المجموعة تجاوزت الحد الأقصى".into()); }
+                        borrowed.push(args[1].clone());
+                    }
+                    drop(borrowed);
+                    Ok(Value::Set(items.clone()))
+                }
+                _ => Err("أضف تتطلب قائمة أو مجموعة كمعامل أول".into()),
+            }
         }
         "يحتوي" => {
             require_args(name, &args, 2)?;
             match (&args[0], &args[1]) {
-                (Value::List(items), sought) => Ok(Value::Bool(items.contains(sought))),
+                (Value::List(items), sought) => Ok(Value::Bool(items.borrow().contains(sought))),
+                (Value::Tuple(items), sought) => Ok(Value::Bool(items.contains(sought))),
+                (Value::Set(items), sought) => Ok(Value::Bool(items.borrow().contains(sought))),
                 (Value::Text(text), Value::Text(sought)) => Ok(Value::Bool(text.contains(sought))),
-                (Value::Map(pairs), Value::Text(key)) => Ok(Value::Bool(pairs.iter().any(|(k, _)| k == key))),
-                _ => Err("يحتوي تتطلب قائمة أو نصين".into()),
+                (Value::Map(pairs), Value::Text(key)) => Ok(Value::Bool(pairs.borrow().iter().any(|(k, _)| k == key))),
+                _ => Err("يحتوي تتطلب قائمة أو مجموعة أو صفًا أو قاموسًا أو نصين".into()),
             }
         }
         "مفاتيح" => {
             require_args(name, &args, 1)?;
             match &args[0] {
-                Value::Map(pairs) => Ok(Value::List(pairs.iter().map(|(key, _)| Value::Text(key.clone())).collect())),
+                Value::Map(pairs) => {
+                    let keys = pairs.borrow().iter().map(|(key, _)| Value::Text(key.clone())).collect();
+                    Ok(Value::list(keys))
+                }
                 _ => Err("مفاتيح تتطلب قاموسًا".into()),
             }
         }
         "قيم" => {
             require_args(name, &args, 1)?;
             match &args[0] {
-                Value::Map(pairs) => Ok(Value::List(pairs.iter().map(|(_, val)| val.clone()).collect())),
+                Value::Map(pairs) => {
+                    let vals = pairs.borrow().iter().map(|(_, val)| val.clone()).collect();
+                    Ok(Value::list(vals))
+                }
                 _ => Err("قيم تتطلب قاموسًا".into()),
             }
         }
@@ -1278,18 +1572,26 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             require_args(name, &args, 2)?;
             match (&args[0], &args[1]) {
                 (Value::Map(pairs), Value::Text(key)) => {
-                    let mut new = pairs.clone();
-                    new.retain(|(name, _)| name != key);
-                    Ok(Value::Map(new))
+                    let mut borrowed = pairs.borrow_mut();
+                    borrowed.retain(|(name, _)| name != key);
+                    drop(borrowed);
+                    Ok(Value::Map(pairs.clone()))
                 }
                 (Value::List(items), Value::Number(_)) => {
                     let index = checked_index(args[1].clone())?;
-                    if index >= items.len() { return Err("الفهرس خارج حدود القائمة".into()); }
-                    let mut new = items.clone();
-                    new.remove(index);
-                    Ok(Value::List(new))
+                    let mut borrowed = items.borrow_mut();
+                    if index >= borrowed.len() { return Err("الفهرس خارج حدود القائمة".into()); }
+                    borrowed.remove(index);
+                    drop(borrowed);
+                    Ok(Value::List(items.clone()))
                 }
-                _ => Err("احذف تتطلب قاموسًا ومفتاحًا نصيًا، أو قائمة وفهرسًا".into()),
+                (Value::Set(items), val) => {
+                    let mut borrowed = items.borrow_mut();
+                    borrowed.retain(|item| item != val);
+                    drop(borrowed);
+                    Ok(Value::Set(items.clone()))
+                }
+                _ => Err("احذف تتطلب قاموسًا ومفتاحًا نصيًا، أو قائمة وفهرسًا، أو مجموعة وعنصرًا".into()),
             }
         }
         "قسّم" | "قسم" => {
@@ -1298,7 +1600,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 (Value::Text(text), Value::Text(sep)) => {
                     let items: Vec<_> = text.split(sep).map(|v| Value::Text(v.to_owned())).collect();
                     if items.len() > max_list_size() { return Err("القائمة تجاوزت الحد الأقصى".into()); }
-                    Ok(Value::List(items))
+                    Ok(Value::list(items))
                 }
                 _ => Err("قسّم تتطلب نصين".into()),
             }
@@ -1307,13 +1609,21 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             require_args(name, &args, 2)?;
             match (&args[0], &args[1]) {
                 (Value::List(items), Value::Text(sep)) => {
-                    let strings: Result<Vec<&str>, String> = items.iter().map(|x| match x {
+                    let borrowed = items.borrow();
+                    let strings: Result<Vec<&str>, String> = borrowed.iter().map(|x| match x {
                         Value::Text(v) => Ok(v.as_str()),
                         _ => Err("ادمج تتطلب قائمة من النصوص".into()),
                     }).collect();
                     Ok(Value::Text(strings?.join(sep)))
                 }
-                _ => Err("ادمج تتطلب قائمة ونصًا للفاصل".into()),
+                (Value::Tuple(items), Value::Text(sep)) => {
+                    let strings: Result<Vec<&str>, String> = items.iter().map(|x| match x {
+                        Value::Text(v) => Ok(v.as_str()),
+                        _ => Err("ادمج تتطلب صفًا من النصوص".into()),
+                    }).collect();
+                    Ok(Value::Text(strings?.join(sep)))
+                }
+                _ => Err("ادمج تتطلب قائمة أو صفًا ونصًا للفاصل".into()),
             }
         }
         "استبدل" => {
@@ -1410,15 +1720,15 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             for i in 0..length as usize {
                 out.push(Value::Number(start + (i as f64) * step));
             }
-            Ok(Value::List(out))
+            Ok(Value::list(out))
         }
         "عكس" | "اعكس" => {
             require_args(name, &args, 1)?;
             match &args[0] {
                 Value::List(items) => {
-                    let mut rev = items.clone();
+                    let mut rev = items.borrow().clone();
                     rev.reverse();
-                    Ok(Value::List(rev))
+                    Ok(Value::list(rev))
                 }
                 Value::Text(text) => {
                     let rev: String = text.chars().rev().collect();
@@ -1431,9 +1741,9 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             require_args(name, &args, 1)?;
             match &args[0] {
                 Value::List(items) => {
-                    let mut sorted = items.clone();
+                    let mut sorted = items.borrow().clone();
                     if sorted.is_empty() {
-                        return Ok(Value::List(sorted));
+                        return Ok(Value::list(sorted));
                     }
                     let all_numbers = sorted.iter().all(|x| matches!(x, Value::Number(_)));
                     let all_strings = sorted.iter().all(|x| matches!(x, Value::Text(_)));
@@ -1442,13 +1752,13 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                             (Value::Number(x), Value::Number(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
                             _ => unreachable!(),
                         });
-                        Ok(Value::List(sorted))
+                        Ok(Value::list(sorted))
                     } else if all_strings {
                         sorted.sort_by(|a, b| match (a, b) {
                             (Value::Text(x), Value::Text(y)) => x.cmp(y),
                             _ => unreachable!(),
                         });
-                        Ok(Value::List(sorted))
+                        Ok(Value::list(sorted))
                     } else {
                         Err("فرز تتطلب قائمة متجانسة من الأرقام أو النصوص".into())
                     }
@@ -1461,7 +1771,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             match &args[0] {
                 Value::List(items) => {
                     let mut sum = 0.0;
-                    for item in items {
+                    for item in items.borrow().iter() {
                         match item {
                             Value::Number(n) => sum += *n,
                             _ => return Err("مجموع تتطلب قائمة من الأرقام فقط".into()),
@@ -1476,17 +1786,18 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             require_args(name, &args, 1)?;
             match &args[0] {
                 Value::List(items) => {
-                    if items.is_empty() {
+                    let borrowed = items.borrow();
+                    if borrowed.is_empty() {
                         return Err("لا يمكن حساب متوسط قائمة فارغة".into());
                     }
                     let mut sum = 0.0;
-                    for item in items {
+                    for item in borrowed.iter() {
                         match item {
                             Value::Number(n) => sum += *n,
                             _ => return Err("متوسط تتطلب قائمة من الأرقام فقط".into()),
                         }
                     }
-                    finite_number(sum / (items.len() as f64))
+                    finite_number(sum / (borrowed.len() as f64))
                 }
                 _ => Err("متوسط تتطلب قائمة".into()),
             }
@@ -1495,7 +1806,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             require_args(name, &args, 2)?;
             match (&args[0], &args[1]) {
                 (Value::List(items), target) => {
-                    let pos = items.iter().position(|x| x == target).map(|i| i as f64).unwrap_or(-1.0);
+                    let pos = items.borrow().iter().position(|x| x == target).map(|i| i as f64).unwrap_or(-1.0);
                     Ok(Value::Number(pos))
                 }
                 (Value::Text(haystack), Value::Text(needle)) => {
@@ -1643,11 +1954,12 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             require_args(name, &args, 1)?;
             match &args[0] {
                 Value::List(items) => {
-                    if items.is_empty() {
+                    let borrowed = items.borrow();
+                    if borrowed.is_empty() {
                         return Err("لا يمكن اختيار عنصر عشوائي من قائمة فارغة".into());
                     }
-                    let idx = (next_random_u64() as usize) % items.len();
-                    Ok(items[idx].clone())
+                    let idx = (next_random_u64() as usize) % borrowed.len();
+                    Ok(borrowed[idx].clone())
                 }
                 _ => Err("عنصر_عشوائي تتطلب قائمة".into()),
             }
@@ -1665,7 +1977,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
         "وسائط" => {
             require_args(name, &args, 0)?;
             let env_args: Vec<Value> = std::env::args().map(Value::Text).collect();
-            Ok(Value::List(env_args))
+            Ok(Value::list(env_args))
         }
         "تحليل_json" => {
             require_args(name, &args, 1)?;
@@ -1683,14 +1995,15 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             require_args(name, &args, 2)?;
             match (&args[0], &args[1]) {
                 (Value::Text(template), Value::List(values)) => {
+                    let borrowed = values.borrow();
                     let mut result = String::new();
                     let mut val_idx = 0;
                     let mut chars = template.chars().peekable();
                     while let Some(c) = chars.next() {
                         if c == '{' && chars.peek() == Some(&'}') {
                             chars.next(); // consume '}'
-                            if val_idx < values.len() {
-                                match &values[val_idx] {
+                            if val_idx < borrowed.len() {
+                                match &borrowed[val_idx] {
                                     Value::Text(t) => result.push_str(t),
                                     other => result.push_str(&other.to_string()),
                                 }
@@ -1739,7 +2052,7 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                         }
                     }
                     names.sort();
-                    Ok(Value::List(names.into_iter().map(Value::Text).collect()))
+                    Ok(Value::list(names.into_iter().map(Value::Text).collect()))
                 }
                 _ => Err("قائمة_ملفات تتطلب مساراً نصياً".into()),
             }
@@ -1950,7 +2263,7 @@ fn eval_ui_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 .iter()
                 .map(|s| Value::Text((*s).to_string()))
                 .collect();
-            Ok(Value::List(list))
+            Ok(Value::list(list))
         }
         "نسق_تصميم" => {
             require_args(name, &args, 1)?;
@@ -2065,7 +2378,7 @@ fn eval_ui_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             let mut items = Vec::new();
             if args.len() == 4 {
                 if let Value::List(list) = &args[3] {
-                    for item in list {
+                    for item in list.borrow().iter() {
                         items.push(item.to_string());
                     }
                 }
@@ -2087,7 +2400,7 @@ fn eval_ui_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             let theme = args[1].to_string();
             let mut sections = Vec::new();
             if let Value::List(list) = &args[2] {
-                for item in list {
+                for item in list.borrow().iter() {
                     sections.push(item.to_string());
                 }
             }

@@ -416,8 +416,10 @@ impl Interpreter {
                 let is_json = matches!(norm.as_str(), "جيسون" | "json");
                 let is_net = matches!(norm.as_str(), "شبكة" | "شبكه" | "شبكات" | "net" | "network" | "http");
                 let is_text = matches!(norm.as_str(), "نصوص" | "نص" | "text" | "string" | "strings");
+                let is_date = matches!(norm.as_str(), "تاريخ" | "date" | "datetime");
+                let is_csv = matches!(norm.as_str(), "csv" | "سي_إس_في" | "سي_اس_في");
 
-                if is_math || is_stats || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text {
+                if is_math || is_stats || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text || is_date || is_csv {
                     let mut initial_exports = Vec::new();
                     if is_math {
                         initial_exports.push(("ط".to_string(), Value::Number(std::f64::consts::PI)));
@@ -494,8 +496,10 @@ impl Interpreter {
                 let is_json = matches!(norm.as_str(), "جيسون" | "json");
                 let is_net = matches!(norm.as_str(), "شبكة" | "شبكه" | "شبكات" | "net" | "network" | "http");
                 let is_text = matches!(norm.as_str(), "نصوص" | "نص" | "text" | "string" | "strings");
+                let is_date = matches!(norm.as_str(), "تاريخ" | "date" | "datetime");
+                let is_csv = matches!(norm.as_str(), "csv" | "سي_إس_في" | "سي_اس_في");
 
-                if is_math || is_stats || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text {
+                if is_math || is_stats || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text || is_date || is_csv {
                     for item in items {
                         if (item == "ط" || item == "قيمة_ط") && is_math {
                             self.scopes.last_mut().expect("scope exists").insert(item.clone(), Value::Number(std::f64::consts::PI));
@@ -1954,6 +1958,8 @@ fn is_builtin(name: &str) -> bool {
         "لوغاريتم10" | "لوغ10" | "لوغاريتم2" | "لوغ2" | "راديان" | "درجات" | "تقارب" |
         "وسيط" | "منوال" | "تباين" | "انحراف_معياري" | "انحراف" | "مدى_إحصائي" |
         "متوسط_هندسي" | "متوسط_توافقي" | "ارتباط" |
+        "تاريخ_اليوم" | "اليوم" | "فرق_أيام" | "فرق_ايام" | "أضف_أيام" | "اضف_ايام" | "يوم_الأسبوع" | "يوم_الاسبوع" |
+        "تحليل_csv" | "ترميز_csv" |
         "أرسل_tcp" | "ارسل_tcp" | "خادم_ويب" | "خادم_ويب_بسيط" |
         "وضع_المنفذ" | "اكتب_رقمي" | "اقرأ_رقمي" | "اكتب_تماثلي" | "اقرأ_تماثلي" |
         "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" | "نبضة_صوت" |
@@ -2854,6 +2860,14 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
         "متوسط_هندسي" => stats_geometric_mean(args),
         "متوسط_توافقي" => stats_harmonic_mean(args),
         "ارتباط" => stats_correlation(args),
+        // ==================== دوال التاريخ والتقويم ====================
+        "تاريخ_اليوم" | "اليوم" => Ok(date_today()),
+        "فرق_أيام" | "فرق_ايام" => date_diff_days(args),
+        "أضف_أيام" | "اضف_ايام" => date_add_days(args),
+        "يوم_الأسبوع" | "يوم_الاسبوع" => date_weekday(args),
+        // ==================== دوال CSV ====================
+        "تحليل_csv" => csv_parse(args),
+        "ترميز_csv" => csv_encode(args),
         // ==================== دوال الأردوينو والمتحكمات الدقيقة ====================
         "وضع_المنفذ" | "اكتب_رقمي" | "اقرأ_رقمي" | "اكتب_تماثلي" | "اقرأ_تماثلي"
         | "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" | "نبضة_صوت"
@@ -3715,6 +3729,32 @@ pub(crate) fn call_builtin_for_module(name: &str, method_name: &str, evaluated_a
                 _ => Err(format!("الدالة '{}' غير معروفة في وحدة النصوص", method_name)),
             }
         }
+        "تاريخ" | "date" | "datetime" => {
+            let m = crate::diagnostics::normalize_arabic(method_name);
+            match m.as_str() {
+                "تاريخ_اليوم" | "اليوم" | "today" => Ok(date_today()),
+                "الان" | "الآن" | "now" => Ok(date_now()),
+                "طابع_زمني" | "timestamp" => call_builtin("طابع_زمني", evaluated_args),
+                "سنة" | "عام" | "year" => date_get_component("سنة", evaluated_args),
+                "شهر" | "month" => date_get_component("شهر", evaluated_args),
+                "يوم" | "day" => date_get_component("يوم", evaluated_args),
+                "ساعة" => date_get_component("ساعة", evaluated_args),
+                "دقيقة" => date_get_component("دقيقة", evaluated_args),
+                "ثانية" => date_get_component("ثانية", evaluated_args),
+                "فرق_ايام" | "فرق_أيام" | "diff_days" => date_diff_days(evaluated_args),
+                "اضف_ايام" | "أضف_أيام" | "add_days" => date_add_days(evaluated_args),
+                "يوم_الاسبوع" | "يوم_الأسبوع" | "weekday" => date_weekday(evaluated_args),
+                _ => Err(format!("الدالة '{}' غير معروفة في وحدة التاريخ", method_name)),
+            }
+        }
+        "csv" | "سي_إس_في" | "سي_اس_في" => {
+            let m = crate::diagnostics::normalize_arabic(method_name);
+            match m.as_str() {
+                "تحليل" | "تحليل_csv" | "اقرا_csv" | "اقرأ_csv" | "parse" => csv_parse(evaluated_args),
+                "ترميز" | "ترميز_csv" | "اكتب_csv" | "encode" => csv_encode(evaluated_args),
+                _ => Err(format!("الدالة '{}' غير معروفة في وحدة CSV", method_name)),
+            }
+        }
         _ => {
             if is_builtin(method_name) {
                 call_builtin(method_name, evaluated_args)
@@ -4022,4 +4062,290 @@ fn stats_correlation(args: Vec<Value>) -> Result<Value, String> {
         return Err("الانحراف المعياري لأحد المتغيرين صفر، لا يمكن حساب الارتباط".into());
     }
     finite_number(num / den)
+}
+
+// ==========================================
+// وظائف وحدة التاريخ والتقويم (Date & Time)
+// ==========================================
+
+fn civil_from_days(days: i64) -> (i32, u32, u32) {
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y as i32, m, d)
+}
+
+fn days_from_civil(y: i32, m: u32, d: u32) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y } as i64;
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = (y - era * 400) as u32;
+    let m_adj = if m > 2 { m - 3 } else { m + 9 };
+    let doy = (153 * m_adj + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + (doe as i64) - 719468
+}
+
+fn parse_ymd(s: &str) -> Result<(i32, u32, u32), String> {
+    let parts: Vec<&str> = s.split('-').collect();
+    if parts.len() != 3 {
+        return Err(format!("تنسيق التاريخ غير صحيح '{}' المتوقع هو سسسس-شش-يي", s));
+    }
+    let y = parts[0].trim().parse::<i32>().map_err(|_| "سنة غير صحيحة")?;
+    let m = parts[1].trim().parse::<u32>().map_err(|_| "شهر غير صحيح")?;
+    let d = parts[2].trim().parse::<u32>().map_err(|_| "يوم غير صحيح")?;
+    if m < 1 || m > 12 || d < 1 || d > 31 {
+        return Err("قيم اليوم أو الشهر خارج النطاق الصحيح".into());
+    }
+    Ok((y, m, d))
+}
+
+fn date_today() -> Value {
+    let now = std::time::SystemTime::now();
+    let secs = match now.duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => d.as_secs() as i64,
+        Err(_) => 0,
+    };
+    let days = secs / 86400;
+    let (y, m, d) = civil_from_days(days);
+    Value::Text(format!("{:04}-{:02}-{:02}", y, m, d))
+}
+
+fn date_now() -> Value {
+    let now = std::time::SystemTime::now();
+    let secs = match now.duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => d.as_secs() as i64,
+        Err(_) => 0,
+    };
+    let days = secs / 86400;
+    let (y, m, d) = civil_from_days(days);
+    let rem = secs.rem_euclid(86400);
+    let h = rem / 3600;
+    let min = (rem % 3600) / 60;
+    let s = rem % 60;
+    Value::Text(format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s))
+}
+
+fn date_get_component(name: &str, args: Vec<Value>) -> Result<Value, String> {
+    let secs = if args.is_empty() {
+        let now = std::time::SystemTime::now();
+        match now.duration_since(std::time::UNIX_EPOCH) {
+            Ok(d) => d.as_secs() as i64,
+            Err(_) => 0,
+        }
+    } else {
+        match &args[0] {
+            Value::Number(n) => *n as i64,
+            Value::Text(s) => {
+                let (y, m, d) = parse_ymd(s)?;
+                days_from_civil(y, m, d) * 86400
+            }
+            _ => return Err("المعامل يجب أن يكون طابعاً زمنياً أو نص تاريخ".into()),
+        }
+    };
+    let days = secs / 86400;
+    let (y, m, d) = civil_from_days(days);
+    let rem = secs.rem_euclid(86400);
+    let h = (rem / 3600) as u32;
+    let min = ((rem % 3600) / 60) as u32;
+    let s = (rem % 60) as u32;
+
+    match name {
+        "سنة" | "عام" => Ok(Value::Number(y as f64)),
+        "شهر" => Ok(Value::Number(m as f64)),
+        "يوم" => Ok(Value::Number(d as f64)),
+        "ساعة" => Ok(Value::Number(h as f64)),
+        "دقيقة" => Ok(Value::Number(min as f64)),
+        "ثانية" => Ok(Value::Number(s as f64)),
+        _ => Err(format!("عنصر غير معروف: {}", name)),
+    }
+}
+
+fn date_diff_days(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 {
+        return Err("فرق_أيام تتطلب تاريخين بنمط 'سسسس-شش-يي'".into());
+    }
+    let s1 = match &args[0] { Value::Text(s) => s.as_str(), _ => return Err("التاريخ الأول يجب أن يكون نصاً".into()) };
+    let s2 = match &args[1] { Value::Text(s) => s.as_str(), _ => return Err("التاريخ الثاني يجب أن يكون نصاً".into()) };
+    let (y1, m1, d1) = parse_ymd(s1)?;
+    let (y2, m2, d2) = parse_ymd(s2)?;
+    let days1 = days_from_civil(y1, m1, d1);
+    let days2 = days_from_civil(y2, m2, d2);
+    Ok(Value::Number((days1 - days2) as f64))
+}
+
+fn date_add_days(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 {
+        return Err("أضف_أيام تتطلب تاريخاً وعدد الأيام".into());
+    }
+    let s = match &args[0] { Value::Text(s) => s.as_str(), _ => return Err("التاريخ يجب أن يكون نصاً".into()) };
+    let n = match args[1] { Value::Number(x) => x as i64, _ => return Err("عدد الأيام يجب أن يكون رقماً".into()) };
+    let (y, m, d) = parse_ymd(s)?;
+    let days = days_from_civil(y, m, d) + n;
+    let (ny, nm, nd) = civil_from_days(days);
+    Ok(Value::Text(format!("{:04}-{:02}-{:02}", ny, nm, nd)))
+}
+
+fn date_weekday(args: Vec<Value>) -> Result<Value, String> {
+    let days = if args.is_empty() {
+        let now = std::time::SystemTime::now();
+        let secs = match now.duration_since(std::time::UNIX_EPOCH) {
+            Ok(d) => d.as_secs() as i64,
+            Err(_) => 0,
+        };
+        secs / 86400
+    } else {
+        match &args[0] {
+            Value::Text(s) => {
+                let (y, m, d) = parse_ymd(s)?;
+                days_from_civil(y, m, d)
+            }
+            Value::Number(n) => (*n as i64) / 86400,
+            _ => return Err("يوم_الأسبوع تتطلب نص تاريخ 'سسسس-شش-يي' أو طابع زمني".into()),
+        }
+    };
+    let day_idx = (days + 4).rem_euclid(7);
+    let name = match day_idx {
+        0 => "الأحد",
+        1 => "الإثنين",
+        2 => "الثلاثاء",
+        3 => "الأربعاء",
+        4 => "الخميس",
+        5 => "الجمعة",
+        _ => "السبت",
+    };
+    Ok(Value::Text(name.to_string()))
+}
+
+// ==========================================
+// وظائف وحدة CSV (Comma-Separated Values)
+// ==========================================
+
+fn csv_parse(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() {
+        return Err("تحليل_csv تتطلب نصاً بتنسيق CSV".into());
+    }
+    let raw = match &args[0] {
+        Value::Text(s) => s.as_str(),
+        _ => return Err("تحليل_csv تتطلب نصاً".into()),
+    };
+    let delim = if args.len() > 1 {
+        match &args[1] {
+            Value::Text(d) if !d.is_empty() => d.chars().next().unwrap(),
+            _ => ',',
+        }
+    } else {
+        ','
+    };
+
+    let mut rows: Vec<Value> = Vec::new();
+    let mut current_row: Vec<Value> = Vec::new();
+    let mut current_field = String::new();
+    let mut in_quotes = false;
+    let mut chars = raw.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if in_quotes {
+            if ch == '"' {
+                if chars.peek() == Some(&'"') {
+                    chars.next();
+                    current_field.push('"');
+                } else {
+                    in_quotes = false;
+                }
+            } else {
+                current_field.push(ch);
+            }
+        } else if ch == '"' {
+            in_quotes = true;
+        } else if ch == delim {
+            let field_val = match current_field.trim().parse::<f64>() {
+                Ok(n) if !current_field.trim().is_empty() => Value::Number(n),
+                _ => Value::Text(current_field.clone()),
+            };
+            current_row.push(field_val);
+            current_field.clear();
+        } else if ch == '\n' {
+            if current_field.ends_with('\r') {
+                current_field.pop();
+            }
+            let field_val = match current_field.trim().parse::<f64>() {
+                Ok(n) if !current_field.trim().is_empty() => Value::Number(n),
+                _ => Value::Text(current_field.clone()),
+            };
+            current_row.push(field_val);
+            current_field.clear();
+            rows.push(Value::list(std::mem::take(&mut current_row)));
+        } else if ch != '\r' {
+            current_field.push(ch);
+        }
+    }
+
+    if !current_field.is_empty() || !current_row.is_empty() {
+        let field_val = match current_field.trim().parse::<f64>() {
+            Ok(n) if !current_field.trim().is_empty() => Value::Number(n),
+            _ => Value::Text(current_field.clone()),
+        };
+        current_row.push(field_val);
+        rows.push(Value::list(current_row));
+    }
+
+    Ok(Value::list(rows))
+}
+
+fn csv_encode(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() {
+        return Err("ترميز_csv تتطلب قائمة من الصفوف".into());
+    }
+    let delim = if args.len() > 1 {
+        match &args[1] {
+            Value::Text(d) if !d.is_empty() => d.as_str(),
+            _ => ",",
+        }
+    } else {
+        ","
+    };
+
+    let rows = match &args[0] {
+        Value::List(r) => r.borrow().clone(),
+        _ => return Err("ترميز_csv تتطلب قائمة من الصفوف".into()),
+    };
+
+    let mut out = String::new();
+    for (r_idx, row_val) in rows.iter().enumerate() {
+        let cells = match row_val {
+            Value::List(c) => c.borrow().clone(),
+            _ => return Err("كل صف في جدول CSV يجب أن يكون قائمة".into()),
+        };
+        for (c_idx, cell) in cells.iter().enumerate() {
+            if c_idx > 0 {
+                out.push_str(delim);
+            }
+            let text = match cell {
+                Value::Number(n) => format!("{}", n),
+                Value::Text(s) => s.clone(),
+                Value::Bool(b) => if *b { "صحيح".into() } else { "خطأ".into() },
+                Value::Null => String::new(),
+                other => format!("{:?}", other),
+            };
+            let needs_quotes = text.contains(delim) || text.contains('"') || text.contains('\n') || text.contains('\r');
+            if needs_quotes {
+                out.push('"');
+                out.push_str(&text.replace('"', "\"\""));
+                out.push('"');
+            } else {
+                out.push_str(&text);
+            }
+        }
+        if r_idx + 1 < rows.len() {
+            out.push('\n');
+        }
+    }
+    Ok(Value::Text(out))
 }

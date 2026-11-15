@@ -826,14 +826,23 @@ impl VM {
     }
 }
 
+struct LoopInfo {
+    start_ip: usize,
+    break_jumps: Vec<usize>,
+}
+
 /// مترجم يحول شجرة بناء التعليمات (AST) إلى بايت كود للآلة الافتراضية
 pub struct Compiler {
     chunk: Chunk,
+    loop_stack: Vec<LoopInfo>,
 }
 
 impl Compiler {
     pub fn compile(statements: &[Stmt]) -> Result<Chunk, String> {
-        let mut compiler = Self { chunk: Chunk::new() };
+        let mut compiler = Self {
+            chunk: Chunk::new(),
+            loop_stack: Vec::new(),
+        };
         for stmt in statements {
             compiler.compile_stmt(stmt)?;
         }
@@ -898,12 +907,18 @@ impl Compiler {
                 self.compile_expr(condition)?;
                 let jump_out = self.chunk.emit(OpCode::JumpIfFalse(0), 0);
 
+                self.loop_stack.push(LoopInfo { start_ip: loop_start, break_jumps: Vec::new() });
                 for s in body {
                     self.compile_stmt(s)?;
                 }
+                let loop_info = self.loop_stack.pop().unwrap();
+
                 self.chunk.emit(OpCode::Jump(loop_start), 0);
                 let loop_end = self.chunk.instructions.len();
                 self.chunk.patch_jump(jump_out, loop_end);
+                for brk in loop_info.break_jumps {
+                    self.chunk.patch_jump(brk, loop_end);
+                }
             }
             Stmt::ForEach(name, iterable, body) => {
                 self.compile_expr(iterable)?;
@@ -911,13 +926,109 @@ impl Compiler {
                 let loop_start = self.chunk.instructions.len();
                 let iter_next = self.chunk.emit(OpCode::IterNext(name.clone(), 0), 0);
 
+                self.loop_stack.push(LoopInfo { start_ip: loop_start, break_jumps: Vec::new() });
                 for s in body {
                     self.compile_stmt(s)?;
                 }
+                let loop_info = self.loop_stack.pop().unwrap();
+
                 self.chunk.emit(OpCode::Jump(loop_start), 0);
                 let loop_end = self.chunk.instructions.len();
                 self.chunk.patch_jump(iter_next, loop_end);
                 self.chunk.emit(OpCode::IterPop, 0);
+                for brk in loop_info.break_jumps {
+                    self.chunk.patch_jump(brk, loop_end);
+                }
+            }
+            Stmt::ForEachUnpack(names, iterable, body) => {
+                self.compile_expr(iterable)?;
+                self.chunk.emit(OpCode::IterInit, 0);
+                let loop_start = self.chunk.instructions.len();
+                let temp_var = format!("__تفكيك_تكرار_{}__", self.chunk.instructions.len());
+                let iter_next = self.chunk.emit(OpCode::IterNext(temp_var.clone(), 0), 0);
+                self.chunk.emit(OpCode::GetGlobal(temp_var), 0);
+                self.chunk.emit(OpCode::UnpackDefine(names.clone()), 0);
+
+                self.loop_stack.push(LoopInfo { start_ip: loop_start, break_jumps: Vec::new() });
+                for s in body {
+                    self.compile_stmt(s)?;
+                }
+                let loop_info = self.loop_stack.pop().unwrap();
+
+                self.chunk.emit(OpCode::Jump(loop_start), 0);
+                let loop_end = self.chunk.instructions.len();
+                self.chunk.patch_jump(iter_next, loop_end);
+                self.chunk.emit(OpCode::IterPop, 0);
+                for brk in loop_info.break_jumps {
+                    self.chunk.patch_jump(brk, loop_end);
+                }
+            }
+            Stmt::Break => {
+                if let Some(info) = self.loop_stack.last_mut() {
+                    let jmp = self.chunk.emit(OpCode::Jump(0), 0);
+                    info.break_jumps.push(jmp);
+                } else {
+                    return Err("أمر 'توقف' (break) مسموح به فقط داخل حلقات التكرار".into());
+                }
+            }
+            Stmt::Continue => {
+                if let Some(info) = self.loop_stack.last() {
+                    self.chunk.emit(OpCode::Jump(info.start_ip), 0);
+                } else {
+                    return Err("أمر 'تابع' (continue) مسموح به فقط داخل حلقات التكرار".into());
+                }
+            }
+            Stmt::Return(maybe_expr) => {
+                if let Some(e) = maybe_expr {
+                    self.compile_expr(e)?;
+                } else {
+                    self.chunk.emit(OpCode::Null, 0);
+                }
+                self.chunk.emit(OpCode::Return, 0);
+            }
+            Stmt::ImportModule { module, alias } => {
+                let target_name = alias.clone().unwrap_or_else(|| {
+                    if module.ends_with(".lsn") {
+                        std::path::Path::new(module)
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or(module)
+                            .to_string()
+                    } else {
+                        module.clone()
+                    }
+                });
+                let mut initial_exports = Vec::new();
+                let norm = crate::diagnostics::normalize_arabic(module);
+                if matches!(norm.as_str(), "رياضيات" | "math") {
+                    initial_exports.push(("ط".to_string(), Value::Number(std::f64::consts::PI)));
+                    initial_exports.push(("قيمة_ط".to_string(), Value::Number(std::f64::consts::PI)));
+                    initial_exports.push(("هـ".to_string(), Value::Number(std::f64::consts::E)));
+                    initial_exports.push(("قيمة_هـ".to_string(), Value::Number(std::f64::consts::E)));
+                }
+                let mod_val = Value::Module {
+                    name: module.clone(),
+                    exports: std::rc::Rc::new(std::cell::RefCell::new(initial_exports)),
+                };
+                let idx = self.chunk.add_constant(mod_val);
+                self.chunk.emit(OpCode::Constant(idx), 0);
+                self.chunk.emit(OpCode::DefineGlobal(target_name), 0);
+            }
+            Stmt::FromImport { module, items } => {
+                let norm = crate::diagnostics::normalize_arabic(module);
+                if matches!(norm.as_str(), "رياضيات" | "math") {
+                    for item in items {
+                        if item == "ط" || item == "قيمة_ط" {
+                            let idx = self.chunk.add_constant(Value::Number(std::f64::consts::PI));
+                            self.chunk.emit(OpCode::Constant(idx), 0);
+                            self.chunk.emit(OpCode::DefineGlobal(item.clone()), 0);
+                        } else if item == "هـ" || item == "قيمة_هـ" {
+                            let idx = self.chunk.add_constant(Value::Number(std::f64::consts::E));
+                            self.chunk.emit(OpCode::Constant(idx), 0);
+                            self.chunk.emit(OpCode::DefineGlobal(item.clone()), 0);
+                        }
+                    }
+                }
             }
             _ => return Err(format!("الجملة غير مدعومة بعد في محرك البايت كود: {:?}", stmt)),
         }

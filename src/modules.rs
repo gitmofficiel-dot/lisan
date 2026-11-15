@@ -12,7 +12,10 @@ pub fn resolve_builtin_module(name: &str) -> Option<&'static str> {
     let trimmed = name.trim().strip_suffix(".lsn").unwrap_or(name.trim());
     let norm = crate::diagnostics::normalize_arabic(trimmed);
     match norm.as_str() {
-        "اردوينو" | "متحكمات" | "arduino" => Some(crate::arduino::STDLIB_ARDUINO),
+        "اردوينو" | "arduino" => Some(crate::arduino::STDLIB_ARDUINO),
+        "esp" | "esp32" | "اي_اس_بي" | "اي_اس_بي32" => Some(crate::arduino::STDLIB_ESP32),
+        "stm32" | "اس_تي_ام" | "اس_تي_ام32" => Some(crate::arduino::STDLIB_STM32),
+        "متحكمات" | "embedded" | "microcontrollers" => Some(crate::arduino::STDLIB_ARDUINO),
         "ايقونات" | "تصميم" | "واجهه" | "هاتف" | "جوال" | "ويب" | "ui" | "mobile" | "web" | "icons" => {
             Some(crate::ui::STDLIB_UI_AND_MOBILE)
         }

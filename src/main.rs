@@ -9,7 +9,7 @@ fn main() {
 fn real_main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan اختبار [ملفات...] تشغيل حزمة اختبارات وتحققات لسان (--test)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات دقيقة C++\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
+        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan اختبار [ملفات...] تشغيل حزمة اختبارات وتحققات لسان (--test)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات C++\n  lisan --esp32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود ESP32 C++ (WiFi/BLE/FreeRTOS)\n  lisan --stm32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود STM32 C++ (Timers/CAN/DAC/RTC)\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
         return;
     }
     if args.len() == 1 && (args[0] == "-V" || args[0] == "--version") {
@@ -113,16 +113,22 @@ fn real_main() {
         eprintln!("الاستخدام: lisan حزمة [تهيئة <اسم> | أضف <اسم> <مسار> | قفل]");
         std::process::exit(2);
     }
-    if !args.is_empty() && args[0] == "--arduino" {
+    if !args.is_empty() && (args[0] == "--arduino" || args[0] == "--esp32" || args[0] == "--esp" || args[0] == "--stm32") {
+        let flag = &args[0];
         if args.len() != 2 && !(args.len() == 4 && args[2] == "--output") {
-            eprintln!("الاستخدام: lisan --arduino ملف.lsn [--output sketch.ino]");
+            eprintln!("الاستخدام: lisan {} ملف.lsn [--output sketch.ino]", flag);
             std::process::exit(2);
         }
         let input = std::path::Path::new(&args[1]);
-        let target = if args.len() == 4 { Some(std::path::Path::new(&args[3])) } else { None };
-        match lisan::arduino::build_arduino_file(input, target) {
-            Ok(path) => println!("تم توليد كود الأردوينو والمتحكمات بنجاح: {}", path.display()),
-            Err(err) => { eprintln!("خطأ في ترجمة الأردوينو: {}", err); std::process::exit(1); }
+        let target_path = if args.len() == 4 { Some(std::path::Path::new(&args[3])) } else { None };
+        let micro_target = match flag.as_str() {
+            "--esp32" | "--esp" => lisan::arduino::MicroTarget::Esp32,
+            "--stm32" => lisan::arduino::MicroTarget::Stm32,
+            _ => lisan::arduino::MicroTarget::Arduino,
+        };
+        match lisan::arduino::build_target_file(input, target_path, micro_target) {
+            Ok(path) => println!("تم توليد كود المتحكم بنجاح: {}", path.display()),
+            Err(err) => { eprintln!("خطأ في ترجمة كود المتحكم: {}", err); std::process::exit(1); }
         }
         return;
     }

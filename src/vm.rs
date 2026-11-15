@@ -670,6 +670,9 @@ impl VM {
                                 other => return Err(format!("الطريقة '{}' غير مدعومة للصفوف في البايت كود", other)),
                             }
                         }
+                        Value::Module { name: ref mod_name, .. } => {
+                            crate::runtime::call_builtin_for_module(mod_name, name, args)?
+                        }
                         _ => return Err("استدعاء الطرق في البايت كود غير مدعوم لهذا النوع".into()),
                     };
                     self.stack.push(res);
@@ -779,8 +782,12 @@ impl VM {
                             Value::Text(crate::json::to_json_string(&args[0])?)
                         }
                         other => {
-                            let empty: Vec<&str> = Vec::new();
-                            return Err(crate::diagnostics::suggest_function_error(other, &empty));
+                            if let Ok(val) = crate::runtime::call_builtin_for_module("", other, args) {
+                                val
+                            } else {
+                                let empty: Vec<&str> = Vec::new();
+                                return Err(crate::diagnostics::suggest_function_error(other, &empty));
+                            }
                         }
                     };
                     self.stack.push(res);

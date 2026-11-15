@@ -408,6 +408,7 @@ impl Interpreter {
                 });
                 let norm = crate::diagnostics::normalize_arabic(module);
                 let is_math = matches!(norm.as_str(), "رياضيات" | "math");
+                let is_stats = matches!(norm.as_str(), "إحصاء" | "احصاء" | "stats" | "statistics");
                 let is_sys = matches!(norm.as_str(), "نظام" | "sys" | "os");
                 let is_fs = matches!(norm.as_str(), "ملفات" | "io" | "fs");
                 let is_time = matches!(norm.as_str(), "وقت" | "time");
@@ -416,7 +417,7 @@ impl Interpreter {
                 let is_net = matches!(norm.as_str(), "شبكة" | "شبكه" | "شبكات" | "net" | "network" | "http");
                 let is_text = matches!(norm.as_str(), "نصوص" | "نص" | "text" | "string" | "strings");
 
-                if is_math || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text {
+                if is_math || is_stats || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text {
                     let mut initial_exports = Vec::new();
                     if is_math {
                         initial_exports.push(("ط".to_string(), Value::Number(std::f64::consts::PI)));
@@ -485,6 +486,7 @@ impl Interpreter {
             Stmt::FromImport { module, items } => {
                 let norm = crate::diagnostics::normalize_arabic(module);
                 let is_math = matches!(norm.as_str(), "رياضيات" | "math");
+                let is_stats = matches!(norm.as_str(), "إحصاء" | "احصاء" | "stats" | "statistics");
                 let is_sys = matches!(norm.as_str(), "نظام" | "sys" | "os");
                 let is_fs = matches!(norm.as_str(), "ملفات" | "io" | "fs");
                 let is_time = matches!(norm.as_str(), "وقت" | "time");
@@ -493,7 +495,7 @@ impl Interpreter {
                 let is_net = matches!(norm.as_str(), "شبكة" | "شبكه" | "شبكات" | "net" | "network" | "http");
                 let is_text = matches!(norm.as_str(), "نصوص" | "نص" | "text" | "string" | "strings");
 
-                if is_math || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text {
+                if is_math || is_stats || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text {
                     for item in items {
                         if (item == "ط" || item == "قيمة_ط") && is_math {
                             self.scopes.last_mut().expect("scope exists").insert(item.clone(), Value::Number(std::f64::consts::PI));
@@ -1630,106 +1632,7 @@ impl Interpreter {
                         return res;
                     }
                 }
-                let norm = crate::diagnostics::normalize_arabic(name);
-                match norm.as_str() {
-                    "رياضيات" | "math" => {
-                        let m = crate::diagnostics::normalize_arabic(method_name);
-                        match m.as_str() {
-                            "جذر" | "مطلق" | "قرب" | "قرّب" | "ارضية" | "أرضية" | "سقف" | "قوة"
-                            | "اعلى" | "أعلى" | "ادنى" | "أدنى" | "مجموع" | "متوسط"
-                            | "جا" | "جتا" | "ظا" | "لوغاريتم" | "لوغ" | "اسي" | "أسي" => {
-                                call_builtin(method_name, evaluated_args)
-                            }
-                            _ => Err(format!("الدالة الرياضية '{}' غير معروفة في وحدة الرياضيات", method_name)),
-                        }
-                    }
-                    "ملفات" | "io" | "fs" => {
-                        match method_name {
-                            "اقرأ_ملف" | "اكتب_ملف" | "ألحق_ملف" | "الحق_ملف"
-                            | "ملف_موجود" | "مجلد_موجود" | "أنشئ_مجلد" | "انشئ_مجلد"
-                            | "احذف_ملف" | "قائمة_ملفات" | "افتح" => {
-                                call_builtin(method_name, evaluated_args)
-                            }
-                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة الملفات", method_name)),
-                        }
-                    }
-                    "نظام" | "sys" | "os" => {
-                        match method_name {
-                            "بيئة" | "وسائط" | "مسار_حالي" | "نظام_تشغيل" | "خروج" => {
-                                call_builtin(method_name, evaluated_args)
-                            }
-                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة النظام", method_name)),
-                        }
-                    }
-                    "وقت" | "time" => {
-                        match method_name {
-                            "الآن" | "الان" | "طابع_زمني" | "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" => {
-                                call_builtin(method_name, evaluated_args)
-                            }
-                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة الوقت", method_name)),
-                        }
-                    }
-                    "عشوائي" | "random" => {
-                        match method_name {
-                            "عشوائي" | "عدد_عشوائي" | "عنصر_عشوائي" | "خلط" => {
-                                call_builtin(method_name, evaluated_args)
-                            }
-                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة العشوائي", method_name)),
-                        }
-                    }
-                    "جيسون" | "json" => {
-                        match method_name {
-                            "تحليل" | "تحليل_json" => call_builtin("تحليل_json", evaluated_args),
-                            "ترميز" | "ترميز_json" => call_builtin("ترميز_json", evaluated_args),
-                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة جيسون", method_name)),
-                        }
-                    }
-                    "شبكة" | "شبكه" | "شبكات" | "net" | "network" | "http" => {
-                        let m = crate::diagnostics::normalize_arabic(method_name);
-                        match m.as_str() {
-                            "طلب_وب" | "جلب" | "اطلب_ويب" | "جلب_ويب" | "get" => {
-                                if evaluated_args.is_empty() {
-                                    return Err("طلب_وب تتطلب رابطاً نصياً".into());
-                                }
-                                match &evaluated_args[0] {
-                                    Value::Text(u) => http_get_full(u),
-                                    _ => Err("طلب_وب تتطلب رابطاً نصياً".into()),
-                                }
-                            }
-                            "أرسل_tcp" | "ارسل_tcp" | "send_tcp" => {
-                                tcp_send_builtin(evaluated_args)
-                            }
-                            "خادم_ويب" | "خادم_ويب_بسيط" | "web_server" => {
-                                web_server_builtin(evaluated_args)
-                            }
-                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة الشبكة", method_name)),
-                        }
-                    }
-                    "نصوص" | "نص" | "text" | "string" | "strings" => {
-                        let m = crate::diagnostics::normalize_arabic(method_name);
-                        match m.as_str() {
-                            "ترميز_قاعده64" | "ترميز_قاعدة64" | "قاعده64" | "قاعدة64" | "base64_encode" => text_b64_encode(evaluated_args),
-                            "فك_قاعده64" | "فك_قاعدة64" | "base64_decode" => text_b64_decode(evaluated_args),
-                            "ترميز_url" | "url_encode" => text_url_encode(evaluated_args),
-                            "فك_url" | "url_decode" => text_url_decode(evaluated_args),
-                            "حشو_يمين" | "حشو_الايمن" | "حشو_الأيمن" | "rjust" => text_rjust(evaluated_args),
-                            "حشو_يسار" | "حشو_الايسر" | "حشو_الأيسر" | "ljust" => text_ljust(evaluated_args),
-                            "تكرار" | "كرر" | "repeat" => call_builtin("كرر", evaluated_args),
-                            "يبدأ_ب" | "يبدا_ب" | "startswith" => call_builtin("يبدأ_ب", evaluated_args),
-                            "ينتهي_ب" | "endswith" => call_builtin("ينتهي_ب", evaluated_args),
-                            "تقسيم" | "قسّم" | "قسم" | "split" => call_builtin("قسّم", evaluated_args),
-                            "استبدل" | "replace" => call_builtin("استبدل", evaluated_args),
-                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة النصوص", method_name)),
-                        }
-                    }
-                    _ => {
-                        if is_builtin(method_name) {
-                            call_builtin(method_name, evaluated_args)
-                        } else {
-                            Err(format!("الطريقة '{}' غير موجودة في الوحدة '{}'", method_name, name))
-                        }
-                    }
-                }
+                call_builtin_for_module(name, method_name, evaluated_args)
             }
             Value::Set(items) => {
                 match method_name {
@@ -2047,6 +1950,10 @@ fn is_builtin(name: &str) -> bool {
         "اطلب_ويب" | "جلب_ويب" | "طلب_وب" | "جلب" |
         "ترميز_قاعدة64" | "قاعدة64" | "فك_قاعدة64" | "ترميز_url" | "فك_url" |
         "حشو_يمين" | "حشو_الأيمن" | "حشو_يسار" | "حشو_الأيسر" |
+        "مضروب" | "عامل" | "قاسم_مشترك" | "مضاعف_مشترك" | "توافيق" | "تباديل" |
+        "لوغاريتم10" | "لوغ10" | "لوغاريتم2" | "لوغ2" | "راديان" | "درجات" | "تقارب" |
+        "وسيط" | "منوال" | "تباين" | "انحراف_معياري" | "انحراف" | "مدى_إحصائي" |
+        "متوسط_هندسي" | "متوسط_توافقي" | "ارتباط" |
         "أرسل_tcp" | "ارسل_tcp" | "خادم_ويب" | "خادم_ويب_بسيط" |
         "وضع_المنفذ" | "اكتب_رقمي" | "اقرأ_رقمي" | "اكتب_تماثلي" | "اقرأ_تماثلي" |
         "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" | "نبضة_صوت" |
@@ -2927,6 +2834,26 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
         "حشو_يسار" | "حشو_الأيسر" => text_ljust(args),
         "أرسل_tcp" | "ارسل_tcp" => tcp_send_builtin(args),
         "خادم_ويب" | "خادم_ويب_بسيط" => web_server_builtin(args),
+        // ==================== دوال الرياضيات والإحصاء المتقدمة ====================
+        "مضروب" | "عامل" => math_factorial(args),
+        "قاسم_مشترك" => math_gcd(args),
+        "مضاعف_مشترك" => math_lcm(args),
+        "توافيق" => math_comb(args),
+        "تباديل" => math_perm(args),
+        "لوغاريتم10" | "لوغ10" => math_log10(args),
+        "لوغاريتم2" | "لوغ2" => math_log2(args),
+        "راديان" => math_radians(args),
+        "درجات" => math_degrees(args),
+        "تقارب" => math_isclose(args),
+
+        "وسيط" => stats_median(args),
+        "منوال" => stats_mode(args),
+        "تباين" => stats_variance(args),
+        "انحراف_معياري" | "انحراف" => stats_stdev(args),
+        "مدى_إحصائي" | "مدى_احصائي" => stats_range(args),
+        "متوسط_هندسي" => stats_geometric_mean(args),
+        "متوسط_توافقي" => stats_harmonic_mean(args),
+        "ارتباط" => stats_correlation(args),
         // ==================== دوال الأردوينو والمتحكمات الدقيقة ====================
         "وضع_المنفذ" | "اكتب_رقمي" | "اقرأ_رقمي" | "اكتب_تماثلي" | "اقرأ_تماثلي"
         | "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" | "نبضة_صوت"
@@ -3675,4 +3602,424 @@ fn text_ljust(args: Vec<Value>) -> Result<Value, String> {
         let padding: String = std::iter::repeat(pad_char).take(pad_count).collect();
         Ok(Value::Text(format!("{}{}", text, padding)))
     }
+}
+
+pub(crate) fn call_builtin_for_module(name: &str, method_name: &str, evaluated_args: Vec<Value>) -> Result<Value, String> {
+    let norm = crate::diagnostics::normalize_arabic(name);
+    match norm.as_str() {
+        "رياضيات" | "math" => {
+            let m = crate::diagnostics::normalize_arabic(method_name);
+            match m.as_str() {
+                "جذر" | "مطلق" | "قرب" | "قرّب" | "ارضية" | "أرضية" | "سقف" | "قوة"
+                | "اعلى" | "أعلى" | "ادنى" | "أدنى" | "مجموع" | "متوسط"
+                | "جا" | "جتا" | "ظا" | "لوغاريتم" | "لوغ" | "اسي" | "أسي"
+                | "مضروب" | "عامل" | "قاسم_مشترك" | "مضاعف_مشترك" | "توافيق" | "تباديل"
+                | "لوغاريتم10" | "لوغ10" | "لوغاريتم2" | "لوغ2"
+                | "راديان" | "درجات" | "تقارب" => {
+                    call_builtin(method_name, evaluated_args)
+                }
+                _ => Err(format!("الدالة الرياضية '{}' غير معروفة في وحدة الرياضيات", method_name)),
+            }
+        }
+        "إحصاء" | "احصاء" | "stats" | "statistics" => {
+            let m = crate::diagnostics::normalize_arabic(method_name);
+            match m.as_str() {
+                "متوسط" | "mean" => call_builtin("متوسط", evaluated_args),
+                "وسيط" | "median" => stats_median(evaluated_args),
+                "منوال" | "mode" => stats_mode(evaluated_args),
+                "تباين" | "variance" => stats_variance(evaluated_args),
+                "انحراف_معياري" | "انحراف" | "stdev" => stats_stdev(evaluated_args),
+                "مدي" | "مدى" | "مدي_احصائي" | "مدى_إحصائي" | "مدي_إحصائي" | "مدى_احصائي" | "range" => stats_range(evaluated_args),
+                "متوسط_هندسي" | "geometric_mean" => stats_geometric_mean(evaluated_args),
+                "متوسط_توافقي" | "harmonic_mean" => stats_harmonic_mean(evaluated_args),
+                "ارتباط" | "correlation" => stats_correlation(evaluated_args),
+                _ => Err(format!("الدالة الإحصائية '{}' غير معروفة في وحدة الإحصاء", method_name)),
+            }
+        }
+        "ملفات" | "io" | "fs" => {
+            match method_name {
+                "اقرأ_ملف" | "اكتب_ملف" | "ألحق_ملف" | "الحق_ملف"
+                | "ملف_موجود" | "مجلد_موجود" | "أنشئ_مجلد" | "انشئ_مجلد"
+                | "احذف_ملف" | "قائمة_ملفات" | "افتح" => {
+                    call_builtin(method_name, evaluated_args)
+                }
+                _ => Err(format!("الدالة '{}' غير معروفة في وحدة الملفات", method_name)),
+            }
+        }
+        "نظام" | "sys" | "os" => {
+            match method_name {
+                "بيئة" | "وسائط" | "مسار_حالي" | "نظام_تشغيل" | "خروج" => {
+                    call_builtin(method_name, evaluated_args)
+                }
+                _ => Err(format!("الدالة '{}' غير معروفة في وحدة النظام", method_name)),
+            }
+        }
+        "وقت" | "time" => {
+            match method_name {
+                "الآن" | "الان" | "طابع_زمني" | "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" => {
+                    call_builtin(method_name, evaluated_args)
+                }
+                _ => Err(format!("الدالة '{}' غير معروفة في وحدة الوقت", method_name)),
+            }
+        }
+        "عشوائي" | "random" => {
+            match method_name {
+                "عشوائي" | "عدد_عشوائي" | "عنصر_عشوائي" | "خلط" => {
+                    call_builtin(method_name, evaluated_args)
+                }
+                _ => Err(format!("الدالة '{}' غير معروفة في وحدة العشوائي", method_name)),
+            }
+        }
+        "جيسون" | "json" => {
+            match method_name {
+                "تحليل" | "تحليل_json" => call_builtin("تحليل_json", evaluated_args),
+                "ترميز" | "ترميز_json" => call_builtin("ترميز_json", evaluated_args),
+                _ => Err(format!("الدالة '{}' غير معروفة في وحدة جيسون", method_name)),
+            }
+        }
+        "شبكة" | "شبكه" | "شبكات" | "net" | "network" | "http" => {
+            let m = crate::diagnostics::normalize_arabic(method_name);
+            match m.as_str() {
+                "طلب_وب" | "جلب" | "اطلب_ويب" | "جلب_ويب" | "get" => {
+                    if evaluated_args.is_empty() {
+                        return Err("طلب_وب تتطلب رابطاً نصياً".into());
+                    }
+                    match &evaluated_args[0] {
+                        Value::Text(u) => http_get_full(u),
+                        _ => Err("طلب_وب تتطلب رابطاً نصياً".into()),
+                    }
+                }
+                "أرسل_tcp" | "ارسل_tcp" | "send_tcp" => {
+                    tcp_send_builtin(evaluated_args)
+                }
+                "خادم_ويب" | "خادم_ويب_بسيط" | "web_server" => {
+                    web_server_builtin(evaluated_args)
+                }
+                _ => Err(format!("الدالة '{}' غير معروفة في وحدة الشبكة", method_name)),
+            }
+        }
+        "نصوص" | "نص" | "text" | "string" | "strings" => {
+            let m = crate::diagnostics::normalize_arabic(method_name);
+            match m.as_str() {
+                "ترميز_قاعده64" | "ترميز_قاعدة64" | "قاعده64" | "قاعدة64" | "base64_encode" => text_b64_encode(evaluated_args),
+                "فك_قاعده64" | "فك_قاعدة64" | "base64_decode" => text_b64_decode(evaluated_args),
+                "ترميز_url" | "url_encode" => text_url_encode(evaluated_args),
+                "فك_url" | "url_decode" => text_url_decode(evaluated_args),
+                "حشو_يمين" | "حشو_الايمن" | "حشو_الأيمن" | "rjust" => text_rjust(evaluated_args),
+                "حشو_يسار" | "حشو_الايسر" | "حشو_الأيسر" | "ljust" => text_ljust(evaluated_args),
+                "تكرار" | "كرر" | "repeat" => call_builtin("كرر", evaluated_args),
+                "يبدأ_ب" | "يبدا_ب" | "startswith" => call_builtin("يبدأ_ب", evaluated_args),
+                "ينتهي_ب" | "endswith" => call_builtin("ينتهي_ب", evaluated_args),
+                "تقسيم" | "قسّم" | "قسم" | "split" => call_builtin("قسّم", evaluated_args),
+                "استبدل" | "replace" => call_builtin("استبدل", evaluated_args),
+                _ => Err(format!("الدالة '{}' غير معروفة في وحدة النصوص", method_name)),
+            }
+        }
+        _ => {
+            if is_builtin(method_name) {
+                call_builtin(method_name, evaluated_args)
+            } else {
+                Err(format!("الطريقة '{}' غير موجودة في الوحدة '{}'", method_name, name))
+            }
+        }
+    }
+}
+
+fn math_factorial(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("مضروب تتطلب عدداً صحيحاً".into()); }
+    let n = match args[0] {
+        Value::Number(x) if x >= 0.0 && x.fract() == 0.0 => x as u64,
+        _ => return Err("مضروب تتطلب عدداً صحيحاً غير سالب".into()),
+    };
+    if n > 170 {
+        return Err("مضروب يتجاوز الحد الأقصى للأرقام العشرية".into());
+    }
+    let mut res = 1.0;
+    for i in 2..=n {
+        res *= i as f64;
+    }
+    finite_number(res)
+}
+
+fn math_gcd(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 { return Err("قاسم_مشترك تتطلب عددين".into()); }
+    let a = match args[0] {
+        Value::Number(x) if x.fract() == 0.0 => x.abs() as u64,
+        _ => return Err("قاسم_مشترك تتطلب أعداداً صحيحة".into()),
+    };
+    let b = match args[1] {
+        Value::Number(x) if x.fract() == 0.0 => x.abs() as u64,
+        _ => return Err("قاسم_مشترك تتطلب أعداداً صحيحة".into()),
+    };
+    let mut x = a;
+    let mut y = b;
+    while y != 0 {
+        let t = y;
+        y = x % y;
+        x = t;
+    }
+    Ok(Value::Number(x as f64))
+}
+
+fn math_lcm(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 { return Err("مضاعف_مشترك تتطلب عددين".into()); }
+    let a = match args[0] {
+        Value::Number(x) if x.fract() == 0.0 => x.abs() as u64,
+        _ => return Err("مضاعف_مشترك تتطلب أعداداً صحيحة".into()),
+    };
+    let b = match args[1] {
+        Value::Number(x) if x.fract() == 0.0 => x.abs() as u64,
+        _ => return Err("مضاعف_مشترك تتطلب أعداداً صحيحة".into()),
+    };
+    if a == 0 || b == 0 {
+        return Ok(Value::Number(0.0));
+    }
+    let mut x = a;
+    let mut y = b;
+    while y != 0 {
+        let t = y;
+        y = x % y;
+        x = t;
+    }
+    let gcd = x;
+    let lcm = (a / gcd) as f64 * b as f64;
+    finite_number(lcm)
+}
+
+fn math_comb(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 { return Err("توافيق تتطلب (ن، ر)".into()); }
+    let n = match args[0] {
+        Value::Number(x) if x >= 0.0 && x.fract() == 0.0 => x as u64,
+        _ => return Err("توافيق تتطلب أعداداً صحيحة موجبة".into()),
+    };
+    let r = match args[1] {
+        Value::Number(x) if x >= 0.0 && x.fract() == 0.0 => x as u64,
+        _ => return Err("توافيق تتطلب أعداداً صحيحة موجبة".into()),
+    };
+    if r > n {
+        return Ok(Value::Number(0.0));
+    }
+    let k = r.min(n - r);
+    let mut c = 1.0;
+    for i in 1..=k {
+        c = c * (n - k + i) as f64 / i as f64;
+    }
+    finite_number(c.round())
+}
+
+fn math_perm(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 { return Err("تباديل تتطلب (ن، ر)".into()); }
+    let n = match args[0] {
+        Value::Number(x) if x >= 0.0 && x.fract() == 0.0 => x as u64,
+        _ => return Err("تباديل تتطلب أعداداً صحيحة موجبة".into()),
+    };
+    let r = match args[1] {
+        Value::Number(x) if x >= 0.0 && x.fract() == 0.0 => x as u64,
+        _ => return Err("تباديل تتطلب أعداداً صحيحة موجبة".into()),
+    };
+    if r > n {
+        return Ok(Value::Number(0.0));
+    }
+    let mut p = 1.0;
+    for i in 0..r {
+        p *= (n - i) as f64;
+    }
+    finite_number(p)
+}
+
+fn math_log10(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("لوغاريتم10 تتطلب عدداً موجباً".into()); }
+    match args[0] {
+        Value::Number(x) if x > 0.0 => finite_number(x.log10()),
+        _ => Err("لوغاريتم10 تتطلب عدداً أكبر من الصفر".into()),
+    }
+}
+
+fn math_log2(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("لوغاريتم2 تتطلب عدداً موجباً".into()); }
+    match args[0] {
+        Value::Number(x) if x > 0.0 => finite_number(x.log2()),
+        _ => Err("لوغاريتم2 تتطلب عدداً أكبر من الصفر".into()),
+    }
+}
+
+fn math_radians(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("راديان تتطلب زاوية بالدرجات".into()); }
+    match args[0] {
+        Value::Number(deg) => finite_number(deg * (std::f64::consts::PI / 180.0)),
+        _ => Err("راديان تتطلب عدداً".into()),
+    }
+}
+
+fn math_degrees(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("درجات تتطلب زاوية بالراديان".into()); }
+    match args[0] {
+        Value::Number(rad) => finite_number(rad * (180.0 / std::f64::consts::PI)),
+        _ => Err("درجات تتطلب عدداً".into()),
+    }
+}
+
+fn math_isclose(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 { return Err("تقارب تتطلب عددين على الأقل للمقارنة".into()); }
+    let a = match args[0] { Value::Number(x) => x, _ => return Err("تقارب تتطلب أرقاماً".into()) };
+    let b = match args[1] { Value::Number(x) => x, _ => return Err("تقارب تتطلب أرقاماً".into()) };
+    let rel_tol = if args.len() > 2 {
+        match args[2] { Value::Number(x) => x, _ => 1e-9 }
+    } else { 1e-9 };
+    let abs_tol = if args.len() > 3 {
+        match args[3] { Value::Number(x) => x, _ => 0.0 }
+    } else { 0.0 };
+    let diff = (a - b).abs();
+    let tol = (rel_tol * a.abs().max(b.abs())).max(abs_tol);
+    Ok(Value::Bool(diff <= tol))
+}
+
+fn extract_number_slice(val: &Value, name: &str) -> Result<Vec<f64>, String> {
+    match val {
+        Value::List(items) => {
+            let borrowed = items.borrow();
+            if borrowed.is_empty() {
+                return Err(format!("{} لا تقبل قائمة فارغة", name));
+            }
+            let mut nums = Vec::with_capacity(borrowed.len());
+            for item in borrowed.iter() {
+                match item {
+                    Value::Number(n) => nums.push(*n),
+                    _ => return Err(format!("{} تتطلب قائمة من الأرقام فقط", name)),
+                }
+            }
+            Ok(nums)
+        }
+        Value::Tuple(items) => {
+            if items.is_empty() {
+                return Err(format!("{} لا تقبل صفا فارغا", name));
+            }
+            let mut nums = Vec::with_capacity(items.len());
+            for item in items.iter() {
+                match item {
+                    Value::Number(n) => nums.push(*n),
+                    _ => return Err(format!("{} تتطلب صفا من الأرقام فقط", name)),
+                }
+            }
+            Ok(nums)
+        }
+        _ => Err(format!("{} تتطلب قائمة أو صفا من الأرقام", name)),
+    }
+}
+
+fn stats_median(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("وسيط تتطلب قائمة بيانات".into()); }
+    let mut nums = extract_number_slice(&args[0], "وسيط")?;
+    nums.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = nums.len();
+    if n % 2 == 1 {
+        Ok(Value::Number(nums[n / 2]))
+    } else {
+        let mid = (nums[n / 2 - 1] + nums[n / 2]) / 2.0;
+        finite_number(mid)
+    }
+}
+
+fn stats_mode(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("منوال تتطلب قائمة بيانات".into()); }
+    let nums = extract_number_slice(&args[0], "منوال")?;
+    let mut counts: Vec<(f64, usize)> = Vec::new();
+    for &num in &nums {
+        if let Some(entry) = counts.iter_mut().find(|(val, _)| (*val - num).abs() < 1e-12) {
+            entry.1 += 1;
+        } else {
+            counts.push((num, 1));
+        }
+    }
+    counts.sort_by(|a, b| b.1.cmp(&a.1));
+    Ok(Value::Number(counts[0].0))
+}
+
+fn stats_variance(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("تباين تتطلب قائمة بيانات".into()); }
+    let nums = extract_number_slice(&args[0], "تباين")?;
+    if nums.len() < 2 {
+        return Err("تباين تتطلب قيمتين إحصائيتين على الأقل".into());
+    }
+    let n = nums.len() as f64;
+    let mean = nums.iter().sum::<f64>() / n;
+    let sum_sq: f64 = nums.iter().map(|x| (x - mean).powi(2)).sum();
+    finite_number(sum_sq / (n - 1.0))
+}
+
+fn stats_stdev(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("انحراف_معياري تتطلب قائمة بيانات".into()); }
+    let var_val = stats_variance(args)?;
+    match var_val {
+        Value::Number(v) => finite_number(v.sqrt()),
+        _ => Err("فشل حساب الانحراف المعياري".into()),
+    }
+}
+
+fn stats_range(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("مدى تتطلب قائمة بيانات".into()); }
+    let nums = extract_number_slice(&args[0], "مدى")?;
+    let mut min = nums[0];
+    let mut max = nums[0];
+    for &x in &nums[1..] {
+        if x < min { min = x; }
+        if x > max { max = x; }
+    }
+    finite_number(max - min)
+}
+
+fn stats_geometric_mean(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("متوسط_هندسي تتطلب قائمة بيانات".into()); }
+    let nums = extract_number_slice(&args[0], "متوسط_هندسي")?;
+    for &x in &nums {
+        if x <= 0.0 {
+            return Err("متوسط_هندسي تتطلب أرقاماً موجبة تماماً".into());
+        }
+    }
+    let n = nums.len() as f64;
+    let log_sum: f64 = nums.iter().map(|x| x.ln()).sum();
+    finite_number((log_sum / n).exp())
+}
+
+fn stats_harmonic_mean(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() { return Err("متوسط_توافقي تتطلب قائمة بيانات".into()); }
+    let nums = extract_number_slice(&args[0], "متوسط_توافقي")?;
+    for &x in &nums {
+        if x <= 0.0 {
+            return Err("متوسط_توافقي تتطلب أرقاماً موجبة تماماً".into());
+        }
+    }
+    let n = nums.len() as f64;
+    let reciprocal_sum: f64 = nums.iter().map(|x| 1.0 / x).sum();
+    finite_number(n / reciprocal_sum)
+}
+
+fn stats_correlation(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 { return Err("ارتباط تتطلب قائمتين رقميتين".into()); }
+    let xs = extract_number_slice(&args[0], "ارتباط")?;
+    let ys = extract_number_slice(&args[1], "ارتباط")?;
+    if xs.len() != ys.len() {
+        return Err("ارتباط تتطلب قائمتين متساويتي الطول".into());
+    }
+    if xs.len() < 2 {
+        return Err("ارتباط تتطلب نقطتين على الأقل".into());
+    }
+    let n = xs.len() as f64;
+    let mean_x = xs.iter().sum::<f64>() / n;
+    let mean_y = ys.iter().sum::<f64>() / n;
+    let mut num = 0.0;
+    let mut den_x = 0.0;
+    let mut den_y = 0.0;
+    for i in 0..xs.len() {
+        let dx = xs[i] - mean_x;
+        let dy = ys[i] - mean_y;
+        num += dx * dy;
+        den_x += dx * dx;
+        den_y += dy * dy;
+    }
+    let den = (den_x * den_y).sqrt();
+    if den == 0.0 {
+        return Err("الانحراف المعياري لأحد المتغيرين صفر، لا يمكن حساب الارتباط".into());
+    }
+    finite_number(num / den)
 }

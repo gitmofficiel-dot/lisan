@@ -12,6 +12,7 @@ pub mod native;
 pub mod parser;
 pub mod pkg;
 pub mod runtime;
+pub mod tester;
 pub mod ui;
 pub mod vm;
 pub mod wasm;

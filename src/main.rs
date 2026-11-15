@@ -9,7 +9,7 @@ fn main() {
 fn real_main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات دقيقة C++\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
+        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan اختبار [ملفات...] تشغيل حزمة اختبارات وتحققات لسان (--test)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات دقيقة C++\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
         return;
     }
     if args.len() == 1 && (args[0] == "-V" || args[0] == "--version") {
@@ -69,6 +69,15 @@ fn real_main() {
         }
 
         if check_only && !all_formatted {
+            std::process::exit(1);
+        }
+        return;
+    }
+    if !args.is_empty() && (args[0] == "--test" || args[0] == "test" || args[0] == "اختبار") {
+        let targets: Vec<std::path::PathBuf> = args[1..].iter().map(std::path::PathBuf::from).collect();
+        let summary = lisan::tester::run_tests(&targets);
+        lisan::tester::print_test_summary(&summary);
+        if summary.failed > 0 {
             std::process::exit(1);
         }
         return;
@@ -218,13 +227,7 @@ fn real_main() {
         }
         return;
     }
-    if args.len() == 2 && args[0] == "--test" {
-        match Interpreter::for_cli().run_file(&args[1]) {
-            Ok(_) => println!("نجحت اختبارات لسان"),
-            Err(err) => { eprintln!("فشلت اختبارات لسان: {}", err); std::process::exit(1); }
-        }
-        return;
-    }
+
     if args.len() == 2 && args[0] == "--check" {
         match check_file(&args[1]) {
             Ok(()) => println!("نجح فحص ملفات لسان"),

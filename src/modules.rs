@@ -68,7 +68,6 @@ fn load_recursive(path: &Path, visited: &mut HashSet<PathBuf>, active: &mut Vec<
                 merged.extend(load_recursive(&imported, visited, active)?);
             }
             Stmt::ImportModule { module, alias } => {
-                validate_no_nested_imports(&statement)?;
                 if module.ends_with(".lsn") || Path::new(module).exists() {
                     let imported = path.parent().expect("canonical file has parent").join(module);
                     let can = fs::canonicalize(&imported).map_err(|e| format!("لا يمكن العثور على وحدة '{}': {}", imported.display(), e))?;
@@ -78,7 +77,6 @@ fn load_recursive(path: &Path, visited: &mut HashSet<PathBuf>, active: &mut Vec<
                 }
             }
             Stmt::FromImport { module, items } => {
-                validate_no_nested_imports(&statement)?;
                 if module.ends_with(".lsn") || Path::new(module).exists() {
                     let imported = path.parent().expect("canonical file has parent").join(module);
                     let can = fs::canonicalize(&imported).map_err(|e| format!("لا يمكن العثور على وحدة '{}': {}", imported.display(), e))?;

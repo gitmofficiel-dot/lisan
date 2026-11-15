@@ -132,10 +132,91 @@ impl VM {
                     let a = self.pop_number("المقارنة أصغر من أو يساوي")?;
                     self.stack.push(Value::Bool(a <= b));
                 }
+                OpCode::In => {
+                    let container = self.pop()?;
+                    let item = self.pop()?;
+                    let res = match &container {
+                        Value::List(l) => l.borrow().contains(&item),
+                        Value::Tuple(t) => t.contains(&item),
+                        Value::Set(s) => s.borrow().contains(&item),
+                        Value::Map(m) => {
+                            if let Value::Text(ref k) = item {
+                                m.borrow().iter().any(|(mk, _)| mk == k)
+                            } else {
+                                false
+                            }
+                        }
+                        Value::Text(t) => {
+                            if let Value::Text(ref needle) = item {
+                                t.contains(needle.as_str())
+                            } else {
+                                false
+                            }
+                        }
+                        _ => return Err("معامل 'في' يتطلب قائمة أو صفاً أو مجموعة أو قاموساً أو نصاً".into()),
+                    };
+                    self.stack.push(Value::Bool(res));
+                }
+                OpCode::NotIn => {
+                    let container = self.pop()?;
+                    let item = self.pop()?;
+                    let res = match &container {
+                        Value::List(l) => !l.borrow().contains(&item),
+                        Value::Tuple(t) => !t.contains(&item),
+                        Value::Set(s) => !s.borrow().contains(&item),
+                        Value::Map(m) => {
+                            if let Value::Text(ref k) = item {
+                                !m.borrow().iter().any(|(mk, _)| mk == k)
+                            } else {
+                                true
+                            }
+                        }
+                        Value::Text(t) => {
+                            if let Value::Text(ref needle) = item {
+                                !t.contains(needle.as_str())
+                            } else {
+                                true
+                            }
+                        }
+                        _ => return Err("معامل 'ليس في' يتطلب قائمة أو صفاً أو مجموعة أو قاموساً أو نصاً".into()),
+                    };
+                    self.stack.push(Value::Bool(res));
+                }
 
                 OpCode::DefineGlobal(name) => {
                     let val = self.pop()?;
                     self.globals.insert(name.clone(), val);
+                }
+                OpCode::UnpackDefine(names) => {
+                    let container = self.pop()?;
+                    let items = match container {
+                        Value::List(l) => l.borrow().clone(),
+                        Value::Tuple(t) => t.clone(),
+                        _ => return Err("فك التعبئة في البايت كود يتطلب قائمة أو صفاً".into()),
+                    };
+                    if items.len() != names.len() {
+                        return Err(format!("فشل فك التعبئة في البايت كود: عدد المتغيرات ({}) لا يطابق عدد العناصر ({})", names.len(), items.len()));
+                    }
+                    for (name, item) in names.iter().zip(items) {
+                        self.globals.insert(name.clone(), item);
+                    }
+                }
+                OpCode::UnpackAssign(names) => {
+                    let container = self.pop()?;
+                    let items = match container {
+                        Value::List(l) => l.borrow().clone(),
+                        Value::Tuple(t) => t.clone(),
+                        _ => return Err("فك التعبئة في البايت كود يتطلب قائمة أو صفاً".into()),
+                    };
+                    if items.len() != names.len() {
+                        return Err(format!("فشل فك التعبئة في البايت كود: عدد المتغيرات ({}) لا يطابق عدد العناصر ({})", names.len(), items.len()));
+                    }
+                    for (name, item) in names.iter().zip(items) {
+                        if !self.globals.contains_key(name) {
+                            return Err(format!("لا يمكن الإسناد لمتغير غير معرّف: '{}'", name));
+                        }
+                        self.globals.insert(name.clone(), item);
+                    }
                 }
                 OpCode::GetGlobal(name) => {
                     if let Some(val) = self.globals.get(name) {
@@ -467,13 +548,22 @@ impl Compiler {
                 self.compile_expr(expr)?;
                 self.chunk.emit(OpCode::DefineGlobal(name.clone()), 0);
             }
+            Stmt::LetUnpack(names, expr) => {
+                self.compile_expr(expr)?;
+                self.chunk.emit(OpCode::UnpackDefine(names.clone()), 0);
+            }
             Stmt::Print(expr) => {
                 self.compile_expr(expr)?;
                 self.chunk.emit(OpCode::Print, 0);
             }
             Stmt::Expr(expr) => {
-                self.compile_expr(expr)?;
-                self.chunk.emit(OpCode::Pop, 0);
+                if let Expr::AssignUnpack(names, target_expr) = expr.unwrap_spanned() {
+                    self.compile_expr(target_expr)?;
+                    self.chunk.emit(OpCode::UnpackAssign(names.clone()), 0);
+                } else {
+                    self.compile_expr(expr)?;
+                    self.chunk.emit(OpCode::Pop, 0);
+                }
             }
             Stmt::Block(stmts) => {
                 for s in stmts {
@@ -571,6 +661,8 @@ impl Compiler {
                     Op::GreaterEqual => self.chunk.emit(OpCode::GreaterEqual, 0),
                     Op::Less => self.chunk.emit(OpCode::Less, 0),
                     Op::LessEqual => self.chunk.emit(OpCode::LessEqual, 0),
+                    Op::In => self.chunk.emit(OpCode::In, 0),
+                    Op::NotIn => self.chunk.emit(OpCode::NotIn, 0),
                     _ => return Err("العملية غير مدعومة بعد في محرك البايت كود".into()),
                 };
             }
@@ -612,7 +704,15 @@ impl Compiler {
                 }
                 self.chunk.emit(OpCode::CallBuiltin(name.clone(), args.len()), 0);
             }
-            Expr::GetProperty(..) | Expr::SetProperty(..) | Expr::MethodCall(..) | Expr::Lambda(..) | Expr::Slice(..) | Expr::ListComprehension { .. } | Expr::AssignUnpack(..) | Expr::FString(..) => {
+            Expr::FString(segments) => {
+                let empty_idx = self.chunk.add_constant(Value::Text(String::new()));
+                self.chunk.emit(OpCode::Constant(empty_idx), 0);
+                for seg in segments {
+                    self.compile_expr(seg)?;
+                    self.chunk.emit(OpCode::Add, 0);
+                }
+            }
+            Expr::GetProperty(..) | Expr::SetProperty(..) | Expr::MethodCall(..) | Expr::Lambda(..) | Expr::Slice(..) | Expr::ListComprehension { .. } | Expr::AssignUnpack(..) => {
                 return Err("الخصائص والطرق الكائنية والدوال المجهولة والتقطيع تعمل حالياً عبر المفسّر".into());
             }
         }
@@ -654,5 +754,45 @@ mod tests {
         let mut vm = VM::new();
         let err = vm.run_source("دالة اجمع(أ، ب) { أرجع أ + ب } اطبع(اجمع(2، 3))").unwrap_err();
         assert!(err.contains("الجملة غير مدعومة بعد في محرك البايت كود"));
+    }
+
+    #[test]
+    fn test_vm_in_and_not_in() {
+        let mut vm = VM::new();
+        let src = r#"
+دع قائمة = [10, 20, 30]
+اطبع(20 في قائمة)
+اطبع(99 ليس في قائمة)
+اطبع(50 في قائمة)
+"#;
+        let out = vm.run_source(src).unwrap();
+        assert_eq!(out, ["صحيح", "صحيح", "خطأ"]);
+    }
+
+    #[test]
+    fn test_vm_unpacking() {
+        let mut vm = VM::new();
+        let src = r#"
+دع أ، ب = [100, 200]
+اطبع(أ)
+اطبع(ب)
+أ، ب = [ب، أ]
+اطبع(أ)
+اطبع(ب)
+"#;
+        let out = vm.run_source(src).unwrap();
+        assert_eq!(out, ["100", "200", "200", "100"]);
+    }
+
+    #[test]
+    fn test_vm_fstring() {
+        let mut vm = VM::new();
+        let src = r#"
+دع اسم = "لسان"
+دع عدد = 42
+اطبع(ن"لغة {اسم} رقم {عدد}")
+"#;
+        let out = vm.run_source(src).unwrap();
+        assert_eq!(out, ["لغة لسان رقم 42"]);
     }
 }

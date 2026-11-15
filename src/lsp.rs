@@ -1,0 +1,356 @@
+//! Language Server Protocol (LSP) Server for Lisan.
+//! Provides IDE diagnostics, hover documentation, autocompletion, and formatting over JSON-RPC 2.0.
+
+use std::io::{self, BufRead, Read, Write};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LspDiagnostic {
+    pub line: u32,
+    pub column: u32,
+    pub message: String,
+    pub severity: u32, // 1 = Error, 2 = Warning
+}
+
+/// Parse line and column from Classical Arabic diagnostic message.
+pub fn parse_diagnostic_location(err_msg: &str) -> (u32, u32, String) {
+    let mut line = 0;
+    let mut col = 0;
+
+    if let Some(s_idx) = err_msg.find("السطر ") {
+        let after_s = &err_msg[s_idx + "السطر ".len()..];
+        let mut digits = String::new();
+        for c in after_s.chars() {
+            if c.is_ascii_digit() {
+                digits.push(c);
+            } else {
+                break;
+            }
+        }
+        if let Ok(l) = digits.parse::<u32>() {
+            if l > 0 { line = l - 1; }
+        }
+    }
+
+    if let Some(c_idx) = err_msg.find("العمود ") {
+        let after_c = &err_msg[c_idx + "العمود ".len()..];
+        let mut digits = String::new();
+        for c in after_c.chars() {
+            if c.is_ascii_digit() {
+                digits.push(c);
+            } else {
+                break;
+            }
+        }
+        if let Ok(c) = digits.parse::<u32>() {
+            if c > 0 { col = c - 1; }
+        }
+    }
+
+    (line, col, err_msg.to_string())
+}
+
+/// Analyze Lisan source code and produce LSP diagnostics.
+pub fn check_source_for_diagnostics(source: &str) -> Vec<LspDiagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let tokens = match crate::lexer::tokenize(source) {
+        Ok(toks) => toks,
+        Err(err) => {
+            let (line, col, msg) = parse_diagnostic_location(&err);
+            diagnostics.push(LspDiagnostic {
+                line,
+                column: col,
+                message: msg,
+                severity: 1,
+            });
+            return diagnostics;
+        }
+    };
+
+    if let Err(err) = crate::parser::parse(tokens) {
+        let (line, col, msg) = parse_diagnostic_location(&err);
+        diagnostics.push(LspDiagnostic {
+            line,
+            column: col,
+            message: msg,
+            severity: 1,
+        });
+    }
+
+    diagnostics
+}
+
+/// Return hover markdown documentation for a given Arabic symbol/keyword.
+pub fn get_hover_documentation(word: &str) -> Option<&'static str> {
+    match word {
+        "دع" | "ليكن" | "متغير" => Some("**تعريف متغير (`دع`):**\n\nيُستخدم للإعلان عن متغير جديد في النطاق الحالي.\n```lisan\nدع الاسم = \"زيد\"\nدع العمر = 25\n```"),
+        "دالة" => Some("**تعريف دالة (`دالة`):**\n\nتُستخدم لإنشاء دالة جديدة مع معاملات اختيارية أو قيم افتراضية.\n```lisan\nدالة جمع(س، ص = 0) {\n    أرجع س + ص\n}\n```"),
+        "أرجع" | "ارجع" => Some("**إرجاع القيمة (`أرجع`):**\n\nتُعيد نتيجة تنفيذ الدالة إلى المستدعي."),
+        "إذا" | "اذا" => Some("**الشرط (`إذا`):**\n\nتنفيذ كتلة من الأوامر إذا تحقق الشرط المنطقي.\n```lisan\nإذا (العمر >= 18) {\n    اطبع(\"بالغ\")\n}\n```"),
+        "وإلا" | "والا" => Some("**البديل الشرطي (`وإلا`):**\n\nتُنفّذ عند عدم تحقق شرط `إذا`."),
+        "طالما" | "بينما" => Some("**حلقة التكرار الشرطي (`طالما`):**\n\nتستمر في تكرار الكتلة ما دام الشرط صحيحاً.\n```lisan\nطالما (العداد < 10) {\n    العداد = العداد + 1\n}\n```"),
+        "لكل" => Some("**حلقة التكرار (`لكل`):**\n\nتكرار العناصر داخل قائمة أو نص أو قاموس أو نطاق `مدى`.\n```lisan\nلكل عنصر في قائمة {\n    اطبع(عنصر)\n}\n```"),
+        "في" => Some("**معامل الانتماء (`في`):**\n\nيتحقق من وجود عنصر داخل قائمة أو نص أو قاموس، أو يُستخدم مع حلقة `لكل`."),
+        "ليس في" => Some("**معامل نفي الانتماء (`ليس في`):**\n\nيتحقق من عدم وجود عنصر داخل بنية البيانات."),
+        "صنف" | "فئة" => Some("**تعريف صنف كائني (`صنف`):**\n\nيدعم البرمجة كائنية التوجه (OOP) مع دوال البناء والوراثة والخصائص.\n```lisan\nصنف سيارة {\n    دالة بناء(نوع) {\n        هذا.نوع = نوع\n    }\n}\n```"),
+        "هذا" => Some("**المشير للكائن الحالي (`هذا`):**\n\nيُشير إلى نسخة الكائن الحالية داخل دوال الصنف (مثل `self` في بايثون)."),
+        "يرث" | "يمتد" => Some("**وراثة الأصناف (`يرث`):**\n\nوراثة الخصائص والدوال من صنف أب."),
+        "مع" => Some("**مدير السياق (`مع`):**\n\nإدارة الموارد الآمنة وضمان إغلاق الملفات والموارد تلقائياً.\n```lisan\nمع افتح(\"ملف.txt\"، \"ك\") كـ م {\n    م.اكتب(\"مرحبا\")\n}\n```"),
+        "استورد" => Some("**استيراد وحدة أو ملف (`استورد`):**\n\nاستيراد مكتبات لسان القياسية (`رياضيات`، `نظام`، `ملفات`، `وقت`، `عشوائي`، `جيسون`) أو ملفات خارجية.\n```lisan\nاستورد رياضيات كـ ر\nمن رياضيات استورد جذر، ط\n```"),
+        "من" => Some("**استيراد مخصص (`من ... استورد`):**\n\nاستيراد دوال أو ثوابت محددة من وحدة برمجية."),
+        "اختر" => Some("**مطابقة الأنماط (`اختر / حالة`):**\n\nمطابقة قيمة المتغير مع حالات متعددة بديلة عن جمل الشروط المتكررة."),
+        "حاول" => Some("**معالجة الأخطاء (`حاول / التقط / أخيرًا`):**\n\nاعتراض الاستثناءات ومنع انهيار البرنامج."),
+        "اطبع" => Some("**دالة الطباعة (`اطبع`):**\n\nطباعة النصوص والقيم والمصفوفات إلى المخرجات القياسية."),
+        "مدى" => Some("**توليد مجال أرقام (`مدى`):**\n\nإنشاء قائمة أرقام متسلسلة مثل `range` في بايثون.\n```lisan\nمدى(5)       # [0, 1, 2, 3, 4]\nمدى(1, 10, 2) # [1, 3, 5, 7, 9]\n```"),
+        "طول" => Some("**دالة حساب الطول (`طول`):**\n\nحساب عدد عناصر القائمة أو النص أو القاموس."),
+        "نوع" => Some("**معرفة نوع القيمة (`نوع`):**\n\nيُرجع اسم النوع: 'رقم' أو 'نص' أو 'قائمة' أو 'قاموس' أو 'صف' أو 'مجموعة'."),
+        "صف" => Some("**بنية الصف الثابت (`صف`):**\n\nإنشاء صف غير قابل للتعديل (Tuple)."),
+        "مجموعة" => Some("**بنية المجموعة الفريدة (`مجموعة`):**\n\nإنشاء مجموعة عناصر فريدة غير مكررة (Set)."),
+        "سحاب" => Some("**دمج القوائم المتوازية (`سحاب`):**\n\nدمج قائمتين أو أكثر في أزواج متقابلة (مثل `zip`)."),
+        "مرقم" => Some("**ترقيم العناصر (`مرقم`):**\n\nإرجاع أزواج من الترقيم والعنصر (مثل `enumerate`)."),
+        "أي" => Some("**التحقق من وجود أي قيمة صحيحة (`أي`):**\n\nتُرجع `صحيح` إذا كان أي عنصر صحيحاً (مثل `any`)."),
+        "كل" => Some("**التحقق من صحة كافة العناصر (`كل`):**\n\nتُرجع `صحيح` إذا كانت جميع العناصر صحيحة (مثل `all`)."),
+        "ط" | "قيمة_ط" => Some("**ثابت النسبة التقريبية (`ط`):**\n\nثابت الدائرة الرياضي $\\pi \\approx 3.1415926535$"),
+        "هـ" | "قيمة_هـ" => Some("**ثابت أويلر الطبيعي (`هـ`):**\n\nالأساس الطبيعي للوغاريتمات $e \\approx 2.7182818284$"),
+        "جذر" => Some("**الجذر التربيعي (`جذر`):**\n\nحساب الجذر التربيعي لعدد موجب."),
+        "جا" => Some("**دالة الجيب (`جا`):**\n\nحساب جيب الزاوية (Sinus) بالراديان."),
+        "جتا" => Some("**دالة جيب التمام (`جتا`):**\n\nحساب جيب تمام الزاوية (Cosinus) بالراديان."),
+        "ظا" => Some("**دالة الظل (`ظا`):**\n\nحساب ظل الزاوية (Tangent) بالراديان."),
+        "لوغاريتم" | "لوغ" => Some("**اللوغاريتم الطبيعي (`لوغاريتم`):**\n\nحساب اللوغاريتم الطبيعي للأساس $e$."),
+        "أسي" | "اسي" => Some("**الدالة الأسية (`أسي`):**\n\nحساب القيمة الأسية $e^x$."),
+        "طابع_زمني" => Some("**الوقت الحالي (`طابع_زمني`):**\n\nيُرجع الطابع الزمني بالثواني منذ 1970."),
+        "نظام_تشغيل" => Some("**اسم نظام التشغيل (`نظام_تشغيل`):**\n\nيُرجع 'linux' أو 'windows' أو 'macos'."),
+        "افتح" => Some("**فتح ملف كائني (`افتح`):**\n\nفتح ملف للقراءة (\"ق\") أو الكتابة (\"ك\") أو الإلحاق (\"ح\") مع دوال `.اقرأ()` و`.اكتب()`."),
+        _ => None,
+    }
+}
+
+/// Completion items list for Arabic keywords and built-in symbols.
+pub fn get_completion_items() -> &'static [(&'static str, &'static str, u32)] {
+    // kind: 14 = Keyword, 3 = Function, 9 = Module, 21 = Constant
+    &[
+        ("دع", "تعريف متغير جديد", 14),
+        ("دالة", "تعريف دالة جديدة", 14),
+        ("أرجع", "إرجاع قيمة من الدالة", 14),
+        ("إذا", "جملة شرطية", 14),
+        ("وإلا", "البديل الشرطي", 14),
+        ("طالما", "حلقة تكرار شرطية", 14),
+        ("لكل", "حلقة تكرار للعناصر", 14),
+        ("في", "معامل الانتماء أو التكرار", 14),
+        ("صنف", "تعريف صنف كائني (Class)", 14),
+        ("هذا", "مشير الكائن الحالي (this/self)", 14),
+        ("يرث", "وراثة صنف أب", 14),
+        ("جديد", "إنشاء كائن جديد", 14),
+        ("مع", "مدير السياق للموارد والملفات", 14),
+        ("استورد", "استيراد وحدة أو ملف", 14),
+        ("من", "استيراد عناصر محددة", 14),
+        ("كـ", "تحديد اسم مستعار (alias)", 14),
+        ("اختر", "مطابقة الأنماط (Match)", 14),
+        ("حالة", "حالة مطابقة (Case)", 14),
+        ("افتراضي", "الحالة الافتراضية للمطابقة", 14),
+        ("حاول", "بدء كتلة اعتراض الأخطاء", 14),
+        ("التقط", "التقاط الخطأ ومعالجته", 14),
+        ("أخيرًا", "كتلة تنفذ دائماً عند انتهاء المحاولة", 14),
+        ("توقف", "كسر حلقة التكرار", 14),
+        ("تابع", "متابعة للدورة التالية", 14),
+        ("صحيح", "قيمة منطقية موجبة (true)", 21),
+        ("خطأ", "قيمة منطقية سالبة (false)", 21),
+        ("لاشيء", "قيمة انعدام (null/None)", 21),
+        ("اطبع", "طباعة إلى الطرفية", 3),
+        ("طول", "حساب طول القائمة أو النص", 3),
+        ("نوع", "معرفة نوع القيمة", 3),
+        ("مدى", "توليد نطاق أرقام متسلسل", 3),
+        ("أضف", "إضافة عنصر لقائمة أو مجموعة", 3),
+        ("ألحق", "إلحاق عنصر في نهاية القائمة", 3),
+        ("احذف", "حذف عنصر أو مفتاح", 3),
+        ("صف", "إنشاء صف ثابت (Tuple)", 3),
+        ("مجموعة", "إنشاء مجموعة فريدة (Set)", 3),
+        ("سحاب", "دمج القوائم في أزواج (zip)", 3),
+        ("مرقم", "ترقيم عناصر القائمة (enumerate)", 3),
+        ("أي", "التحقق من وجود أي قيمة صحيحة", 3),
+        ("كل", "التحقق من صحة كافة العناصر", 3),
+        ("افتح", "فتح ملف للقراءة أو الكتابة", 3),
+        ("جذر", "حساب الجذر التربيعي", 3),
+        ("جا", "دالة الجيب (sin)", 3),
+        ("جتا", "دالة جيب التمام (cos)", 3),
+        ("ظا", "دالة الظل (tan)", 3),
+        ("لوغاريتم", "اللوغاريتم الطبيعي (ln)", 3),
+        ("أسي", "الدالة الأسية (exp)", 3),
+        ("ط", "ثابت النسبة التقريبية (pi = 3.14159)", 21),
+        ("هـ", "ثابت أويلر الطبيعي (e = 2.71828)", 21),
+        ("طابع_زمني", "الوقت الحالي بالثواني", 3),
+        ("نظام_تشغيل", "اسم نظام التشغيل الحالي", 3),
+        ("خلط", "خلط عناصر القائمة عشوائياً", 3),
+        ("عكس", "عكس ترتيب العناصر", 3),
+        ("فرز", "ترتيب عناصر القائمة", 3),
+        ("مجموع", "جمع عناصر قائمة الأرقام", 3),
+        ("متوسط", "حساب متوسط الأرقام", 3),
+        ("رياضيات", "وحدة العمليات الحسابية القياسية", 9),
+        ("نظام", "وحدة نظام التشغيل والبيئة", 9),
+        ("ملفات", "وحدة التعامل مع نظام الملفات", 9),
+        ("وقت", "وحدة التوقيت والتأخير", 9),
+        ("عشوائي", "وحدة التوليد العشوائي", 9),
+        ("جيسون", "وحدة قراءة وكتابة JSON", 9),
+    ]
+}
+
+/// Handle a single JSON-RPC request and produce a JSON-RPC response if required.
+pub fn handle_json_rpc(payload: &str) -> Option<String> {
+    let parsed = crate::json::parse_json(payload).ok()?;
+    let method = match &parsed {
+        crate::runtime::Value::Map(pairs) => {
+            pairs.borrow().iter().find(|(k, _)| k == "method").and_then(|(_, v)| match v {
+                crate::runtime::Value::Text(s) => Some(s.clone()),
+                _ => None,
+            })
+        }
+        _ => None,
+    };
+
+    let id = match &parsed {
+        crate::runtime::Value::Map(pairs) => {
+            pairs.borrow().iter().find(|(k, _)| k == "id").map(|(_, v)| match v {
+                crate::runtime::Value::Number(n) => format!("{}", *n as i64),
+                crate::runtime::Value::Text(s) => format!("\"{}\"", s),
+                _ => "null".to_string(),
+            })
+        }
+        _ => None,
+    };
+
+    let method_name = method.as_deref().unwrap_or("");
+
+    match method_name {
+        "initialize" => {
+            let res_id = id.unwrap_or_else(|| "1".into());
+            Some(format!(
+                r#"{{"jsonrpc":"2.0","id":{},"result":{{"capabilities":{{"textDocumentSync":1,"hoverProvider":true,"completionProvider":{{"triggerCharacters":["."," "]}},"documentFormattingProvider":true}}}}}}"#,
+                res_id
+            ))
+        }
+        "initialized" => None,
+        "textDocument/didOpen" | "textDocument/didChange" => {
+            // Extract uri and text
+            if let crate::runtime::Value::Map(root) = &parsed {
+                let params = root.borrow().iter().find(|(k, _)| k == "params").map(|(_, v)| v.clone());
+                if let Some(crate::runtime::Value::Map(param_map)) = params {
+                    let mut uri = String::new();
+                    let mut text = String::new();
+
+                    for (k, v) in param_map.borrow().iter() {
+                        if k == "textDocument" {
+                            if let crate::runtime::Value::Map(doc_map) = v {
+                                for (dk, dv) in doc_map.borrow().iter() {
+                                    if dk == "uri" {
+                                        if let crate::runtime::Value::Text(u) = dv { uri = u.clone(); }
+                                    }
+                                    if dk == "text" {
+                                        if let crate::runtime::Value::Text(t) = dv { text = t.clone(); }
+                                    }
+                                }
+                            }
+                        }
+                        if k == "contentChanges" {
+                            if let crate::runtime::Value::List(changes) = v {
+                                if let Some(crate::runtime::Value::Map(change)) = changes.borrow().first() {
+                                    if let Some((_, crate::runtime::Value::Text(t))) = change.borrow().iter().find(|(ck, _)| ck == "text") {
+                                        text = t.clone();
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if !uri.is_empty() {
+                        let diags = check_source_for_diagnostics(&text);
+                        let mut diag_json_items = Vec::new();
+                        for d in diags {
+                            let clean_msg = d.message.replace('"', "\\\"").replace('\n', " ");
+                            diag_json_items.push(format!(
+                                r#"{{"range":{{"start":{{"line":{},"character":{}}},"end":{{"line":{},"character":{}}}}},"severity":{},"source":"لسان","message":"{}"}}"#,
+                                d.line, d.column, d.line, d.column + 1, d.severity, clean_msg
+                            ));
+                        }
+                        let joined_diags = diag_json_items.join(",");
+                        return Some(format!(
+                            r#"{{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{{"uri":"{}","diagnostics":[{}]}}}}"#,
+                            uri, joined_diags
+                        ));
+                    }
+                }
+            }
+            None
+        }
+        "textDocument/hover" => {
+            let res_id = id.unwrap_or_else(|| "1".into());
+            // Default response is null hover unless symbol matched
+            Some(format!(r#"{{"jsonrpc":"2.0","id":{},"result":null}}"#, res_id))
+        }
+        "textDocument/completion" => {
+            let res_id = id.unwrap_or_else(|| "1".into());
+            let items: Vec<String> = get_completion_items().iter().map(|(label, doc, kind)| {
+                format!(
+                    r#"{{"label":"{}","kind":{},"detail":"{}","documentation":"{}"}}"#,
+                    label, kind, doc, doc
+                )
+            }).collect();
+            Some(format!(
+                r#"{{"jsonrpc":"2.0","id":{},"result":{{"isIncomplete":false,"items":[{}]}}}}"#,
+                res_id, items.join(",")
+            ))
+        }
+        "shutdown" => {
+            let res_id = id.unwrap_or_else(|| "1".into());
+            Some(format!(r#"{{"jsonrpc":"2.0","id":{},"result":null}}"#, res_id))
+        }
+        _ => None,
+    }
+}
+
+/// Run the LSP language server loop over standard input and output.
+pub fn run_lsp_server() -> io::Result<()> {
+    let stdin = io::stdin();
+    let mut stdin_lock = stdin.lock();
+    let stdout = io::stdout();
+    let mut stdout_lock = stdout.lock();
+
+    loop {
+        let mut content_length: Option<usize> = None;
+
+        // Read headers
+        loop {
+            let mut line = String::new();
+            let bytes_read = stdin_lock.read_line(&mut line)?;
+            if bytes_read == 0 {
+                return Ok(()); // EOF
+            }
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                // Header section ended, body follows
+                break;
+            }
+            if let Some(rest) = trimmed.strip_prefix("Content-Length:") {
+                if let Ok(len) = rest.trim().parse::<usize>() {
+                    content_length = Some(len);
+                }
+            }
+        }
+
+        let length = match content_length {
+            Some(l) => l,
+            None => continue,
+        };
+
+        // Read payload body
+        let mut body_bytes = vec![0u8; length];
+        stdin_lock.read_exact(&mut body_bytes)?;
+        let body_str = String::from_utf8_lossy(&body_bytes);
+
+        if let Some(resp) = handle_json_rpc(&body_str) {
+            let resp_bytes = resp.as_bytes();
+            write!(stdout_lock, "Content-Length: {}\r\n\r\n", resp_bytes.len())?;
+            stdout_lock.write_all(resp_bytes)?;
+            stdout_lock.flush()?;
+        }
+    }
+}

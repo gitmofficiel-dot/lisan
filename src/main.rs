@@ -9,12 +9,50 @@ fn main() {
 fn real_main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات دقيقة C++\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
+        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات دقيقة C++\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
         return;
     }
     if args.len() == 1 && (args[0] == "-V" || args[0] == "--version") {
         println!("لسان 1.0.0");
         return;
+    }
+    if !args.is_empty() && (args[0] == "--lsp" || args[0] == "lsp") {
+        if let Err(e) = lisan::lsp::run_lsp_server() {
+            eprintln!("خطأ خادم لغة لسان (LSP): {}", e);
+            std::process::exit(1);
+        }
+        return;
+    }
+    if !args.is_empty() && (args[0] == "--pkg" || args[0] == "pkg" || args[0] == "حزمة") {
+        if args.len() >= 2 && (args[1] == "init" || args[1] == "تهيئة") {
+            let name = if args.len() >= 3 { &args[2] } else { "مشروع_لسان" };
+            let dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            match lisan::pkg::init_project(name, &dir) {
+                Ok(p) => println!("تمت تهيئة حزمة لسان بنجاح في: {}", p.display()),
+                Err(e) => { eprintln!("خطأ في تهيئة الحزمة: {}", e); std::process::exit(1); }
+            }
+            return;
+        }
+        if args.len() >= 4 && (args[1] == "add" || args[1] == "أضف" || args[1] == "اضف") {
+            let dep_name = &args[2];
+            let dep_path = &args[3];
+            let dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            match lisan::pkg::add_dependency(dep_name, dep_path, &dir) {
+                Ok(()) => println!("تمت إضافة الاعتمادية '{}' وتحديث ملف القفل lisan.lock", dep_name),
+                Err(e) => { eprintln!("خطأ في إضافة الاعتمادية: {}", e); std::process::exit(1); }
+            }
+            return;
+        }
+        if args.len() >= 2 && (args[1] == "lock" || args[1] == "قفل") {
+            let dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            match lisan::pkg::create_lockfile(&dir) {
+                Ok(p) => println!("تم إنشاء ملف القفل: {}", p.display()),
+                Err(e) => { eprintln!("خطأ في قفل الحزمة: {}", e); std::process::exit(1); }
+            }
+            return;
+        }
+        eprintln!("الاستخدام: lisan حزمة [تهيئة <اسم> | أضف <اسم> <مسار> | قفل]");
+        std::process::exit(2);
     }
     if !args.is_empty() && args[0] == "--arduino" {
         if args.len() != 2 && !(args.len() == 4 && args[2] == "--output") {

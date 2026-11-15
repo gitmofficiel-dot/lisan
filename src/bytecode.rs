@@ -29,11 +29,15 @@ pub enum OpCode {
     GreaterEqual,
     Less,
     LessEqual,
+    In,
+    NotIn,
 
     /// إدارة المتغيرات العامة
     DefineGlobal(String),
     GetGlobal(String),
     SetGlobal(String),
+    UnpackDefine(Vec<String>),
+    UnpackAssign(Vec<String>),
 
     /// القفز والتحكم بالتدفق
     Jump(usize),

@@ -4,6 +4,10 @@
   "description": "دعم التلوين النحوي وإعدادات المحرر للغة البرمجة العربية لسان (.lsn)",
   "version": "1.0.0",
   "publisher": "lisan-lang",
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:lisan"
+  ],
   "engines": {
     "vscode": "^1.75.0"
   },
@@ -31,6 +35,22 @@
         "scopeName": "source.lisan",
         "path": "./syntaxes/lisan.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Lisan Language Server",
+      "properties": {
+        "lisan.executablePath": {
+          "type": "string",
+          "default": "lisan",
+          "description": "المسار التنفيذي لمترجم ومفسّر لسان (Lisan Executable Path)"
+        },
+        "lisan.lsp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "تفعيل خادم لغة لسان الذكي LSP"
+        }
+      }
+    }
   }
 }

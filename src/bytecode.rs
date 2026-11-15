@@ -51,6 +51,13 @@ pub enum OpCode {
     BuildMap(usize),
     GetIndex,
     SetIndex(String),
+    Slice,
+    ListAppend(usize),
+
+    /// الخصائص واستدعاء الطرق
+    GetProperty(String),
+    SetProperty(String),
+    CallMethod(String, usize),
 
     /// استدعاء الدوال والدوال المدمجة
     CallBuiltin(String, usize),

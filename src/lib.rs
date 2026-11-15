@@ -3,6 +3,7 @@ pub mod ast;
 pub mod bundle;
 pub mod bytecode;
 pub mod diagnostics;
+pub mod fmt;
 pub mod json;
 pub mod lexer;
 pub mod lsp;

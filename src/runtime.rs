@@ -413,8 +413,10 @@ impl Interpreter {
                 let is_time = matches!(norm.as_str(), "وقت" | "time");
                 let is_rand = matches!(norm.as_str(), "عشوائي" | "random");
                 let is_json = matches!(norm.as_str(), "جيسون" | "json");
+                let is_net = matches!(norm.as_str(), "شبكة" | "شبكه" | "شبكات" | "net" | "network" | "http");
+                let is_text = matches!(norm.as_str(), "نصوص" | "نص" | "text" | "string" | "strings");
 
-                if is_math || is_sys || is_fs || is_time || is_rand || is_json {
+                if is_math || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text {
                     let mut initial_exports = Vec::new();
                     if is_math {
                         initial_exports.push(("ط".to_string(), Value::Number(std::f64::consts::PI)));
@@ -488,8 +490,10 @@ impl Interpreter {
                 let is_time = matches!(norm.as_str(), "وقت" | "time");
                 let is_rand = matches!(norm.as_str(), "عشوائي" | "random");
                 let is_json = matches!(norm.as_str(), "جيسون" | "json");
+                let is_net = matches!(norm.as_str(), "شبكة" | "شبكه" | "شبكات" | "net" | "network" | "http");
+                let is_text = matches!(norm.as_str(), "نصوص" | "نص" | "text" | "string" | "strings");
 
-                if is_math || is_sys || is_fs || is_time || is_rand || is_json {
+                if is_math || is_sys || is_fs || is_time || is_rand || is_json || is_net || is_text {
                     for item in items {
                         if (item == "ط" || item == "قيمة_ط") && is_math {
                             self.scopes.last_mut().expect("scope exists").insert(item.clone(), Value::Number(std::f64::consts::PI));
@@ -1680,6 +1684,44 @@ impl Interpreter {
                             _ => Err(format!("الدالة '{}' غير معروفة في وحدة جيسون", method_name)),
                         }
                     }
+                    "شبكة" | "شبكه" | "شبكات" | "net" | "network" | "http" => {
+                        let m = crate::diagnostics::normalize_arabic(method_name);
+                        match m.as_str() {
+                            "طلب_وب" | "جلب" | "اطلب_ويب" | "جلب_ويب" | "get" => {
+                                if evaluated_args.is_empty() {
+                                    return Err("طلب_وب تتطلب رابطاً نصياً".into());
+                                }
+                                match &evaluated_args[0] {
+                                    Value::Text(u) => http_get_full(u),
+                                    _ => Err("طلب_وب تتطلب رابطاً نصياً".into()),
+                                }
+                            }
+                            "أرسل_tcp" | "ارسل_tcp" | "send_tcp" => {
+                                tcp_send_builtin(evaluated_args)
+                            }
+                            "خادم_ويب" | "خادم_ويب_بسيط" | "web_server" => {
+                                web_server_builtin(evaluated_args)
+                            }
+                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة الشبكة", method_name)),
+                        }
+                    }
+                    "نصوص" | "نص" | "text" | "string" | "strings" => {
+                        let m = crate::diagnostics::normalize_arabic(method_name);
+                        match m.as_str() {
+                            "ترميز_قاعده64" | "ترميز_قاعدة64" | "قاعده64" | "قاعدة64" | "base64_encode" => text_b64_encode(evaluated_args),
+                            "فك_قاعده64" | "فك_قاعدة64" | "base64_decode" => text_b64_decode(evaluated_args),
+                            "ترميز_url" | "url_encode" => text_url_encode(evaluated_args),
+                            "فك_url" | "url_decode" => text_url_decode(evaluated_args),
+                            "حشو_يمين" | "حشو_الايمن" | "حشو_الأيمن" | "rjust" => text_rjust(evaluated_args),
+                            "حشو_يسار" | "حشو_الايسر" | "حشو_الأيسر" | "ljust" => text_ljust(evaluated_args),
+                            "تكرار" | "كرر" | "repeat" => call_builtin("كرر", evaluated_args),
+                            "يبدأ_ب" | "يبدا_ب" | "startswith" => call_builtin("يبدأ_ب", evaluated_args),
+                            "ينتهي_ب" | "endswith" => call_builtin("ينتهي_ب", evaluated_args),
+                            "تقسيم" | "قسّم" | "قسم" | "split" => call_builtin("قسّم", evaluated_args),
+                            "استبدل" | "replace" => call_builtin("استبدل", evaluated_args),
+                            _ => Err(format!("الدالة '{}' غير معروفة في وحدة النصوص", method_name)),
+                        }
+                    }
                     _ => {
                         if is_builtin(method_name) {
                             call_builtin(method_name, evaluated_args)
@@ -1923,7 +1965,7 @@ fn checked_index(index: Value) -> Result<usize, String> {
     }
 }
 
-fn compute_slice_indices(len: usize, start: Option<i64>, end: Option<i64>, step: Option<i64>) -> Result<Vec<usize>, String> {
+pub(crate) fn compute_slice_indices(len: usize, start: Option<i64>, end: Option<i64>, step: Option<i64>) -> Result<Vec<usize>, String> {
     let step_val = step.unwrap_or(1);
     if step_val == 0 {
         return Err("خطوة التقطيع لا يمكن أن تكون صفرًا".into());
@@ -2002,7 +2044,10 @@ fn is_builtin(name: &str) -> bool {
         "بيئة" | "بيئه" | "وسائط" |
         "تحليل_json" | "ترميز_json" | "تنسيق" |
         "مجلد_موجود" | "أنشئ_مجلد" | "انشئ_مجلد" | "قائمة_ملفات" | "احذف_ملف" | "مسار_حالي" |
-        "اطلب_ويب" | "جلب_ويب" |
+        "اطلب_ويب" | "جلب_ويب" | "طلب_وب" | "جلب" |
+        "ترميز_قاعدة64" | "قاعدة64" | "فك_قاعدة64" | "ترميز_url" | "فك_url" |
+        "حشو_يمين" | "حشو_الأيمن" | "حشو_يسار" | "حشو_الأيسر" |
+        "أرسل_tcp" | "ارسل_tcp" | "خادم_ويب" | "خادم_ويب_بسيط" |
         "وضع_المنفذ" | "اكتب_رقمي" | "اقرأ_رقمي" | "اكتب_تماثلي" | "اقرأ_تماثلي" |
         "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" | "نبضة_صوت" |
         "أوقف_صوت" | "تسلسلي_ابدأ" | "تسلسلي_اطبع" | "تسلسلي_متاح" |
@@ -2867,6 +2912,21 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
                 _ => Err("اطلب_ويب تتطلب رابطاً نصياً (URL)".into()),
             }
         }
+        "طلب_وب" | "جلب" => {
+            require_args(name, &args, 1)?;
+            match &args[0] {
+                Value::Text(url) => http_get_full(url),
+                _ => Err("طلب_وب تتطلب رابطاً نصياً (URL)".into()),
+            }
+        }
+        "ترميز_قاعدة64" | "قاعدة64" | "base64_encode" => text_b64_encode(args),
+        "فك_قاعدة64" | "base64_decode" => text_b64_decode(args),
+        "ترميز_url" | "url_encode" => text_url_encode(args),
+        "فك_url" | "url_decode" => text_url_decode(args),
+        "حشو_يمين" | "حشو_الأيمن" => text_rjust(args),
+        "حشو_يسار" | "حشو_الأيسر" => text_ljust(args),
+        "أرسل_tcp" | "ارسل_tcp" => tcp_send_builtin(args),
+        "خادم_ويب" | "خادم_ويب_بسيط" => web_server_builtin(args),
         // ==================== دوال الأردوينو والمتحكمات الدقيقة ====================
         "وضع_المنفذ" | "اكتب_رقمي" | "اقرأ_رقمي" | "اكتب_تماثلي" | "اقرأ_تماثلي"
         | "انتظر_ملي" | "تأخير" | "انتظر_ميكرو" | "وقت_التشغيل" | "نبضة_صوت"
@@ -3250,4 +3310,369 @@ fn http_get(url: &str) -> Result<Value, String> {
 #[cfg(target_arch = "wasm32")]
 fn http_get(_url: &str) -> Result<Value, String> {
     Err("اطلب_ويب عبر المقابس المباشرة غير متاحة داخل WebAssembly".into())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn http_get_full(url: &str) -> Result<Value, String> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+
+    let stripped = if let Some(s) = url.strip_prefix("http://") {
+        s
+    } else if url.starts_with("https://") {
+        return Err("طلب_وب المدمجة بدون مكتبات خارجية تدعم بروتوكول http:// المباشر؛ لبروتوكول https استخدم خادم وكيل محلي".into());
+    } else {
+        url
+    };
+
+    let (host_port, path) = match stripped.find('/') {
+        Some(idx) => (&stripped[..idx], &stripped[idx..]),
+        None => (stripped, "/"),
+    };
+
+    let addr = if host_port.contains(':') {
+        host_port.to_string()
+    } else {
+        format!("{}:80", host_port)
+    };
+
+    let host_only = host_port.split(':').next().unwrap_or(host_port);
+
+    let mut stream = TcpStream::connect(&addr)
+        .map_err(|e| format!("تعذر الاتصال بالخادم '{}': {}", addr, e))?;
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: Lisan/1.0\r\nConnection: close\r\n\r\n",
+        path, host_only
+    );
+    stream.write_all(request.as_bytes())
+        .map_err(|e| format!("فشل إرسال طلب الشبكة: {}", e))?;
+
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response)
+        .map_err(|e| format!("فشل قراءة استجابة الشبكة: {}", e))?;
+
+    let text = String::from_utf8_lossy(&response);
+    let (header_part, body_part) = if let Some(idx) = text.find("\r\n\r\n") {
+        (&text[..idx], &text[idx + 4..])
+    } else if let Some(idx) = text.find("\n\n") {
+        (&text[..idx], &text[idx + 2..])
+    } else {
+        ("", text.as_ref())
+    };
+
+    let mut status_code = 200.0;
+    if let Some(first_line) = header_part.lines().next() {
+        let pieces: Vec<&str> = first_line.split_whitespace().collect();
+        if pieces.len() >= 2 {
+            if let Ok(code) = pieces[1].parse::<f64>() {
+                status_code = code;
+            }
+        }
+    }
+
+    let success = status_code >= 200.0 && status_code < 400.0;
+    let mut map_fields = Vec::new();
+    map_fields.push(("حالة".to_string(), Value::Number(status_code)));
+    map_fields.push(("نص".to_string(), Value::Text(body_part.to_string())));
+    map_fields.push(("نجاح".to_string(), Value::Bool(success)));
+    Ok(Value::map(map_fields))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn http_get_full(_url: &str) -> Result<Value, String> {
+    Err("طلب_وب عبر المقابس المباشرة غير متاحة داخل WebAssembly".into())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn tcp_send_builtin(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 3 {
+        return Err("أرسل_tcp تتطلب 3 معاملات: (مضيف, منفذ, رسالة)".into());
+    }
+    let host = match &args[0] {
+        Value::Text(s) => s.as_str(),
+        _ => return Err("المضيف يجب أن يكون نصاً".into()),
+    };
+    let port = match &args[1] {
+        Value::Number(n) if *n > 0.0 && *n <= 65535.0 => *n as u16,
+        _ => return Err("المنفذ يجب أن يكون عدداً صحيحاً بين 1 و 65535".into()),
+    };
+    let message = match &args[2] {
+        Value::Text(s) => s.as_str(),
+        other => &other.to_string(),
+    };
+
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    let mut stream = TcpStream::connect((host, port))
+        .map_err(|e| format!("فشل الاتصال بـ '{}:{}': {}", host, port, e))?;
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(3)));
+    stream.write_all(message.as_bytes())
+        .map_err(|e| format!("فشل إرسال البيانات: {}", e))?;
+    let _ = stream.shutdown(std::net::Shutdown::Write);
+    let mut response = Vec::new();
+    let _ = stream.read_to_end(&mut response);
+    Ok(Value::Text(String::from_utf8_lossy(&response).into_owned()))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn tcp_send_builtin(_args: Vec<Value>) -> Result<Value, String> {
+    Err("ميزة TCP غير مدعومة في بيئة WebAssembly".into())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn web_server_builtin(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() {
+        return Err("خادم_ويب يتطلب على الأقل رقم المنفذ".into());
+    }
+    let port = match &args[0] {
+        Value::Number(n) if *n > 0.0 && *n <= 65535.0 => *n as u16,
+        _ => return Err("المنفذ يجب أن يكون عدداً صحيحاً بين 1 و 65535".into()),
+    };
+    let routes = if args.len() > 1 {
+        match &args[1] {
+            Value::Map(m) => m.borrow().clone(),
+            _ => return Err("المسارات يجب أن تكون قاموساً يربط المسار بمحتوى الرد".into()),
+        }
+    } else {
+        vec![("/".to_string(), Value::Text("خادم لسان يعمل بنجاح".to_string()))]
+    };
+
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    let listener = TcpListener::bind(("127.0.0.1", port))
+        .map_err(|e| format!("فشل تشغيل خادم الويب على المنفذ {}: {}", port, e))?;
+
+    if let Ok((mut stream, _)) = listener.accept() {
+        let mut buf = [0u8; 2048];
+        let bytes_read = stream.read(&mut buf).unwrap_or(0);
+        let req = String::from_utf8_lossy(&buf[..bytes_read]);
+        let path = req.lines().next()
+            .and_then(|l| l.split_whitespace().nth(1))
+            .unwrap_or("/");
+
+        let body = routes.iter()
+            .find(|(k, _)| k == path)
+            .map(|(_, v)| v.to_string())
+            .unwrap_or_else(|| "404 غير موجود في خادم لسان".to_string());
+
+        let resp = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.as_bytes().len(),
+            body
+        );
+        let _ = stream.write_all(resp.as_bytes());
+    }
+
+    Ok(Value::Bool(true))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn web_server_builtin(_args: Vec<Value>) -> Result<Value, String> {
+    Err("خادم الويب غير مدعوم في بيئة WebAssembly".into())
+}
+
+fn base64_encode_str(text: &str) -> String {
+    const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes = text.as_bytes();
+    let mut result = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0];
+        let b1 = if chunk.len() > 1 { chunk[1] } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] } else { 0 };
+
+        result.push(CHARSET[(b0 >> 2) as usize] as char);
+        result.push(CHARSET[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARSET[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARSET[(b2 & 0x3f) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+fn base64_decode_str(s: &str) -> Result<String, String> {
+    fn decode_char(c: u8) -> Option<u8> {
+        match c {
+            b'A'..=b'Z' => Some(c - b'A'),
+            b'a'..=b'z' => Some(c - b'a' + 26),
+            b'0'..=b'9' => Some(c - b'0' + 52),
+            b'+' => Some(62),
+            b'/' => Some(63),
+            _ => None,
+        }
+    }
+    let filtered: Vec<u8> = s.bytes().filter(|&b| !b.is_ascii_whitespace()).collect();
+    if filtered.len() % 4 != 0 {
+        return Err("نص قاعدة64 غير صالح: الطول غير متوافق مع متطلبات التشفير".into());
+    }
+    let mut out = Vec::with_capacity(filtered.len() * 3 / 4);
+    for chunk in filtered.chunks(4) {
+        let c0 = decode_char(chunk[0]).ok_or("محرف غير صالح في قاعدة64")?;
+        let c1 = decode_char(chunk[1]).ok_or("محرف غير صالح في قاعدة64")?;
+        out.push((c0 << 2) | (c1 >> 4));
+        if chunk[2] != b'=' {
+            let c2 = decode_char(chunk[2]).ok_or("محرف غير صالح في قاعدة64")?;
+            out.push(((c1 & 0x0f) << 4) | (c2 >> 2));
+            if chunk[3] != b'=' {
+                let c3 = decode_char(chunk[3]).ok_or("محرف غير صالح في قاعدة64")?;
+                out.push(((c2 & 0x03) << 6) | c3);
+            }
+        }
+    }
+    String::from_utf8(out).map_err(|e| format!("فشل تحويل البيانات المسترجعة إلى نص UTF-8 سليم: {}", e))
+}
+
+fn url_encode_str(s: &str) -> String {
+    let mut out = String::new();
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{:02X}", b));
+        }
+    }
+    out
+}
+
+fn url_decode_str(s: &str) -> Result<String, String> {
+    let mut bytes = Vec::new();
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '%' && i + 2 < chars.len() {
+            let hex: String = chars[i+1..=i+2].iter().collect();
+            if let Ok(b) = u8::from_str_radix(&hex, 16) {
+                bytes.push(b);
+                i += 3;
+                continue;
+            }
+        } else if chars[i] == '+' {
+            bytes.push(b' ');
+            i += 1;
+            continue;
+        }
+        let mut buf = [0u8; 4];
+        let encoded = chars[i].encode_utf8(&mut buf);
+        bytes.extend_from_slice(encoded.as_bytes());
+        i += 1;
+    }
+    String::from_utf8(bytes).map_err(|e| format!("فشل فك ترميز الرابط: {}", e))
+}
+
+fn text_b64_encode(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() {
+        return Err("ترميز_قاعدة64 تتطلب نصاً للترميز".into());
+    }
+    match &args[0] {
+        Value::Text(s) => Ok(Value::Text(base64_encode_str(s))),
+        other => Ok(Value::Text(base64_encode_str(&other.to_string()))),
+    }
+}
+
+fn text_b64_decode(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() {
+        return Err("فك_قاعدة64 تتطلب نصاً مفكوكاً".into());
+    }
+    match &args[0] {
+        Value::Text(s) => {
+            let decoded = base64_decode_str(s)?;
+            Ok(Value::Text(decoded))
+        }
+        _ => Err("فك_قاعدة64 تتطلب نصاً".into()),
+    }
+}
+
+fn text_url_encode(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() {
+        return Err("ترميز_url تتطلب نصاً".into());
+    }
+    match &args[0] {
+        Value::Text(s) => Ok(Value::Text(url_encode_str(s))),
+        other => Ok(Value::Text(url_encode_str(&other.to_string()))),
+    }
+}
+
+fn text_url_decode(args: Vec<Value>) -> Result<Value, String> {
+    if args.is_empty() {
+        return Err("فك_url تتطلب نصاً مرمزاً".into());
+    }
+    match &args[0] {
+        Value::Text(s) => {
+            let decoded = url_decode_str(s)?;
+            Ok(Value::Text(decoded))
+        }
+        _ => Err("فك_url تتطلب نصاً".into()),
+    }
+}
+
+fn text_rjust(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 {
+        return Err("حشو_يمين تتطلب (نص، الطول_المستهدف)".into());
+    }
+    let text = match &args[0] {
+        Value::Text(s) => s.clone(),
+        other => other.to_string(),
+    };
+    let target_len = match &args[1] {
+        Value::Number(n) if *n >= 0.0 => *n as usize,
+        _ => return Err("الطول المستهدف يجب أن يكون عدداً صحيحاً موجباً".into()),
+    };
+    let pad_char = if args.len() > 2 {
+        match &args[2] {
+            Value::Text(s) => s.chars().next().unwrap_or(' '),
+            _ => ' ',
+        }
+    } else {
+        ' '
+    };
+    let current_len = text.chars().count();
+    if current_len >= target_len {
+        Ok(Value::Text(text))
+    } else {
+        let pad_count = target_len - current_len;
+        let padding: String = std::iter::repeat(pad_char).take(pad_count).collect();
+        Ok(Value::Text(format!("{}{}", padding, text)))
+    }
+}
+
+fn text_ljust(args: Vec<Value>) -> Result<Value, String> {
+    if args.len() < 2 {
+        return Err("حشو_يسار تتطلب (نص، الطول_المستهدف)".into());
+    }
+    let text = match &args[0] {
+        Value::Text(s) => s.clone(),
+        other => other.to_string(),
+    };
+    let target_len = match &args[1] {
+        Value::Number(n) if *n >= 0.0 => *n as usize,
+        _ => return Err("الطول المستهدف يجب أن يكون عدداً صحيحاً موجباً".into()),
+    };
+    let pad_char = if args.len() > 2 {
+        match &args[2] {
+            Value::Text(s) => s.chars().next().unwrap_or(' '),
+            _ => ' ',
+        }
+    } else {
+        ' '
+    };
+    let current_len = text.chars().count();
+    if current_len >= target_len {
+        Ok(Value::Text(text))
+    } else {
+        let pad_count = target_len - current_len;
+        let padding: String = std::iter::repeat(pad_char).take(pad_count).collect();
+        Ok(Value::Text(format!("{}{}", text, padding)))
+    }
 }

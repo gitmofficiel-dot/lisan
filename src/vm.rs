@@ -252,13 +252,18 @@ impl VM {
                 }
                 OpCode::IterInit => {
                     let iter_val = self.pop()?;
-                    match iter_val {
-                        Value::List(items) => {
-                            self.stack.push(Value::List(items));
-                            self.stack.push(Value::Number(0.0));
+                    let items_list = match iter_val {
+                        Value::List(items) => Value::List(items),
+                        Value::Tuple(items) => Value::list(items),
+                        Value::Set(items) => Value::list(items.borrow().clone()),
+                        Value::Text(t) => {
+                            let chars = t.chars().map(|c| Value::Text(c.to_string())).collect();
+                            Value::list(chars)
                         }
-                        _ => return Err("حلقة لكل تتطلب قائمة عناصر".into()),
-                    }
+                        _ => return Err("حلقة لكل أو التوليد المختصر تتطلب قائمة أو صفاً أو مجموعة أو نصاً".into()),
+                    };
+                    self.stack.push(items_list);
+                    self.stack.push(Value::Number(0.0));
                 }
                 OpCode::IterNext(var_name, end_dest) => {
                     let idx_val = self.stack.pop().ok_or("فقدان فهرس التكرار")?;
@@ -380,6 +385,294 @@ impl VM {
                     } else {
                         return Err(format!("متغير غير معرّف: '{}'", var_name));
                     }
+                }
+
+                OpCode::Slice => {
+                    let step_val = match self.pop()? {
+                        Value::Number(n) => Some(n as i64),
+                        Value::Null => None,
+                        _ => return Err("خطوة التقطيع يجب أن تكون عدداً".into()),
+                    };
+                    let end_val = match self.pop()? {
+                        Value::Number(n) => Some(n as i64),
+                        Value::Null => None,
+                        _ => return Err("نهاية التقطيع يجب أن تكون عدداً".into()),
+                    };
+                    let start_val = match self.pop()? {
+                        Value::Number(n) => Some(n as i64),
+                        Value::Null => None,
+                        _ => return Err("بداية التقطيع يجب أن تكون عدداً".into()),
+                    };
+                    let target = self.pop()?;
+                    let res = match target {
+                        Value::List(items) => {
+                            let borrowed = items.borrow();
+                            let indices = crate::runtime::compute_slice_indices(borrowed.len(), start_val, end_val, step_val)?;
+                            let sliced: Vec<Value> = indices.iter().map(|&i| borrowed[i].clone()).collect();
+                            Value::list(sliced)
+                        }
+                        Value::Tuple(items) => {
+                            let indices = crate::runtime::compute_slice_indices(items.len(), start_val, end_val, step_val)?;
+                            let sliced: Vec<Value> = indices.iter().map(|&i| items[i].clone()).collect();
+                            Value::Tuple(sliced)
+                        }
+                        Value::Text(text) => {
+                            let chars: Vec<char> = text.chars().collect();
+                            let indices = crate::runtime::compute_slice_indices(chars.len(), start_val, end_val, step_val)?;
+                            let sliced: String = indices.iter().map(|&i| chars[i]).collect();
+                            Value::Text(sliced)
+                        }
+                        _ => return Err("التقطيع متاح فقط للقوائم والصفوف والنصوص".into()),
+                    };
+                    self.stack.push(res);
+                }
+
+                OpCode::ListAppend(depth) => {
+                    let val = self.pop()?;
+                    let stack_len = self.stack.len();
+                    if stack_len < *depth {
+                        return Err("مكدس الآلة الافتراضية غير كافٍ لإضافة عنصر التوليد المختصر".into());
+                    }
+                    let target_idx = stack_len - *depth;
+                    match &self.stack[target_idx] {
+                        Value::List(l) => {
+                            l.borrow_mut().push(val);
+                        }
+                        _ => return Err("الهدف في التوليد المختصر ليس قائمة".into()),
+                    }
+                }
+
+                OpCode::GetProperty(name) => {
+                    let target = self.pop()?;
+                    match target {
+                        Value::Map(m) => {
+                            let borrowed = m.borrow();
+                            if let Some((_, v)) = borrowed.iter().find(|(k, _)| k == name) {
+                                self.stack.push(v.clone());
+                            } else {
+                                self.stack.push(Value::Null);
+                            }
+                        }
+                        Value::Instance { fields, .. } => {
+                            let borrowed = fields.borrow();
+                            if let Some((_, v)) = borrowed.iter().find(|(k, _)| k == name) {
+                                self.stack.push(v.clone());
+                            } else {
+                                self.stack.push(Value::Null);
+                            }
+                        }
+                        Value::Module { exports, .. } => {
+                            let borrowed = exports.borrow();
+                            if let Some((_, v)) = borrowed.iter().find(|(k, _)| k == name) {
+                                self.stack.push(v.clone());
+                            } else {
+                                self.stack.push(Value::Null);
+                            }
+                        }
+                        _ => return Err(format!("لا يمكن قراءة الخاصية '{}' من هذا النوع في البايت كود", name)),
+                    }
+                }
+
+                OpCode::SetProperty(name) => {
+                    let val = self.pop()?;
+                    let target = self.pop()?;
+                    match target {
+                        Value::Map(m) => {
+                            let mut borrowed = m.borrow_mut();
+                            if let Some((_, v)) = borrowed.iter_mut().find(|(k, _)| k == name) {
+                                *v = val.clone();
+                            } else {
+                                borrowed.push((name.clone(), val.clone()));
+                            }
+                            self.stack.push(val);
+                        }
+                        Value::Instance { fields, .. } => {
+                            let mut borrowed = fields.borrow_mut();
+                            if let Some((_, v)) = borrowed.iter_mut().find(|(k, _)| k == name) {
+                                *v = val.clone();
+                            } else {
+                                borrowed.push((name.clone(), val.clone()));
+                            }
+                            self.stack.push(val);
+                        }
+                        _ => return Err(format!("لا يمكن تعديل الخاصية '{}' في هذا النوع في البايت كود", name)),
+                    }
+                }
+
+                OpCode::CallMethod(name, arg_count) => {
+                    let mut args = Vec::with_capacity(*arg_count);
+                    for _ in 0..*arg_count {
+                        args.push(self.pop()?);
+                    }
+                    args.reverse();
+                    let target = self.pop()?;
+                    let res = match target {
+                        Value::List(items) => {
+                            match name.as_str() {
+                                "طول" if args.is_empty() => Value::Number(items.borrow().len() as f64),
+                                "أضف" | "اضف" | "ألحق" | "الحق" if args.len() == 1 => {
+                                    items.borrow_mut().push(args[0].clone());
+                                    Value::List(items.clone())
+                                }
+                                "احذف" if args.len() == 1 => {
+                                    let idx = match &args[0] {
+                                        Value::Number(n) if *n >= 0.0 && n.fract() == 0.0 => *n as usize,
+                                        _ => return Err("فهرس الحذف يجب أن يكون عدداً صحيحاً".into()),
+                                    };
+                                    let mut borrowed = items.borrow_mut();
+                                    if idx >= borrowed.len() {
+                                        return Err(format!("فهرس الحذف {} خارج حدود القائمة", idx));
+                                    }
+                                    borrowed.remove(idx)
+                                }
+                                "أدرج" | "ادرج" if args.len() == 2 => {
+                                    let idx = match &args[0] {
+                                        Value::Number(n) if *n >= 0.0 && n.fract() == 0.0 => *n as usize,
+                                        _ => return Err("فهرس الإدراج يجب أن يكون عدداً صحيحاً".into()),
+                                    };
+                                    let mut borrowed = items.borrow_mut();
+                                    if idx > borrowed.len() {
+                                        return Err(format!("فهرس الإدراج {} خارج حدود القائمة", idx));
+                                    }
+                                    borrowed.insert(idx, args[1].clone());
+                                    drop(borrowed);
+                                    Value::List(items.clone())
+                                }
+                                "تمديد" | "مدد" if args.len() == 1 => {
+                                    let to_add: Vec<Value> = match &args[0] {
+                                        Value::List(other) => other.borrow().clone(),
+                                        Value::Tuple(other) => other.clone(),
+                                        _ => return Err("طريقة تمديد تتطلب قائمة أو صفاً".into()),
+                                    };
+                                    items.borrow_mut().extend(to_add);
+                                    Value::List(items.clone())
+                                }
+                                "مسح" if args.is_empty() => {
+                                    items.borrow_mut().clear();
+                                    Value::List(items.clone())
+                                }
+                                "نسخ" if args.is_empty() => {
+                                    let copy = items.borrow().clone();
+                                    Value::list(copy)
+                                }
+                                "عكس" if args.is_empty() => {
+                                    let mut rev = items.borrow().clone();
+                                    rev.reverse();
+                                    Value::list(rev)
+                                }
+                                "فرز" if args.is_empty() => {
+                                    let mut sorted = items.borrow().clone();
+                                    sorted.sort_by(|a, b| match (a, b) {
+                                        (Value::Number(x), Value::Number(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
+                                        (Value::Text(x), Value::Text(y)) => x.cmp(y),
+                                        _ => std::cmp::Ordering::Equal,
+                                    });
+                                    Value::list(sorted)
+                                }
+                                "مجموع" if args.is_empty() => {
+                                    let mut sum = 0.0;
+                                    for it in items.borrow().iter() {
+                                        match it {
+                                            Value::Number(n) => sum += n,
+                                            _ => return Err("طريقة مجموع تتطلب قائمة أرقام".into()),
+                                        }
+                                    }
+                                    Value::Number(sum)
+                                }
+                                other => return Err(format!("الطريقة '{}' غير مدعومة للقوائم في البايت كود", other)),
+                            }
+                        }
+                        Value::Map(pairs) => {
+                            match name.as_str() {
+                                "طول" | "حجم" if args.is_empty() => Value::Number(pairs.borrow().len() as f64),
+                                "مفاتيح" if args.is_empty() => {
+                                    let keys: Vec<Value> = pairs.borrow().iter().map(|(k, _)| Value::Text(k.clone())).collect();
+                                    Value::list(keys)
+                                }
+                                "قيم" if args.is_empty() => {
+                                    let vals: Vec<Value> = pairs.borrow().iter().map(|(_, v)| v.clone()).collect();
+                                    Value::list(vals)
+                                }
+                                "عناصر" if args.is_empty() => {
+                                    let entries: Vec<Value> = pairs.borrow().iter().map(|(k, v)| Value::Tuple(vec![Value::Text(k.clone()), v.clone()])).collect();
+                                    Value::list(entries)
+                                }
+                                "يحتوي" if args.len() == 1 => {
+                                    let key = match &args[0] {
+                                        Value::Text(s) => s.as_str(),
+                                        _ => return Err("يحتوي تتطلب نصاً كمفتاح".into()),
+                                    };
+                                    Value::Bool(pairs.borrow().iter().any(|(k, _)| k == key))
+                                }
+                                "مسح" if args.is_empty() => {
+                                    pairs.borrow_mut().clear();
+                                    Value::Map(pairs.clone())
+                                }
+                                other => return Err(format!("الطريقة '{}' غير مدعومة للقواميس في البايت كود", other)),
+                            }
+                        }
+                        Value::Set(items) => {
+                            match name.as_str() {
+                                "طول" | "حجم" if args.is_empty() => Value::Number(items.borrow().len() as f64),
+                                "أضف" | "اضف" if args.len() == 1 => {
+                                    let mut borrowed = items.borrow_mut();
+                                    if !borrowed.contains(&args[0]) {
+                                        borrowed.push(args[0].clone());
+                                    }
+                                    Value::Set(items.clone())
+                                }
+                                "احذف" if args.len() == 1 => {
+                                    let mut borrowed = items.borrow_mut();
+                                    borrowed.retain(|x| x != &args[0]);
+                                    Value::Set(items.clone())
+                                }
+                                "يحتوي" if args.len() == 1 => {
+                                    Value::Bool(items.borrow().contains(&args[0]))
+                                }
+                                "قائمة" if args.is_empty() => {
+                                    Value::list(items.borrow().clone())
+                                }
+                                "مسح" if args.is_empty() => {
+                                    items.borrow_mut().clear();
+                                    Value::Set(items.clone())
+                                }
+                                other => return Err(format!("الطريقة '{}' غير مدعومة للمجموعات في البايت كود", other)),
+                            }
+                        }
+                        Value::Text(text) => {
+                            match name.as_str() {
+                                "طول" if args.is_empty() => Value::Number(text.chars().count() as f64),
+                                "تحتوي" if args.len() == 1 => match &args[0] {
+                                    Value::Text(sub) => Value::Bool(text.contains(sub)),
+                                    _ => return Err("طريقة تحتوي تتطلب نصاً للبحث".into()),
+                                },
+                                "تقسيم" if args.len() == 1 => match &args[0] {
+                                    Value::Text(delim) => {
+                                        let parts: Vec<Value> = text.split(delim).map(|s| Value::Text(s.to_string())).collect();
+                                        Value::list(parts)
+                                    }
+                                    _ => return Err("طريقة تقسيم تتطلب فاصلاً نصياً".into()),
+                                },
+                                "عكس" if args.is_empty() => Value::Text(text.chars().rev().collect()),
+                                "أحرف_كبيرة" if args.is_empty() => Value::Text(text.to_uppercase()),
+                                "أحرف_صغيرة" if args.is_empty() => Value::Text(text.to_lowercase()),
+                                "استبدل" if args.len() == 2 => match (&args[0], &args[1]) {
+                                    (Value::Text(from), Value::Text(to)) => Value::Text(text.replace(from, to)),
+                                    _ => return Err("طريقة استبدل تتطلب نصين".into()),
+                                },
+                                other => return Err(format!("الطريقة '{}' غير مدعومة للنصوص في البايت كود", other)),
+                            }
+                        }
+                        Value::Tuple(items) => {
+                            match name.as_str() {
+                                "طول" if args.is_empty() => Value::Number(items.len() as f64),
+                                "قائمة" if args.is_empty() => Value::list(items.clone()),
+                                other => return Err(format!("الطريقة '{}' غير مدعومة للصفوف في البايت كود", other)),
+                            }
+                        }
+                        _ => return Err("استدعاء الطرق في البايت كود غير مدعوم لهذا النوع".into()),
+                    };
+                    self.stack.push(res);
                 }
 
                 OpCode::CallBuiltin(name, arg_count) => {
@@ -712,8 +1005,73 @@ impl Compiler {
                     self.chunk.emit(OpCode::Add, 0);
                 }
             }
-            Expr::GetProperty(..) | Expr::SetProperty(..) | Expr::MethodCall(..) | Expr::Lambda(..) | Expr::Slice(..) | Expr::ListComprehension { .. } | Expr::AssignUnpack(..) => {
-                return Err("الخصائص والطرق الكائنية والدوال المجهولة والتقطيع تعمل حالياً عبر المفسّر".into());
+            Expr::Slice(target, start, end, step) => {
+                self.compile_expr(target)?;
+                if let Some(s) = start {
+                    self.compile_expr(s)?;
+                } else {
+                    let idx = self.chunk.add_constant(Value::Null);
+                    self.chunk.emit(OpCode::Constant(idx), 0);
+                }
+                if let Some(e) = end {
+                    self.compile_expr(e)?;
+                } else {
+                    let idx = self.chunk.add_constant(Value::Null);
+                    self.chunk.emit(OpCode::Constant(idx), 0);
+                }
+                if let Some(st) = step {
+                    self.compile_expr(st)?;
+                } else {
+                    let idx = self.chunk.add_constant(Value::Null);
+                    self.chunk.emit(OpCode::Constant(idx), 0);
+                }
+                self.chunk.emit(OpCode::Slice, 0);
+            }
+            Expr::ListComprehension { expr, var, iterable, condition } => {
+                self.chunk.emit(OpCode::BuildList(0), 0);
+                self.compile_expr(iterable)?;
+                self.chunk.emit(OpCode::IterInit, 0);
+                let loop_start = self.chunk.instructions.len();
+                let iter_next = self.chunk.emit(OpCode::IterNext(var.clone(), 0), 0);
+
+                if let Some(cond) = condition {
+                    self.compile_expr(cond)?;
+                    let jump_skip = self.chunk.emit(OpCode::JumpIfFalse(0), 0);
+                    self.compile_expr(expr)?;
+                    self.chunk.emit(OpCode::ListAppend(3), 0);
+                    let after_append = self.chunk.instructions.len();
+                    self.chunk.patch_jump(jump_skip, after_append);
+                } else {
+                    self.compile_expr(expr)?;
+                    self.chunk.emit(OpCode::ListAppend(3), 0);
+                }
+
+                self.chunk.emit(OpCode::Jump(loop_start), 0);
+                let loop_end = self.chunk.instructions.len();
+                self.chunk.patch_jump(iter_next, loop_end);
+                self.chunk.emit(OpCode::IterPop, 0);
+            }
+            Expr::MethodCall(target, method_name, args) => {
+                self.compile_expr(target)?;
+                for arg in args {
+                    self.compile_expr(arg)?;
+                }
+                self.chunk.emit(OpCode::CallMethod(method_name.clone(), args.len()), 0);
+            }
+            Expr::GetProperty(target, prop) => {
+                self.compile_expr(target)?;
+                self.chunk.emit(OpCode::GetProperty(prop.clone()), 0);
+            }
+            Expr::SetProperty(target, prop, val) => {
+                self.compile_expr(target)?;
+                self.compile_expr(val)?;
+                self.chunk.emit(OpCode::SetProperty(prop.clone()), 0);
+            }
+            Expr::Lambda(..) => {
+                return Err("الدوال المجهولة (Lambda) تعمل حالياً عبر المفسّر".into());
+            }
+            Expr::AssignUnpack(..) => {
+                return Err("فك التعبئة غير مسموح كتعبير مستقل داخل تعبير آخر".into());
             }
         }
         Ok(())
@@ -794,5 +1152,82 @@ mod tests {
 "#;
         let out = vm.run_source(src).unwrap();
         assert_eq!(out, ["لغة لسان رقم 42"]);
+    }
+
+    #[test]
+    fn test_vm_slicing() {
+        let mut vm = VM::new();
+        let src = r#"
+دع أرقام = [10, 20, 30, 40, 50]
+اطبع(أرقام[1:4])
+اطبع(أرقام[:2])
+اطبع(أرقام[3:])
+اطبع(أرقام[::-1])
+دع نص = "العربية"
+اطبع(نص[:6])
+"#;
+        let out = vm.run_source(src).unwrap();
+        assert_eq!(out, [
+            "[20، 30، 40]",
+            "[10، 20]",
+            "[40، 50]",
+            "[50، 40، 30، 20، 10]",
+            "العربي"
+        ]);
+    }
+
+    #[test]
+    fn test_vm_list_comprehension() {
+        let mut vm = VM::new();
+        let src = r#"
+دع مربعات = [س * س لكل س في [1, 2, 3, 4, 5]]
+اطبع(مربعات)
+دع زوجي = [س لكل س في [1, 2, 3, 4, 5, 6] إذا س % 2 == 0]
+اطبع(زوجي)
+"#;
+        let out = vm.run_source(src).unwrap();
+        assert_eq!(out, [
+            "[1، 4، 9، 16، 25]",
+            "[2، 4، 6]"
+        ]);
+    }
+
+    #[test]
+    fn test_vm_method_calls() {
+        let mut vm = VM::new();
+        let src = r#"
+دع قائمة = [30, 10, 20]
+قائمة.أضف(40)
+اطبع(قائمة.طول())
+اطبع(قائمة.فرز())
+اطبع(قائمة.عكس())
+اطبع(قائمة.مجموع())
+دع نص = "أ،ب،ج"
+اطبع(نص.تقسيم("،"))
+"#;
+        let out = vm.run_source(src).unwrap();
+        assert_eq!(out, [
+            "4",
+            "[10، 20، 30، 40]",
+            "[40، 20، 10، 30]",
+            "100",
+            "[\"أ\"، \"ب\"، \"ج\"]"
+        ]);
+    }
+
+    #[test]
+    fn test_vm_property_access() {
+        let mut vm = VM::new();
+        let src = r#"
+دع كائن = {"اسم": "أحمد", "عمر": 30}
+اطبع(كائن.اسم)
+كائن.اسم = "سعيد"
+اطبع(كائن.اسم)
+"#;
+        let out = vm.run_source(src).unwrap();
+        assert_eq!(out, [
+            "أحمد",
+            "سعيد"
+        ]);
     }
 }

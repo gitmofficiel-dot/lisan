@@ -215,6 +215,8 @@
         </div>
         <div class="actions">
             <select id="exampleSelector">
+                <option value="python_parity">🐍 الصياغة البايثونية (تقطيع، توليد، نصوص منسقة)</option>
+                <option value="stats_and_math">📊 الإحصاء والرياضيات المتقدمة</option>
                 <option value="mobile">📱 تطبيق هاتف ذكي وأيقونات (موبايل)</option>
                 <option value="arduino">🤖 برمجة أردوينو ومتحكمات (المنزل الذكي)</option>
                 <option value="web_ui">🌐 بناء موقع ويب وتصميمات عصرية</option>
@@ -229,6 +231,9 @@
             </button>
             <button class="ino-btn" id="arduinoBtn">
                 <span>⚡ توليد كود أردوينو (.ino)</span>
+            </button>
+            <button class="fmt-btn" id="fmtBtn" style="background-color: #6366f1; color: white; border: none; padding: 0.55rem 1.1rem; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer;">
+                <span>✨ تنسيق (نسّق)</span>
             </button>
         </div>
     </header>
@@ -262,6 +267,47 @@
     <script src="lisan.js"></script>
     <script>
         const examples = {
+            python_parity: `# الصياغة البايثونية العصرية في لسان
+دع اسم = "زيد"
+دع عمر = 28
+
+# 1. النصوص المنسقة (f-strings)
+اطبع(ن"مرحباً {اسم}، عمرك بعد سنتين سيكون {عمر + 2} سنة")
+
+# 2. التقطيع العصري (Slicing)
+دع أرقام = [10، 20، 30، 40، 50]
+اطبع("تقطيع من 1 إلى 3: " + نص(أرقام[1:3]))
+اطبع("عكس القائمة: " + نص(أرقام[::-1]))
+
+# 3. التوليد المختصر للقوائم (Comprehensions)
+دع مربعات_الزوجية = [س * س لكل س في مدى(6) إذا س % 2 == 0]
+اطبع("مربعات الأعداد الزوجية: " + نص(مربعات_الزوجية))
+
+# 4. فك التعبئة المباشر
+دع أ، ب = [100، 200]
+أ، ب = [ب، أ]
+اطبع("التبديل: أ = " + نص(أ) + "، ب = " + نص(ب))
+
+# 5. دوال التكرار المدمجة
+اطبع("كل الأرقام موجبة؟ " + نص(كل(أرقام)))
+`,
+            stats_and_math: `# العمليات الرياضية المتقدمة والإحصاء
+استورد رياضيات كـ ر
+استورد إحصاء كـ ح
+
+# رياضيات متقدمة
+اطبع("مضروب 5! = " + نص(ر.مضروب(5)))
+اطبع("توافيق 6C2 = " + نص(ر.توافيق(6، 2)))
+اطبع("قاسم مشترك (24، 36) = " + نص(ر.قاسم_مشترك(24، 36)))
+
+# إحصاء وتحليل بيانات
+دع درجات = [85، 90، 78، 92، 88، 90، 95]
+اطبع("المتوسط الحسابي: " + نص(ح.متوسط(درجات)))
+اطبع("الوسيط: " + نص(ح.وسيط(درجات)))
+اطبع("المنوال: " + نص(ح.منوال(درجات)))
+اطبع("المدى: " + نص(ح.مدى(درجات)))
+اطبع("الانحراف المعياري: " + نص(ح.انحراف_معياري(درجات)))
+`,
             mobile: `// تصميم تطبيق هاتف ذكي تفاعلي بالأيقونات والتصميمات
 استورد "هاتف"
 
@@ -450,6 +496,22 @@
                 showConsoleOutput(ino, ino.startsWith('خطأ:'));
             } catch (err) {
                 showConsoleOutput('خطأ ترجمة أردوينو: ' + err.message, true);
+            }
+        });
+
+        const fmtBtn = document.getElementById('fmtBtn');
+        fmtBtn.addEventListener('click', () => {
+            if (!runtime) return;
+            try {
+                const formatted = runtime.fmt(editor.value);
+                if (!formatted.startsWith('خطأ:')) {
+                    editor.value = formatted;
+                    showConsoleOutput('✓ تم تنسيق الشيفرة وضبط المحاذاة بنجاح.');
+                } else {
+                    showConsoleOutput(formatted, true);
+                }
+            } catch (err) {
+                showConsoleOutput('خطأ في التنسيق: ' + err.message, true);
             }
         });
 

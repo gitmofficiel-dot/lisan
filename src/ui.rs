@@ -335,6 +335,18 @@ self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => c
     Ok(index_path)
 }
 
+/// تصدير صفحة موقع ويب كملف index.html جاهز داخل مجلد
+pub fn export_web_page(_site_name: &str, html: &str, out_dir: &Path) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(out_dir)
+        .map_err(|e| format!("تعذر إنشاء مجلد الموقع '{}': {}", out_dir.display(), e))?;
+
+    let index_path = out_dir.join("index.html");
+    std::fs::write(&index_path, html)
+        .map_err(|e| format!("تعذر حفظ ملف الموقع '{}': {}", index_path.display(), e))?;
+
+    Ok(index_path)
+}
+
 /// بناء صفحة موقع ويب متكاملة ومتجاوبة بالعربية
 pub fn build_web_page_html(title: &str, theme: &str, sections_html: &[String]) -> String {
     let theme_vars = get_theme_css(theme);
@@ -348,29 +360,118 @@ pub fn build_web_page_html(title: &str, theme: &str, sections_html: &[String]) -
 <title>{title}</title>
 <style>
 {theme_vars}
-* {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, system-ui, sans-serif; }}
-body {{ background: var(--bg); color: var(--text); line-height: 1.6; }}
-.container {{ max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 28px; }}
-.web-hero {{ background: linear-gradient(135deg, var(--surface), var(--surface-2)); border: 1px solid var(--border); border-radius: 24px; padding: 48px 32px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; }}
-.web-hero h1 {{ font-size: 34px; font-weight: 800; }}
-.web-hero p {{ color: var(--muted); max-width: 650px; font-size: 17px; }}
-.lsn-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 20px; display: flex; align-items: flex-start; gap: 14px; }}
-.lsn-card-icon {{ width: 46px; height: 46px; border-radius: 12px; background: var(--surface-2); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }}
-.lsn-btn {{ padding: 12px 24px; border: none; border-radius: 12px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }}
-.web-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }}
+* {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', 'Cairo', Tahoma, system-ui, sans-serif; }}
+body {{ background: var(--bg); color: var(--text); line-height: 1.6; transition: background 0.3s, color 0.3s; }}
+.container {{ max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 32px; }}
+
+/* شريط التنقل العلوي */
+.web-nav {{ display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px 24px; position: sticky; top: 16px; z-index: 100; backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0,0,0,0.06); }}
+.web-brand {{ display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 800; color: var(--text); }}
+.web-links {{ display: flex; align-items: center; gap: 20px; }}
+.web-links a {{ color: var(--muted); text-decoration: none; font-size: 15px; font-weight: 600; transition: color 0.2s; }}
+.web-links a:hover {{ color: var(--primary); }}
+.theme-toggle-btn {{ background: var(--surface-2); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; transition: all 0.2s; }}
+.theme-toggle-btn:hover {{ border-color: var(--primary); color: var(--primary); }}
+
+/* القسم الترحيبي الرئيسي */
+.web-hero {{ background: linear-gradient(135deg, var(--surface), var(--surface-2)); border: 1px solid var(--border); border-radius: 24px; padding: 56px 32px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); position: relative; overflow: hidden; }}
+.web-hero h1 {{ font-size: 38px; font-weight: 900; }}
+.web-hero p {{ color: var(--muted); max-width: 680px; font-size: 18px; line-height: 1.7; }}
+
+/* البطاقات والشبكة */
+.web-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }}
+.lsn-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 22px; display: flex; align-items: flex-start; gap: 16px; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }}
+.lsn-card:hover {{ transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); border-color: var(--primary); }}
+.lsn-card-icon {{ width: 50px; height: 50px; border-radius: 14px; background: var(--surface-2); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }}
+.lsn-card-body h3 {{ font-size: 17px; margin-bottom: 6px; color: var(--text); font-weight: 700; }}
+.lsn-card-body p {{ color: var(--muted); font-size: 14px; line-height: 1.5; }}
+
+/* الأزرار الفصيحة */
+.lsn-btn {{ padding: 13px 26px; border: none; border-radius: 14px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 10px; transition: transform 0.15s, opacity 0.2s; box-shadow: 0 4px 16px rgba(0,0,0,0.15); }}
+.lsn-btn:hover {{ opacity: 0.95; transform: scale(1.02); }}
+.lsn-btn:active {{ transform: scale(0.98); }}
+.full-btn {{ width: 100%; }}
+
+/* الإحصائيات */
+.web-stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }}
+.lsn-stat {{ background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; text-align: center; }}
+.lsn-stat-top {{ display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; font-weight: 600; }}
+.lsn-stat-val {{ font-size: 28px; font-weight: 900; color: var(--primary); }}
+
+/* الأقسام العامة */
+.web-section {{ background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; display: flex; flex-direction: column; gap: 14px; }}
+.web-section h2 {{ font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px; }}
+.web-section p {{ color: var(--muted); font-size: 16px; }}
+
+/* نموذج التواصل التفاعلي */
+.web-form-box {{ background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 36px 32px; display: flex; flex-direction: column; gap: 20px; max-width: 650px; margin: 0 auto; width: 100%; box-shadow: 0 6px 24px rgba(0,0,0,0.06); }}
+.web-form-box h2 {{ font-size: 26px; font-weight: 800; text-align: center; }}
+.web-form-box p {{ color: var(--muted); text-align: center; font-size: 15px; }}
+.web-form-box form {{ display: flex; flex-direction: column; gap: 16px; }}
+.form-group {{ display: flex; flex-direction: column; gap: 6px; text-align: right; }}
+.form-group label {{ font-size: 13px; font-weight: 700; color: var(--muted); }}
+.lsn-input {{ width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 14px; outline: none; transition: border-color 0.2s; }}
+.lsn-input:focus {{ border-color: var(--primary); }}
+
+/* التذييل */
+.web-footer {{ text-align: center; padding: 28px 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }}
+.footer-badge {{ display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--primary); font-weight: 700; }}
+
+/* إشعار عائم */
+.lsn-toast {{ position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--primary); color: #fff; padding: 12px 24px; border-radius: 14px; font-size: 14px; font-weight: 700; box-shadow: 0 8px 30px rgba(0,0,0,0.3); display: none; z-index: 1000; transition: opacity 0.3s; }}
 </style>
 </head>
 <body>
 <div class="container">
 {body}
 </div>
+<div class="lsn-toast" id="toastMsg"></div>
+<script>
+function showToast(msg) {{
+  const t = document.getElementById('toastMsg');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.display = 'block';
+  t.style.opacity = '1';
+  setTimeout(() => {{
+    t.style.opacity = '0';
+    setTimeout(() => {{ t.style.display = 'none'; }}, 300);
+  }}, 2500);
+}}
+function toggleTheme() {{
+  const root = document.documentElement;
+  const currentBg = getComputedStyle(root).getPropertyValue('--bg').trim();
+  if (currentBg === '#f8fafc' || currentBg.includes('248')) {{
+    root.style.setProperty('--bg', '#0f172a');
+    root.style.setProperty('--surface', '#1e293b');
+    root.style.setProperty('--surface-2', '#334155');
+    root.style.setProperty('--text', '#f8fafc');
+    root.style.setProperty('--muted', '#94a3b8');
+    root.style.setProperty('--border', '#334155');
+    showToast('تم تفعيل الوضع الليلي 🌙');
+  }} else {{
+    root.style.setProperty('--bg', '#f8fafc');
+    root.style.setProperty('--surface', '#ffffff');
+    root.style.setProperty('--surface-2', '#f1f5f9');
+    root.style.setProperty('--text', '#0f172a');
+    root.style.setProperty('--muted', '#64748b');
+    root.style.setProperty('--border', '#e2e8f0');
+    showToast('تم تفعيل الوضع النهاري ☀️');
+  }}
+}}
+function handleContact(e) {{
+  e.preventDefault();
+  showToast('شكراً لتواصلك! تم استلام رسالتك بنجاح ✅');
+  e.target.reset();
+}}
+</script>
 </body>
 </html>"#
     )
 }
 
 /// المكتبة القياسية المدمجة للأيقونات والتصميمات وتطبيقات الهواتف والويب بلغة لسان
-pub const STDLIB_UI_AND_MOBILE: &str = r#"
+pub const STDLIB_UI_AND_MOBILE: &str = r##"
 # مكتبة الأيقونات والتصميمات وتطبيقات الهواتف الذكية والويب في لغة لسان
 
 صنف تطبيق_هاتف {
@@ -427,24 +528,94 @@ pub const STDLIB_UI_AND_MOBILE: &str = r#"
 }
 
 صنف موقع_ويب {
-    دالة بناء(عنوان_الموقع، النسق) {
+    دالة بناء(عنوان_الموقع، النسق = "ملكي") {
         هذا.عنوان_الموقع = عنوان_الموقع
         هذا.النسق = النسق
         هذا.الأقسام = []
     }
 
-    دالة قسم_رئيسي(عنوان، وصف، نص_الزر، اسم_الأيقونة) {
-        دع رمز = أيقونة(اسم_الأيقونة، 40، "var(--primary)")
-        دع زر = عنصر_زر(نص_الزر، "تشغيل"، عنوان)
-        دع قسم = "<section class=\"web-hero\">" + رمز + "<h1>" + عنوان + "</h1><p>" + وصف + "</p>" + زر + "</section>"
+    دالة شريط_تنقل(اسم_الموقع، أيقونة_الشعار = "كود") {
+        دع رمز = أيقونة(أيقونة_الشعار، 24، "var(--primary)")
+        دع زر_النسق = "<button class=\"theme-toggle-btn\" onclick=\"toggleTheme()\">" + أيقونة("قمر"، 16، "currentColor") + " <span>النسق</span></button>"
+        دع كود = "<header class=\"web-nav\"><div class=\"web-brand\">" + رمز + "<span>" + اسم_الموقع + "</span></div><nav class=\"web-links\"><a href=\"#hero\">الرئيسية</a><a href=\"#features\">الميزات</a><a href=\"#stats\">إحصائيات</a><a href=\"#contact\">تواصل</a></nav>" + زر_النسق + "</header>"
+        هذا.الأقسام = أضف(هذا.الأقسام، كود)
+        أرجع كود
+    }
+
+    دالة قسم_رئيسي(عنوان، وصف، نص_الزر = "ابدأ الآن"، اسم_الأيقونة = "روبوت") {
+        دع رمز = أيقونة(اسم_الأيقونة، 42، "var(--primary)")
+        دع زر = عنصر_زر(نص_الزر، "تشغيل"، "مرحباً بكم في " + عنوان)
+        دع قسم = "<section id=\"hero\" class=\"web-hero\">" + رمز + "<h1>" + عنوان + "</h1><p>" + وصف + "</p>" + زر + "</section>"
         هذا.الأقسام = أضف(هذا.الأقسام، قسم)
         أرجع قسم
     }
 
-    دالة أضف_بطاقة(عنوان، وصف، اسم_الأيقونة) {
+    دالة أضف_بطاقة(عنوان، وصف، اسم_الأيقونة = "نجمة") {
         دع كود = عنصر_بطاقة(عنوان، وصف، اسم_الأيقونة)
         هذا.الأقسام = أضف(هذا.الأقسام، كود)
         أرجع كود
+    }
+
+    دالة أضف_إحصائية(عنوان، قيمة، اسم_الأيقونة = "شريحة") {
+        دع كود = عنصر_إحصائية(عنوان، نص(قيمة)، اسم_الأيقونة)
+        هذا.الأقسام = أضف(هذا.الأقسام, كود)
+        أرجع كود
+    }
+
+    دالة أضف_إحصائيات(قائمة_الإحصائيات) {
+        دع محتوى = ""
+        لكل إحصاء في قائمة_الإحصائيات {
+            دع عنوان = إحصاء[0]
+            دع قيمة = إحصاء[1]
+            دع رمز = "شريحة"
+            إذا (طول(إحصاء) > 2) {
+                رمز = إحصاء[2]
+            }
+            محتوى = محتوى + عنصر_إحصائية(عنوان، نص(قيمة)، رمز)
+        }
+        دع كود = "<section id=\"stats\" class=\"web-stats\">" + محتوى + "</section>"
+        هذا.الأقسام = أضف(هذا.الأقسام، كود)
+        أرجع كود
+    }
+
+    دالة أضف_شبكة(قائمة_البطاقات) {
+        دع محتوى = ""
+        لكل بطاقة في قائمة_البطاقات {
+            دع عنوان = بطاقة[0]
+            دع وصف = بطاقة[1]
+            دع رمز = "نجمة"
+            إذا (طول(بطاقة) > 2) {
+                رمز = بطاقة[2]
+            }
+            محتوى = محتوى + عنصر_بطاقة(عنوان، وصف، رمز)
+        }
+        دع كود = "<section id=\"features\" class=\"web-grid\">" + محتوى + "</section>"
+        هذا.الأقسام = أضف(هذا.الأقسام، كود)
+        أرجع كود
+    }
+
+    دالة أضف_قسم(عنوان، محتوى_نصي، اسم_الأيقونة = "معلومات") {
+        دع رمز = أيقونة(اسم_الأيقونة، 24، "var(--primary)")
+        دع كود = "<section class=\"web-section\"><h2>" + رمز + " " + عنوان + "</h2><p>" + محتوى_نصي + "</p></section>"
+        هذا.الأقسام = أضف(هذا.الأقسام، كود)
+        أرجع كود
+    }
+
+    دالة أضف_نموذج_تواصل(عنوان = "تواصل معنا", وصف = "أرسل لنا رسالتك وسنرد عليك بأسرع وقت", نص_الزر = "إرسال الرسالة") {
+        دع كود = "<section id=\"contact\" class=\"web-form-box\"><h2>" + عنوان + "</h2><p>" + وصف + "</p><form onsubmit=\"handleContact(event)\"><div class=\"form-group\"><label>الاسم الكريم</label><input type=\"text\" required placeholder=\"اكتب اسمك هنا...\" class=\"lsn-input\"></div><div class=\"form-group\"><label>البريد الإلكتروني</label><input type=\"email\" required placeholder=\"name@example.com\" class=\"lsn-input\"></div><div class=\"form-group\"><label>الرسالة</label><textarea required rows=\"4\" placeholder=\"اكتب استفسارك هنا...\" class=\"lsn-input\"></textarea></div><button type=\"submit\" class=\"lsn-btn full-btn\">" + أيقونة("رسالة"، 18، "#fff") + " <span>" + نص_الزر + "</span></button></form></section>"
+        هذا.الأقسام = أضف(هذا.الأقسام، كود)
+        أرجع كود
+    }
+
+    دالة أضف_تذييل(نص_الحقوق = "جميع الحقوق محفوظة © لغة لسان") {
+        دع كود = "<footer class=\"web-footer\"><p>" + نص_الحقوق + "</p><div class=\"footer-badge\">" + أيقونة("درع"، 16، "var(--primary)") + " <span>صُنع بلغة البرمجة العربية لسان</span></div></footer>"
+        هذا.الأقسام = أضف(هذا.الأقسام، كود)
+        أرجع كود
+    }
+
+    دالة أضف_عنصر(كود_html) {
+        هذا.الأقسام = أضف(هذا.الأقسام، كود_html)
+        أرجع كود_html
     }
 
     دالة بناء_html() {
@@ -456,5 +627,10 @@ pub const STDLIB_UI_AND_MOBILE: &str = r#"
         اكتب_ملف(مسار_الملف، كود)
         أرجع مسار_الملف
     }
+
+    دالة تصدير(مجلد_الموقع) {
+        دع كود = هذا.بناء_html()
+        أرجع تصدير_صفحة_ويب(هذا.عنوان_الموقع، كود، مجلد_الموقع)
+    }
 }
-"#;
+"##;

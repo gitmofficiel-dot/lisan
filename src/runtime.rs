@@ -1968,7 +1968,8 @@ fn is_builtin(name: &str) -> bool {
         "أيقونة" | "ايقونة" | "قائمة_الأيقونات" | "قائمة_الايقونات" | "نسق_تصميم" |
         "عنصر_بطاقة" | "عنصر_زر" | "عنصر_إحصائية" | "عنصر_احصائية" |
         "عنصر_مفتاح" | "عنصر_تنبيه" | "عنصر_شارة" | "عنصر_حقل" | "عنصر_شريط_تقدم" |
-        "بناء_تطبيق_هاتف" | "تصدير_تطبيق_هاتف" | "بناء_صفحة_ويب")
+        "بناء_تطبيق_هاتف" | "تصدير_تطبيق_هاتف" | "بناء_صفحة_ويب" |
+        "تصدير_صفحة_ويب" | "تصدير_موقع")
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -2879,7 +2880,8 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
         "أيقونة" | "ايقونة" | "قائمة_الأيقونات" | "قائمة_الايقونات" | "نسق_تصميم"
         | "عنصر_بطاقة" | "عنصر_زر" | "عنصر_إحصائية" | "عنصر_احصائية"
         | "عنصر_مفتاح" | "عنصر_تنبيه" | "عنصر_شارة" | "عنصر_حقل" | "عنصر_شريط_تقدم"
-        | "بناء_تطبيق_هاتف" | "تصدير_تطبيق_هاتف" | "بناء_صفحة_ويب" => {
+        | "بناء_تطبيق_هاتف" | "تصدير_تطبيق_هاتف" | "بناء_صفحة_ويب"
+        | "تصدير_صفحة_ويب" | "تصدير_موقع" => {
             eval_ui_builtin(name, args)
         }
         _ => {
@@ -3193,6 +3195,14 @@ fn eval_ui_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             }
             Ok(Value::Text(crate::ui::build_web_page_html(&title, &theme, &sections)))
         }
+        "تصدير_صفحة_ويب" | "تصدير_موقع" => {
+            require_args(name, &args, 3)?;
+            let site_name = args[0].to_string();
+            let html = args[1].to_string();
+            let out_dir = args[2].to_string();
+            let path = crate::ui::export_web_page(&site_name, &html, std::path::Path::new(&out_dir))?;
+            Ok(Value::Text(path.to_string_lossy().into_owned()))
+        }
         _ => unreachable!(),
     }
 }
@@ -3383,31 +3393,64 @@ fn web_server_builtin(args: Vec<Value>) -> Result<Value, String> {
         vec![("/".to_string(), Value::Text("خادم لسان يعمل بنجاح".to_string()))]
     };
 
+    let req_limit = if args.len() > 2 {
+        match &args[2] {
+            Value::Number(n) => *n as i64,
+            _ => 1,
+        }
+    } else {
+        1
+    };
+
     use std::io::{Read, Write};
     use std::net::TcpListener;
 
     let listener = TcpListener::bind(("127.0.0.1", port))
         .map_err(|e| format!("فشل تشغيل خادم الويب على المنفذ {}: {}", port, e))?;
 
-    if let Ok((mut stream, _)) = listener.accept() {
-        let mut buf = [0u8; 2048];
-        let bytes_read = stream.read(&mut buf).unwrap_or(0);
-        let req = String::from_utf8_lossy(&buf[..bytes_read]);
-        let path = req.lines().next()
-            .and_then(|l| l.split_whitespace().nth(1))
-            .unwrap_or("/");
+    let mut handled = 0;
+    while req_limit <= 0 || handled < req_limit {
+        if let Ok((mut stream, _)) = listener.accept() {
+            let mut buf = [0u8; 4096];
+            let bytes_read = stream.read(&mut buf).unwrap_or(0);
+            if bytes_read == 0 {
+                continue;
+            }
+            let req = String::from_utf8_lossy(&buf[..bytes_read]);
+            let path = req.lines().next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .unwrap_or("/");
 
-        let body = routes.iter()
-            .find(|(k, _)| k == path)
-            .map(|(_, v)| v.to_string())
-            .unwrap_or_else(|| "404 غير موجود في خادم لسان".to_string());
+            let body = routes.iter()
+                .find(|(k, _)| k == path || (k == "/" && path.is_empty()))
+                .map(|(_, v)| v.to_string())
+                .unwrap_or_else(|| {
+                    if routes.len() == 1 {
+                        routes[0].1.to_string()
+                    } else {
+                        "<h1>404 الصفحة غير موجودة في خادم لسان</h1>".to_string()
+                    }
+                });
 
-        let resp = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-            body.as_bytes().len(),
-            body
-        );
-        let _ = stream.write_all(resp.as_bytes());
+            let trimmed = body.trim_start();
+            let content_type = if trimmed.starts_with('<') || trimmed.to_lowercase().starts_with("<!doctype") {
+                "text/html; charset=utf-8"
+            } else if trimmed.starts_with('{') || trimmed.starts_with('[') {
+                "application/json; charset=utf-8"
+            } else {
+                "text/plain; charset=utf-8"
+            };
+
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                content_type,
+                body.as_bytes().len(),
+                body
+            );
+            let _ = stream.write_all(resp.as_bytes());
+            let _ = stream.flush();
+            handled += 1;
+        }
     }
 
     Ok(Value::Bool(true))

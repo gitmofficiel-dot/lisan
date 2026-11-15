@@ -16,7 +16,7 @@ pub fn resolve_builtin_module(name: &str) -> Option<&'static str> {
         "esp" | "esp32" | "اي_اس_بي" | "اي_اس_بي32" => Some(crate::arduino::STDLIB_ESP32),
         "stm32" | "اس_تي_ام" | "اس_تي_ام32" => Some(crate::arduino::STDLIB_STM32),
         "متحكمات" | "embedded" | "microcontrollers" => Some(crate::arduino::STDLIB_ARDUINO),
-        "ايقونات" | "تصميم" | "واجهه" | "هاتف" | "جوال" | "ويب" | "ui" | "mobile" | "web" | "icons" => {
+        "موقع" | "مواقع" | "موقع_ويب" | "ايقونات" | "تصميم" | "واجهه" | "هاتف" | "جوال" | "ويب" | "ui" | "mobile" | "web" | "icons" => {
             Some(crate::ui::STDLIB_UI_AND_MOBILE)
         }
         _ => None,

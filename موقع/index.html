@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بوابة لسان العربية</title>
+<style>
+:root { --bg: #130b29; --surface: #1f1244; --surface-2: #2d1b63; --text: #f5f3ff; --muted: #c4b5fd; --primary: #8b5cf6; --accent: #f59e0b; --border: #4c1d95; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', 'Cairo', Tahoma, system-ui, sans-serif; }
+body { background: var(--bg); color: var(--text); line-height: 1.6; transition: background 0.3s, color 0.3s; }
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 32px; }
+
+/* شريط التنقل العلوي */
+.web-nav { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px 24px; position: sticky; top: 16px; z-index: 100; backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+.web-brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 800; color: var(--text); }
+.web-links { display: flex; align-items: center; gap: 20px; }
+.web-links a { color: var(--muted); text-decoration: none; font-size: 15px; font-weight: 600; transition: color 0.2s; }
+.web-links a:hover { color: var(--primary); }
+.theme-toggle-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+.theme-toggle-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+/* القسم الترحيبي الرئيسي */
+.web-hero { background: linear-gradient(135deg, var(--surface), var(--surface-2)); border: 1px solid var(--border); border-radius: 24px; padding: 56px 32px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); position: relative; overflow: hidden; }
+.web-hero h1 { font-size: 38px; font-weight: 900; }
+.web-hero p { color: var(--muted); max-width: 680px; font-size: 18px; line-height: 1.7; }
+
+/* البطاقات والشبكة */
+.web-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.lsn-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 22px; display: flex; align-items: flex-start; gap: 16px; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
+.lsn-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); border-color: var(--primary); }
+.lsn-card-icon { width: 50px; height: 50px; border-radius: 14px; background: var(--surface-2); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.lsn-card-body h3 { font-size: 17px; margin-bottom: 6px; color: var(--text); font-weight: 700; }
+.lsn-card-body p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+/* الأزرار الفصيحة */
+.lsn-btn { padding: 13px 26px; border: none; border-radius: 14px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 10px; transition: transform 0.15s, opacity 0.2s; box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+.lsn-btn:hover { opacity: 0.95; transform: scale(1.02); }
+.lsn-btn:active { transform: scale(0.98); }
+.full-btn { width: 100%; }
+
+/* الإحصائيات */
+.web-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+.lsn-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; text-align: center; }
+.lsn-stat-top { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; font-weight: 600; }
+.lsn-stat-val { font-size: 28px; font-weight: 900; color: var(--primary); }
+
+/* الأقسام العامة */
+.web-section { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; display: flex; flex-direction: column; gap: 14px; }
+.web-section h2 { font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+.web-section p { color: var(--muted); font-size: 16px; }
+
+/* نموذج التواصل التفاعلي */
+.web-form-box { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 36px 32px; display: flex; flex-direction: column; gap: 20px; max-width: 650px; margin: 0 auto; width: 100%; box-shadow: 0 6px 24px rgba(0,0,0,0.06); }
+.web-form-box h2 { font-size: 26px; font-weight: 800; text-align: center; }
+.web-form-box p { color: var(--muted); text-align: center; font-size: 15px; }
+.web-form-box form { display: flex; flex-direction: column; gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; text-align: right; }
+.form-group label { font-size: 13px; font-weight: 700; color: var(--muted); }
+.lsn-input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 14px; outline: none; transition: border-color 0.2s; }
+.lsn-input:focus { border-color: var(--primary); }
+
+/* التذييل */
+.web-footer { text-align: center; padding: 28px 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.footer-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--primary); font-weight: 700; }
+
+/* إشعار عائم */
+.lsn-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--primary); color: #fff; padding: 12px 24px; border-radius: 14px; font-size: 14px; font-weight: 700; box-shadow: 0 8px 30px rgba(0,0,0,0.3); display: none; z-index: 1000; transition: opacity 0.3s; }
+</style>
+</head>
+<body>
+<div class="container">
+<header class="web-nav"><div class="web-brand"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span>بوابة لسان العربية</span></div><nav class="web-links"><a href="#hero">الرئيسية</a><a href="#features">الميزات</a><a href="#stats">إحصائيات</a><a href="#contact">تواصل</a></nav><button class="theme-toggle-btn" onclick="toggleTheme()"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> <span>النسق</span></button></header>
+<section id="hero" class="web-hero"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg><h1>أهلاً بكم في بوابة لسان</h1><p>أول موقع ويب متكامل يتم بناؤه وتوليده وتنسيقه بالكامل بلغة البرمجة العربية الفصيحة لسان 1.0.0</p><button class="lsn-btn" onclick="if(window.showToast)showToast('مرحباً بكم في أهلاً بكم في بوابة لسان')"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>ابدأ الاستكشاف</span></button></section>
+<section id="stats" class="web-stats"><div class="lsn-stat"><div class="lsn-stat-top"><span>السرعة والكفاءة</span><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div><div class="lsn-stat-val">100%</div></div><div class="lsn-stat"><div class="lsn-stat-top"><span>الأمان الرقمي</span><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="lsn-stat-val">0 تبعيات</div></div><div class="lsn-stat"><div class="lsn-stat-top"><span>دعم المتحكمات</span><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div><div class="lsn-stat-val">Arduino / ESP32 / STM32</div></div><div class="lsn-stat"><div class="lsn-stat-top"><span>الواجهات والتطبيقات</span><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div><div class="lsn-stat-val">Web & PWA</div></div></section>
+<section id="features" class="web-grid"><div class="lsn-card"><div class="lsn-card-icon"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div><div class="lsn-card-body"><h3>محرك عالي الأداء</h3><p>تجمع لسان بين سهولة بايثون وقوة لغة Rust مع إمكانية الترجمة إلى كود آلة أصلي عبر Clang و LLVM.</p></div></div><div class="lsn-card"><div class="lsn-card-icon"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div><div class="lsn-card-body"><h3>تصميم متجاوب بالكامل</h3><p>صفحات ويب حديثة وتطبيقات هواتف ذكية متناسقة تلقائياً بدون أي ملفات خارجية.</p></div></div><div class="lsn-card"><div class="lsn-card-icon"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div><div class="lsn-card-body"><h3>إنترنت الأشياء والمتحكمات</h3><p>مكتبات برمجية كاملة لدعم Arduino AVR و ESP32 و STM32 مع محاكاة فورية وترجمة إلى C++.</p></div></div><div class="lsn-card"><div class="lsn-card-icon"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="lsn-card-body"><h3>حماية وأمان كامل</h3><p>تشفير قياسي وتوليد ذاتي للأيقونات والأنماط بدون الحاجة لتحميل أي حزم من الإنترنت.</p></div></div></section>
+<section class="web-section"><h2><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> عن لغة لسان</h2><p>لغة لسان هي لغة برمجة عربية فصيحة عصرية صُممت لتكون أداة شاملة للتعليم والتطوير وهندسة النظم وإنترنت الأشياء والويب والذكاء الاصطناعي، بهوية عربية أصيلة وأداء هندسي عالمي.</p></section>
+<section id="contact" class="web-form-box"><h2>تواصل مع فريق لسان</h2><p>يسعدنا استقبال آرائكم واقتراحاتكم لتطوير منظومة لسان ومكتباتها القياسية</p><form onsubmit="handleContact(event)"><div class="form-group"><label>الاسم الكريم</label><input type="text" required placeholder="اكتب اسمك هنا..." class="lsn-input"></div><div class="form-group"><label>البريد الإلكتروني</label><input type="email" required placeholder="name@example.com" class="lsn-input"></div><div class="form-group"><label>الرسالة</label><textarea required rows="4" placeholder="اكتب استفسارك هنا..." class="lsn-input"></textarea></div><button type="submit" class="lsn-btn full-btn"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> <span>إرسال الرسالة</span></button></form></section>
+<footer class="web-footer"><p>جميع الحقوق محفوظة © 2026 — صُنع بكل فخر بواسطة لغة لسان العربية الفصيحة</p><div class="footer-badge"><svg class="lsn-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span>صُنع بلغة البرمجة العربية لسان</span></div></footer>
+</div>
+<div class="lsn-toast" id="toastMsg"></div>
+<script>
+function showToast(msg) {
+  const t = document.getElementById('toastMsg');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.display = 'block';
+  t.style.opacity = '1';
+  setTimeout(() => {
+    t.style.opacity = '0';
+    setTimeout(() => { t.style.display = 'none'; }, 300);
+  }, 2500);
+}
+function toggleTheme() {
+  const root = document.documentElement;
+  const currentBg = getComputedStyle(root).getPropertyValue('--bg').trim();
+  if (currentBg === '#f8fafc' || currentBg.includes('248')) {
+    root.style.setProperty('--bg', '#0f172a');
+    root.style.setProperty('--surface', '#1e293b');
+    root.style.setProperty('--surface-2', '#334155');
+    root.style.setProperty('--text', '#f8fafc');
+    root.style.setProperty('--muted', '#94a3b8');
+    root.style.setProperty('--border', '#334155');
+    showToast('تم تفعيل الوضع الليلي 🌙');
+  } else {
+    root.style.setProperty('--bg', '#f8fafc');
+    root.style.setProperty('--surface', '#ffffff');
+    root.style.setProperty('--surface-2', '#f1f5f9');
+    root.style.setProperty('--text', '#0f172a');
+    root.style.setProperty('--muted', '#64748b');
+    root.style.setProperty('--border', '#e2e8f0');
+    showToast('تم تفعيل الوضع النهاري ☀️');
+  }
+}
+function handleContact(e) {
+  e.preventDefault();
+  showToast('شكراً لتواصلك! تم استلام رسالتك بنجاح ✅');
+  e.target.reset();
+}
+</script>
+</body>
+</html>

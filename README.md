@@ -169,6 +169,12 @@
   * `الآن()`: الوقت الحالي بالثواني منذ 1970.
   * `عدد_صحيح(قيمة)`: اقتطاع القيمة إلى عدد صحيح.
 
+## خارطة الطريق ومعيار الاكتمال
+
+- خارطة الطريق المرحلية: [docs/ROADMAP.md](docs/ROADMAP.md)
+- خط الأساس ومعيار القبول: [docs/COMPLETION-BASELINE.md](docs/COMPLETION-BASELINE.md)
+- فروقات مسارات التنفيذ (Interpreter/VM/Native/Build): [docs/EXECUTION-PATHS.md](docs/EXECUTION-PATHS.md)
+
 ```bash
 cargo test --all-targets
 cargo run -- --interpret examples/errors_and_match.lsn

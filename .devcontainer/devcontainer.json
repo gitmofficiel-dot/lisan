@@ -1,0 +1,57 @@
+{
+  "name": "Lisan Arabic Programming Language (لغة لسان)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "usernamehw.errorlens",
+        "eamodio.gitlens",
+        "ms-vscode.live-server",
+        "ms-vscode.cpptools"
+      ],
+      "settings": {
+        "rust-analyzer.check.command": "clippy",
+        "files.associations": {
+          "*.lsn": "lisan"
+        },
+        "editor.formatOnSave": true,
+        "[lisan]": {
+          "editor.formatOnSave": true,
+          "editor.tabSize": 4,
+          "editor.insertSpaces": true
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "forwardPorts": [8080, 3000],
+  "portsAttributes": {
+    "8080": {
+      "label": "Lisan Web Server / Playground (خادم لسان)",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Web Preview (معاينة الويب)",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postAttachCommand": "bash .devcontainer/welcome.sh",
+  "remoteUser": "vscode"
+}

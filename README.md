@@ -2,6 +2,8 @@
 
 <div dir="rtl">
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/gitmofficiel-dot/lisan)
+
 **لسان (Lisan)** هي لغة برمجة عربية عصرية عالية الأداء تجمع بين سهولة وخفة لغة **بايثون**، وقوة وأمان لغة **Rust**، وسرعة البرامج المترجمة عبر **LLVM/Clang**.
 
 ---
@@ -387,7 +389,22 @@ cargo run -- --emit-llvm examples/native.lsn --output native.ll
 - استيراد ملفات `.lsn`، مع كشف الدورات والملفات المكررة.
 - CLI: بناء ملف تنفيذي مستقل (`--build`)، تفسير الملفات، REPL، `--check`، `--tokens`، `--ast`.
 - اختبارات Rust وتغليف المفسّر لنظام Windows وLinux وmacOS عبر GitHub Actions.
-- دعم أولي للمحرّر Visual Studio Code داخل `editors/vscode/` (تمييز نحوي ومقاطع جاهزة فقط، دون LSP).
+- دعم رسمي متكامل لمحرّر Visual Studio Code وخادم LSP للتلوين النحوي والتكميل التلقائي والتنسيق.
+- بيئة تطوير سحابية جاهزة بنقرة واحدة عبر **GitHub Codespaces**.
+
+## التطوير السحابي الفوري عبر GitHub Codespaces
+
+يمكنك البدء في تطوير وتشغيل لغة لسان فوراً دون الحاجة لتثبيت أي برمجيات أو أدوات على جهازك:
+
+[![فتح في GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/gitmofficiel-dot/lisan)
+
+عند النقر على الرابط أعلاه، تُهيئ GitHub حاوية سحابية مخصصة تحتوي على:
+1. بيئة Rust كاملة وأداة Cargo وأحدث إصدار مستقر من Rust.
+2. بناء مسبق لمترجم ومفسر `lisan` وتثبيته مباشرة في المسار العام للنظام ليتاح في الطرفية فوراً.
+3. ملحق لسان الرسمي لمحرر VS Code مع التلوين النحوي العربي، وقوالب الشيفرة، وخادم LSP.
+4. حزم المتحكمات الدقيقة السحابية: `arduino-cli`، ومترجمات ARM Cortex-M (`gcc-arm-none-eabi`) لمتحكمات STM32، وأدوات ESP32 (`esptool`).
+5. دعم كامل لترجمة الويب WebAssembly عبر الهدف `wasm32-unknown-unknown`.
+6. منافذ مجهزة مسبقاً لعرض خادم الويب والموقع المولد (المنفذ `8080` والمنفذ `3000`).
 
 ## مثال
 

@@ -83,6 +83,10 @@ fn test_foreach_unpacking() {
 
 #[test]
 fn test_context_manager_with() {
+    let temp_path = std::env::temp_dir()
+        .join("lisan_parity_test.txt")
+        .to_string_lossy()
+        .replace('\\', "/");
     let code = r#"
     صنف مورد {
         دالة بناء(اسم) {
@@ -117,7 +121,7 @@ fn test_context_manager_with() {
         دع نص_الملف = م.اقرأ()
         تحقق_يساوي(نص_الملف, "مرحبا يا لسان")
     }
-    "#;
+    "#.replace("/tmp/lisan_parity_test.txt", &temp_path);
     if let Err(e) = run(code) {
         panic!("Context manager test failed: {}", e);
     }

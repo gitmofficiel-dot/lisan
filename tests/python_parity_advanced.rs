@@ -122,7 +122,7 @@ fn test_context_manager_with() {
         تحقق_يساوي(نص_الملف, "مرحبا يا لسان")
     }
     "#.replace("/tmp/lisan_parity_test.txt", &temp_path);
-    if let Err(e) = run(code) {
+    if let Err(e) = run(&code) {
         panic!("Context manager test failed: {}", e);
     }
 }

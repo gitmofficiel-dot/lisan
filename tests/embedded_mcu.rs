@@ -139,3 +139,50 @@ fn test_stm32_industrial_automation_full_program() {
     assert!(transpiled.contains("#include <HalCan.h>"));
 }
 
+#[test]
+fn test_advanced_embedded_sensors_and_oled() {
+    let code = r#"
+استورد "اردوينو"
+
+دع شاشة = جديد شاشة_oled(60، 128، 64)
+اطبع(شاشة.ابدأ())
+اطبع(شاشة.اكتب_نص(10، 20، "لسان الذكية"))
+
+دع مرحل = جديد مرحل_كهربائي(7)
+اطبع(مرحل.شغّل())
+اطبع(مرحل.هل_يعمل())
+اطبع(مرحل.أوقف())
+
+دع حركة = جديد حساس_حركة_pir(2)
+حركة.ضبط_محاكاة(صحيح)
+اطبع(حركة.هل_يوجد_حركة())
+
+دع غاز = جديد حساس_غاز_mq(0)
+غاز.ضبط_محاكاة(550)
+اطبع(غاز.هل_يوجد_تسريب(400))
+
+دع موقع = جديد محدد_مواقع_gps(4، 3)
+اطبع(موقع.خط_العرض())
+اطبع(موقع.الأقمار())
+
+اطبع(إعادة_تشغيل())
+"#;
+    let output = run(code).expect("يجب تنفيذ محاكاة العتاد المتقدم بنجاح");
+    assert_eq!(output[0], "صحيح");
+    assert_eq!(output[1], "صحيح");
+    assert_eq!(output[2], "صحيح");
+    assert_eq!(output[3], "صحيح");
+    assert_eq!(output[4], "صحيح");
+    assert_eq!(output[5], "صحيح");
+    assert_eq!(output[6], "صحيح");
+    assert_eq!(output[7], "24.7136");
+    assert_eq!(output[8], "9");
+    assert_eq!(output[9], "صحيح");
+
+    let ino = transpile_arduino(code).expect("يجب ترجمة الكود إلى C++");
+    assert!(ino.contains("#include <Adafruit_SSD1306.h>"));
+    assert!(ino.contains("#include <TinyGPSPlus.h>"));
+    assert!(ino.contains("ESP.restart()"));
+}
+
+

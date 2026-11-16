@@ -109,3 +109,33 @@ fn test_transpiler_outputs_for_all_targets() {
     assert!(ino_stm.contains("LISAN_TARGET_STM32"));
     assert!(ino_stm.contains("#include <HardwareTimer.h>"));
 }
+
+#[test]
+fn test_esp32_iot_station_full_program() {
+    let source = std::fs::read_to_string("examples/esp32_iot_station.lsn")
+        .expect("يجب قراءة ملف examples/esp32_iot_station.lsn بنجاح");
+    let output = run(&source).expect("يجب تشغيل محطة ESP32 بنجاح");
+    assert!(output.iter().any(|line| line.contains("حالة الاتصال بالواي فاي: صحيح")));
+    assert!(output.iter().any(|line| line.contains("broker.hivemq.com") || line.contains("MQTT")));
+
+    let transpiled = transpile_esp32(&source).expect("يجب ترجمة كود ESP32 إلى C++ بنجاح");
+    assert!(transpiled.contains("LISAN_TARGET_ESP32"));
+    assert!(transpiled.contains("#include <WiFi.h>"));
+    assert!(transpiled.contains("#include <PubSubClient.h>"));
+}
+
+#[test]
+fn test_stm32_industrial_automation_full_program() {
+    let source = std::fs::read_to_string("examples/stm32_industrial_automation.lsn")
+        .expect("يجب قراءة ملف examples/stm32_industrial_automation.lsn بنجاح");
+    let output = run(&source).expect("يجب تشغيل نظام أتمتة STM32 بنجاح");
+    assert!(output.iter().any(|line| line.contains("20kHz")));
+    assert!(output.iter().any(|line| line.contains("500kbps")));
+
+    let transpiled = transpile_stm32(&source).expect("يجب ترجمة كود STM32 إلى C++ بنجاح");
+    assert!(transpiled.contains("LISAN_TARGET_STM32"));
+    assert!(transpiled.contains("#include <HardwareTimer.h>"));
+    assert!(transpiled.contains("#include <STM32RTC.h>"));
+    assert!(transpiled.contains("#include <HalCan.h>"));
+}
+

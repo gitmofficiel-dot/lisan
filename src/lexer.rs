@@ -199,52 +199,61 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
                 }
                 TokenKind::String(s)
             }
-            _ if c.is_numeric() && !c.is_ascii_digit() => {
-                return Err(format!("السطر {}، العمود {}: استخدم الأرقام اللاتينية 0-9 فقط", line, column));
+         _ if is_lisan_digit(c) => {
+            let mut num = String::new();
+            while i < chars.len() {
+                if let Some(d) = normalize_digit(chars[i]) {
+                    num.push(d);
+                    i += 1;
+                    column += 1;
+                } else {
+                    break;
+                }
             }
-            _ if c.is_ascii_digit() => {
-                let mut num = String::new();
-                while i < chars.len() && chars[i].is_ascii_digit() {
+            if chars.get(i).copied().map(is_decimal_sep).unwrap_or(false)
+                && chars.get(i + 1).copied().map(is_lisan_digit).unwrap_or(false)
+            {
+                num.push('.');
+                i += 1;
+                column += 1;
+                while i < chars.len() {
+                    if let Some(d) = normalize_digit(chars[i]) {
+                        num.push(d);
+                        i += 1;
+                        column += 1;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            if matches!(chars.get(i).copied(), Some('e' | 'E')) {
+                num.push(chars[i]);
+                i += 1;
+                column += 1;
+                if matches!(chars.get(i).copied(), Some('+' | '-')) {
                     num.push(chars[i]);
                     i += 1;
                     column += 1;
                 }
-                if chars.get(i) == Some(&'.')
-                    && chars.get(i + 1).copied().map(|x| x.is_ascii_digit()).unwrap_or(false)
-                {
-                    num.push('.');
-                    i += 1;
-                    column += 1;
-                    while i < chars.len() && chars[i].is_ascii_digit() {
-                        num.push(chars[i]);
+                if !chars.get(i).copied().map(is_lisan_digit).unwrap_or(false) {
+                    return Err(format!("Invalid scientific notation at line {} col {}", start_line, start_col));
+                }
+                while i < chars.len() {
+                    if let Some(d) = normalize_digit(chars[i]) {
+                        num.push(d);
                         i += 1;
                         column += 1;
+                    } else {
+                        break;
                     }
                 }
-                if matches!(chars.get(i).copied(), Some('e' | 'E')) {
-                    num.push(chars[i]);
-                    i += 1;
-                    column += 1;
-                    if matches!(chars.get(i).copied(), Some('+' | '-')) {
-                        num.push(chars[i]);
-                        i += 1;
-                        column += 1;
-                    }
-                    if !chars.get(i).copied().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                        return Err(format!("السطر {}، العمود {}: أس العدد العلمي غير مكتمل", start_line, start_col));
-                    }
-                    while i < chars.len() && chars[i].is_ascii_digit() {
-                        num.push(chars[i]);
-                        i += 1;
-                        column += 1;
-                    }
-                }
-                i -= 1;
-                column -= 1;
-                let parsed: f64 = num.parse().map_err(|_| format!("السطر {}: رقم غير صحيح", start_line))?;
-                if !parsed.is_finite() { return Err(format!("السطر {}: الرقم خارج النطاق المسموح", start_line)); }
-                TokenKind::Number(parsed)
             }
+            i -= 1;
+            column -= 1;
+            let parsed: f64 = num.parse().map_err(|_| format!("Invalid number at line {}", start_line))?;
+            if !parsed.is_finite() { return Err(format!("Number out of range at line {}", start_line)); }
+            TokenKind::Number(parsed)
+         }  
             _ if is_ident_start(c) => {
                 while i + 1 < chars.len() && is_ident_continue(chars[i + 1]) {
                     i += 1;
@@ -283,7 +292,37 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
                     "مع" => TokenKind::With,
                     "كـ" | "باسم" | "كاسم" | "as" => TokenKind::As,
                     "من" | "from" => TokenKind::From,
+                    _ => match normalize_arabic_keyword(&word).as_str() {
+                    "\u{0627}\u{0630}\u{0627}" => TokenKind::If,
+                    "\u{0627}\u{0644}\u{0627}" => TokenKind::Else,
+                    "\u{0648}\u{0627}\u{0644}\u{0627}" => TokenKind::Else,
+                    "\u{062F}\u{0627}\u{0644}\u{0647}" => TokenKind::Function,
+                    "\u{0627}\u{0631}\u{062C}\u{0639}" => TokenKind::Return,
+                    "\u{0627}\u{0633}\u{062A}\u{064A}\u{0631}\u{0627}\u{062F}" => TokenKind::Import,
+                    "\u{062E}\u{0637}\u{0627}" => TokenKind::False,
+                    "\u{0627}\u{0648}" => TokenKind::OrOr,
+                    "\u{0627}\u{0645}\u{0633}\u{0643}" => TokenKind::Catch,
+                    "\u{0627}\u{062E}\u{064A}\u{0631}\u{0627}" => TokenKind::Finally,
+                    "\u{0646}\u{0647}\u{0627}\u{0626}\u{064A}\u{0627}" => TokenKind::Finally,
+                    "\u{0627}\u{0631}\u{0645}" => TokenKind::Throw,
+                    "\u{0627}\u{0637}\u{0644}\u{0642}" => TokenKind::Throw,
+                    "\u{0627}\u{0641}\u{062A}\u{0631}\u{0627}\u{0636}\u{064A}" => TokenKind::Default,
+                    "\u{0641}\u{0626}\u{0647}" => TokenKind::Class,
+                    "\u{062D}\u{0627}\u{0644}\u{0647}" => TokenKind::Case,
+                    "\u{0627}\u{0637}\u{0628}\u{0639}" => TokenKind::Print,
+                    "\u{0645}\u{062A}\u{063A}\u{064A}\u{0631}" => TokenKind::Let,
+                    "\u{0644}\u{064A}\u{0643}\u{0646}" => TokenKind::Let,
+                    "\u{0635}\u{062D}\u{064A}\u{062D}" => TokenKind::True,
+                    "\u{0641}\u{0627}\u{0631}\u{063A}" => TokenKind::Null,
+                    "\u{0644}\u{064A}\u{0633}" => TokenKind::Bang,
+                    "\u{062C}\u{062F}\u{064A}\u{062F}" => TokenKind::New,
+                    "\u{0644}\u{0643}\u{0644}" => TokenKind::ForEach,
+                    "\u{0637}\u{0627}\u{0644}\u{0645}\u{0627}" => TokenKind::While,
+                    "\u{0628}\u{064A}\u{0646}\u{0645}\u{0627}" => TokenKind::While,
+                    "\u{062A}\u{0648}\u{0642}\u{0641}" => TokenKind::Break,
+                    "\u{0627}\u{0633}\u{062A}\u{0645}\u{0631}" => TokenKind::Continue,
                     _ => TokenKind::Identifier(word),
+                },
                 }
             }
             _ => return Err(format!("السطر {}، العمود {}: رمز غير معروف '{}'", line, column, c)),
@@ -297,4 +336,49 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
 }
 
 fn is_ident_start(c: char) -> bool { c.is_alphabetic() || c == '_' }
-fn is_ident_continue(c: char) -> bool { is_ident_start(c) || c.is_ascii_digit() }
+fn is_ident_continue(c: char) -> bool { is_ident_start(c) || is_lisan_digit(c) || matches!(c, '\u{064B}'..='\u{065F}' | '\u{0670}' | '\u{0640}') }
+fn is_lisan_digit(c: char) -> bool { normalize_digit(c).is_some() }
+fn is_decimal_sep(c: char) -> bool { matches!(c, '.' | '\u{066B}') }
+fn normalize_digit(c: char) -> Option<char> {
+    match c {
+        '0'..='9' => Some(c),
+        '\u{0660}'..='\u{0669}' => Some((b'0' + (c as u32 - 0x0660) as u8) as char),
+        '\u{06F0}'..='\u{06F9}' => Some((b'0' + (c as u32 - 0x06F0) as u8) as char),
+        _ => None,
+    }
+}
+fn normalize_arabic_keyword(word: &str) -> String {
+    let mut out = String::with_capacity(word.len());
+    for c in word.chars() {
+        match c {
+            '\u{064B}'..='\u{065F}' | '\u{0670}' | '\u{0640}' => {}
+            '\u{0622}' | '\u{0623}' | '\u{0625}' | '\u{0671}' => out.push('\u{0627}'),
+            '\u{0629}' => out.push('\u{0647}'),
+            '\u{0649}' => out.push('\u{064A}'),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_arabic_and_persian_numerals() {
+        let tokens = tokenize("\u{0661}\u{0662}\u{0663} \u{0663}\u{066B}\u{0661}\u{0664} \u{06F4}\u{06F5}").unwrap();
+        assert!(matches!(tokens[0].kind, TokenKind::Number(n) if (n - 123.0).abs() < f64::EPSILON));
+        assert!(matches!(tokens[1].kind, TokenKind::Number(n) if (n - 3.14).abs() < 1e-10));
+        assert!(matches!(tokens[2].kind, TokenKind::Number(n) if (n - 45.0).abs() < f64::EPSILON));
+    }
+
+    #[test]
+    fn test_normalized_arabic_keywords() {
+        let tokens = tokenize("\u{0625}\u{0630}\u{0627} \u{0627}\u{0630}\u{0627} \u{062F}\u{0627}\u{0644}\u{0629} \u{062F}\u{0627}\u{0644}\u{0647}").unwrap();
+        assert!(matches!(tokens[0].kind, TokenKind::If));
+        assert!(matches!(tokens[1].kind, TokenKind::If));
+        assert!(matches!(tokens[2].kind, TokenKind::Function));
+        assert!(matches!(tokens[3].kind, TokenKind::Function));
+    }
+}

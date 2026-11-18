@@ -1,0 +1,18 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Lisan Studio
+Name[ar]=استوديو لسان
+GenericName=Arabic Programming IDE
+GenericName[ar]=بيئة تطوير لغة البرمجة العربية لسان
+Comment=Write, run, and transpile Arabic Lisan programs for Desktop, Web, Mobile, Arduino, ESP32, STM32, and Raspberry Pi
+Comment[ar]=بيئة تطوير متكاملة لكتابة وتشغيل وترجمة برامج لغة لسان العربية لسطح المكتب والمتحكمات والراسبيري باي والويب
+Exec=lisan --studio
+TryExec=lisan
+Icon=lisan
+Terminal=false
+Categories=Development;IDE;Education;Electronics;
+MimeType=text/x-lisan;
+Keywords=Lisan;Arabic;Programming;IDE;Arduino;ESP32;STM32;RaspberryPi;لسان;برمجة;عربي;استوديو;
+StartupNotify=true
+StartupWMClass=LisanStudio

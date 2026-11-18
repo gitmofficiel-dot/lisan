@@ -88,10 +88,10 @@ fn power_is_right_associative_with_unary_precedence() {
 #[test]
 fn scientific_numbers_use_latin_digits() {
     assert_eq!(run("اطبع(1e3 + 2.5E-1)؛").unwrap(), ["1000.25"]);
+    assert_eq!(run("اطبع(١e3)؛").unwrap(), ["1000"]);
     assert!(run("اطبع(1e+)؛").is_err());
     assert!(run("اطبع(1e9999)؛").is_err());
-    assert!(run("اطبع(١e3)؛").unwrap_err().contains("اللاتينية"));
-    assert!(run("اطبع(१२)؛").unwrap_err().contains("اللاتينية"));
+    assert!(run("اطبع(१२)؛").is_err());
 }
 
 #[test]

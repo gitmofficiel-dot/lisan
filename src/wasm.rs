@@ -42,6 +42,66 @@ pub extern "C" fn lisan_arduino_wasm(ptr: *const c_char) -> *mut c_char {
     CString::new(output).unwrap_or_else(|_| CString::new("خطأ غير متوقع").unwrap()).into_raw()
 }
 
+/// تحويل شيفرة لسان إلى كود ESP32 C++ (.ino) داخل WebAssembly
+#[no_mangle]
+pub extern "C" fn lisan_esp32_wasm(ptr: *const c_char) -> *mut c_char {
+    if ptr.is_null() {
+        return CString::new("خطأ: مؤشر الإدخال فارغ").unwrap().into_raw();
+    }
+    let c_str = unsafe { CStr::from_ptr(ptr) };
+    let source = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return CString::new("خطأ: نص غير متوافق مع UTF-8").unwrap().into_raw(),
+    };
+
+    let output = match crate::arduino::transpile_esp32(source) {
+        Ok(ino) => ino,
+        Err(err) => format!("خطأ: {}", err),
+    };
+
+    CString::new(output).unwrap_or_else(|_| CString::new("خطأ غير متوقع").unwrap()).into_raw()
+}
+
+/// تحويل شيفرة لسان إلى كود STM32 C++ (.ino) داخل WebAssembly
+#[no_mangle]
+pub extern "C" fn lisan_stm32_wasm(ptr: *const c_char) -> *mut c_char {
+    if ptr.is_null() {
+        return CString::new("خطأ: مؤشر الإدخال فارغ").unwrap().into_raw();
+    }
+    let c_str = unsafe { CStr::from_ptr(ptr) };
+    let source = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return CString::new("خطأ: نص غير متوافق مع UTF-8").unwrap().into_raw(),
+    };
+
+    let output = match crate::arduino::transpile_stm32(source) {
+        Ok(ino) => ino,
+        Err(err) => format!("خطأ: {}", err),
+    };
+
+    CString::new(output).unwrap_or_else(|_| CString::new("خطأ غير متوقع").unwrap()).into_raw()
+}
+
+/// تحويل شيفرة لسان إلى كود راسبيري باي Python 3 (.py) داخل WebAssembly
+#[no_mangle]
+pub extern "C" fn lisan_raspberry_wasm(ptr: *const c_char) -> *mut c_char {
+    if ptr.is_null() {
+        return CString::new("خطأ: مؤشر الإدخال فارغ").unwrap().into_raw();
+    }
+    let c_str = unsafe { CStr::from_ptr(ptr) };
+    let source = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return CString::new("خطأ: نص غير متوافق مع UTF-8").unwrap().into_raw(),
+    };
+
+    let output = match crate::raspberry::transpile_raspberry_python(source) {
+        Ok(py) => py,
+        Err(err) => format!("خطأ: {}", err),
+    };
+
+    CString::new(output).unwrap_or_else(|_| CString::new("خطأ غير متوقع").unwrap()).into_raw()
+}
+
 /// تنسيق كود لسان داخل WebAssembly
 #[no_mangle]
 pub extern "C" fn lisan_fmt_wasm(ptr: *const c_char) -> *mut c_char {
@@ -73,6 +133,10 @@ pub extern "C" fn lisan_vm_eval_wasm(ptr: *const c_char) -> *mut c_char {
     let mut vm = crate::vm::VM::new();
     let output = match vm.run_source(source) {
         Ok(lines) => lines.join("\n"),
+        Err(e) if e.contains("غير مدعوم") => match crate::run(source) {
+            Ok(lines) => lines.join("\n"),
+            Err(err) => format!("خطأ: {}", err),
+        },
         Err(err) => format!("خطأ: {}", err),
     };
 

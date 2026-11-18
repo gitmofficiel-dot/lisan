@@ -4,6 +4,7 @@
   "description": "دعم التلوين النحوي وإعدادات المحرر للغة البرمجة العربية لسان (.lsn)",
   "version": "1.0.0",
   "publisher": "lisan-lang",
+  "icon": "icon.png",
   "main": "./extension.js",
   "activationEvents": [
     "onLanguage:lisan"

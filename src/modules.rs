@@ -13,9 +13,16 @@ pub fn resolve_builtin_module(name: &str) -> Option<&'static str> {
     let norm = crate::diagnostics::normalize_arabic(trimmed);
     match norm.as_str() {
         "اردوينو" | "arduino" => Some(crate::arduino::STDLIB_ARDUINO),
-        "esp" | "esp32" | "اي_اس_بي" | "اي_اس_بي32" => Some(crate::arduino::STDLIB_ESP32),
-        "stm32" | "اس_تي_ام" | "اس_تي_ام32" => Some(crate::arduino::STDLIB_STM32),
-        "متحكمات" | "embedded" | "microcontrollers" => Some(crate::arduino::STDLIB_ARDUINO),
+        "esp" | "esp32" | "esp8266" | "اي_اس_بي" | "اي_اس_بي32" => Some(crate::arduino::STDLIB_ESP32),
+        "stm" | "stm32" | "اس_تي_ام" | "اس_تي_ام32" => Some(crate::arduino::STDLIB_STM32),
+        "متحكمات" | "embedded" | "microcontrollers" => Some(crate::arduino::STDLIB_EMBEDDED),
+        "راسبيري" | "راسبيري_باي" | "راسپيري" | "raspberry" | "raspberry_pi" | "raspberrypi" | "rasspiry" | "rpi" => {
+            Some(crate::raspberry::STDLIB_RASPBERRY)
+        }
+        "قاعده_بيانات" | "قواعد_بيانات" | "تشفير" | "انماط" | "منصه" | "امان" | "مكتبه_قياسيه"
+        | "db" | "database" | "crypto" | "regex" | "platform" => {
+            Some(crate::stdlib_ext::STDLIB_EXT_LISAN)
+        }
         "موقع" | "مواقع" | "موقع_ويب" | "ايقونات" | "تصميم" | "واجهه" | "هاتف" | "جوال" | "ويب" | "ui" | "mobile" | "web" | "icons" => {
             Some(crate::ui::STDLIB_UI_AND_MOBILE)
         }

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const MAX_GENERATED_SOURCE: usize = 12_000_000;
+const MAX_GENERATED_SOURCE: usize = 24_000_000;
 const RUNTIME_SOURCES: &[(&str, &str)] = &[
     ("arduino.rs", include_str!("arduino.rs")),
     ("ast.rs", include_str!("ast.rs")),
@@ -16,7 +16,9 @@ const RUNTIME_SOURCES: &[(&str, &str)] = &[
     ("lexer.rs", include_str!("lexer.rs")),
     ("modules.rs", include_str!("modules.rs")),
     ("parser.rs", include_str!("parser.rs")),
+    ("raspberry.rs", include_str!("raspberry.rs")),
     ("runtime.rs", include_str!("runtime.rs")),
+    ("stdlib_ext.rs", include_str!("stdlib_ext.rs")),
     ("ui.rs", include_str!("ui.rs")),
     ("vm.rs", include_str!("vm.rs")),
 ];
@@ -143,7 +145,9 @@ mod json;
 mod lexer;
 mod modules;
 mod parser;
+mod raspberry;
 mod runtime;
+mod stdlib_ext;
 mod ui;
 mod vm;
 use ast::{{ClassDef, Expr, Function, Op, Stmt}};

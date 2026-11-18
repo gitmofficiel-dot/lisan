@@ -1970,7 +1970,7 @@ fn is_builtin(name: &str) -> bool {
         "عنصر_بطاقة" | "عنصر_زر" | "عنصر_إحصائية" | "عنصر_احصائية" |
         "عنصر_مفتاح" | "عنصر_تنبيه" | "عنصر_شارة" | "عنصر_حقل" | "عنصر_شريط_تقدم" |
         "بناء_تطبيق_هاتف" | "تصدير_تطبيق_هاتف" | "بناء_صفحة_ويب" |
-        "تصدير_صفحة_ويب" | "تصدير_موقع")
+        "تصدير_صفحة_ويب" | "تصدير_موقع") || crate::stdlib_ext::is_ext_builtin(name)
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -2887,6 +2887,9 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             eval_ui_builtin(name, args)
         }
         _ => {
+            if crate::stdlib_ext::is_ext_builtin(name) {
+                return crate::stdlib_ext::eval_ext_builtin(name, args);
+            }
             let empty: Vec<&str> = Vec::new();
             Err(crate::diagnostics::suggest_function_error(name, &empty))
         }

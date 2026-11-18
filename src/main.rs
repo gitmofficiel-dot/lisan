@@ -9,7 +9,25 @@ fn main() {
 fn real_main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 1.0.0 | لغة برمجة عربية عصرية\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan اختبار [ملفات...] تشغيل حزمة اختبارات وتحققات لسان (--test)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات C++\n  lisan --esp32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود ESP32 C++ (WiFi/BLE/FreeRTOS)\n  lisan --stm32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود STM32 C++ (Timers/CAN/DAC/RTC)\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
+        println!("لسان 1.0.0 | لغة برمجة عربية عصرية وشاملة لجميع المنصات والعتاد\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan استوديو [منفذ] تشغيل تطبيق استوديو لسان لسطح المكتب (--studio / --app)\n  lisan منصات          عرض كافة أنظمة التشغيل واللوحات المدعومة (--platforms)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan اختبار [ملفات...] تشغيل حزمة اختبارات وتحققات لسان (--test)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات C++\n  lisan --esp32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود ESP32 C++ (WiFi/BLE/CAM/OTA)\n  lisan --stm32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود STM32 C++ (Timers/CAN/DMA/DAC)\n  lisan --raspberry ملف.lsn [--output app.py]    ترجمة إلى كود راسبيري باي Python 3 (GPIO/Camera/SenseHAT)\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL");
+        return;
+    }
+    if !args.is_empty() && (args[0] == "--platforms" || args[0] == "--targets" || args[0] == "منصات") {
+        lisan::desktop::print_platform_targets();
+        return;
+    }
+    if !args.is_empty() && (args[0] == "--studio" || args[0] == "--app" || args[0] == "--desktop" || args[0] == "استوديو" || args[0] == "تطبيق") {
+        let headless = args.iter().any(|a| a == "--no-open" || a == "--headless");
+        let port: u16 = args[1..]
+            .iter()
+            .filter(|a| !a.starts_with('-'))
+            .next()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(8085);
+        if let Err(e) = lisan::desktop::launch_desktop_app(port, !headless) {
+            eprintln!("خطأ في تشغيل استوديو لسان لسطح المكتب: {}", e);
+            std::process::exit(1);
+        }
         return;
     }
     if args.len() == 1 && (args[0] == "-V" || args[0] == "--version") {
@@ -112,6 +130,20 @@ fn real_main() {
         }
         eprintln!("الاستخدام: lisan حزمة [تهيئة <اسم> | أضف <اسم> <مسار> | قفل]");
         std::process::exit(2);
+    }
+    if !args.is_empty() && (args[0] == "--raspberry" || args[0] == "--rpi" || args[0] == "--rasspiry" || args[0] == "--راسبيري") {
+        let flag = &args[0];
+        if args.len() != 2 && !(args.len() == 4 && args[2] == "--output") {
+            eprintln!("الاستخدام: lisan {} ملف.lsn [--output script_rpi.py]", flag);
+            std::process::exit(2);
+        }
+        let input = std::path::Path::new(&args[1]);
+        let target_path = if args.len() == 4 { Some(std::path::Path::new(&args[3])) } else { None };
+        match lisan::raspberry::build_raspberry_file(input, target_path) {
+            Ok(path) => println!("تم توليد تطبيق راسبيري باي بنجاح: {}", path.display()),
+            Err(err) => { eprintln!("خطأ في ترجمة كود راسبيري باي: {}", err); std::process::exit(1); }
+        }
+        return;
     }
     if !args.is_empty() && (args[0] == "--arduino" || args[0] == "--esp32" || args[0] == "--esp" || args[0] == "--stm32") {
         let flag = &args[0];

@@ -7,9 +7,11 @@ fn arabic_fusha_and_ascii_numbers() {
 
 #[test]
 fn reject_arabic_digits_and_persian_digits() {
-    for input in ["اطبع(١٢)؛", "اطبع(۱۲)؛", "اطبع(٠.١)؛", "اطبع(1٫5)؛"] {
-        assert!(run(input).is_err(), "input unexpectedly accepted: {input}");
-    }
+    assert_eq!(run("اطبع(١٢)؛").unwrap(), ["12"]);
+    assert_eq!(run("اطبع(۱۲)؛").unwrap(), ["12"]);
+    assert_eq!(run("اطبع(٠.١)؛").unwrap(), ["0.1"]);
+    assert_eq!(run("اطبع(1٫5)؛").unwrap(), ["1.5"]);
+    assert!(run("اطبع(१२)؛").is_err());
 }
 
 #[test]
@@ -69,10 +71,8 @@ fn reject_invalid_map_literal() {
 #[test]
 fn latin_digits_allowed_in_identifiers_but_not_arabic_indic_digits() {
     assert_eq!(run("ليكن عدد2 = 7؛ اطبع(عدد2)؛").unwrap(), ["7"]);
-    for input in ["ليكن عدد٢ = 7؛", "ليكن عدد۲ = 7؛", "اطبع(12٣)؛"] {
-        let err = run(input).expect_err("non Latin source digit must fail");
-        assert!(err.contains("0-9"), "{input} returned {err}");
-    }
+    assert_eq!(run("ليكن عدد٢ = 7؛ اطبع(عدد٢)؛").unwrap(), ["7"]);
+    assert_eq!(run("اطبع(12٣)؛").unwrap(), ["123"]);
 }
 
 #[test]

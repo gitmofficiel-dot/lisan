@@ -1,4 +1,4 @@
-name: Release Lisan Binaries
+name: Release Lisan Desktop & Cross-Platform Packages
 
 on:
   push:
@@ -10,81 +10,139 @@ permissions:
   contents: write
 
 jobs:
-  build-release:
-    name: Build (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            binary_name: lisan
-            asset_name: lisan-linux-x86_64.tar.gz
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            binary_name: lisan.exe
-            asset_name: lisan-windows-x86_64.zip
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            binary_name: lisan
-            asset_name: lisan-macos-arm64.tar.gz
-          - os: macos-13
-            target: x86_64-apple-darwin
-            binary_name: lisan
-            asset_name: lisan-macos-x86_64.tar.gz
-
+  build-linux-x86_64:
+    name: Build Linux x86_64 (.tar.gz + .deb)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: x86_64-unknown-linux-gnu
 
-      - name: Build Release Binary
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build and Package Linux x86_64 & Debian (.deb)
+        run: bash scripts/package-linux.sh x86_64-unknown-linux-gnu
 
-      - name: Package Archive (Unix)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar -czf ../../../${{ matrix.asset_name }} ${{ matrix.binary_name }}
-          cd ../../..
-          shasum -a 256 ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
-
-      - name: Package Archive (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cd target/${{ matrix.target }}/release
-          Compress-Archive -Path ${{ matrix.binary_name }} -DestinationPath ../../../${{ matrix.asset_name }}
-          cd ../../..
-          $hash = (Get-FileHash -Algorithm SHA256 ${{ matrix.asset_name }}).Hash.ToLower()
-          "$hash  ${{ matrix.asset_name }}" | Out-File -Encoding ascii "${{ matrix.asset_name }}.sha256"
-
-      - name: Upload Artifact
+      - name: Upload Linux x86_64 Release Packages
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
+          name: release-linux-x86_64
           path: |
-            ${{ matrix.asset_name }}
-            ${{ matrix.asset_name }}.sha256
+            dist/lisan-linux-x86_64.tar.gz
+            dist/lisan-linux-x86_64.tar.gz.sha256
+            dist/lisan_1.0.0_amd64.deb
+            dist/lisan_1.0.0_amd64.deb.sha256
+
+  build-linux-arm64-raspberrypi:
+    name: Build Linux ARM64 / Raspberry Pi 4 & 5 (.tar.gz + .deb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ARM64 Cross-Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu dpkg-dev
+
+      - name: Install Rust ARM64 Target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Build and Package Linux ARM64 / Raspberry Pi
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: bash scripts/package-linux.sh aarch64-unknown-linux-gnu
+
+      - name: Upload Raspberry Pi / ARM64 Release Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-arm64-raspberrypi
+          path: |
+            dist/lisan-linux-arm64-raspberrypi.tar.gz
+            dist/lisan-linux-arm64-raspberrypi.tar.gz.sha256
+            dist/lisan_1.0.0_arm64.deb
+            dist/lisan_1.0.0_arm64.deb.sha256
+
+  build-windows-x86_64:
+    name: Build Windows x86_64 (.zip + Lisan Studio)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build and Package Windows x86_64
+        shell: pwsh
+        run: ./scripts/package-windows.ps1 -Target x86_64-pc-windows-msvc
+
+      - name: Upload Windows x86_64 Release Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x86_64
+          path: |
+            dist/lisan-windows-x86_64.zip
+            dist/lisan-windows-x86_64.zip.sha256
+
+  build-macos-universal:
+    name: Build macOS (Apple Silicon M1-M4 + Intel + Universal .app)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Apple Silicon & Intel Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Build and Package macOS arm64, x86_64, and Universal App Bundle
+        shell: bash
+        run: |
+          bash scripts/package-macos.sh aarch64-apple-darwin
+          bash scripts/package-macos.sh x86_64-apple-darwin
+          SKIP_BUILD=1 bash scripts/package-macos.sh universal
+          rm -rf "dist/Lisan Studio.app"
+
+      - name: Upload macOS Release Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: |
+            dist/lisan-macos-arm64.tar.gz
+            dist/lisan-macos-arm64.tar.gz.sha256
+            dist/lisan-macos-x86_64.tar.gz
+            dist/lisan-macos-x86_64.tar.gz.sha256
+            dist/lisan-macos-universal.tar.gz
+            dist/lisan-macos-universal.tar.gz.sha256
+            dist/Lisan-Studio-macOS-arm64.zip
+            dist/Lisan-Studio-macOS-arm64.zip.sha256
+            dist/Lisan-Studio-macOS-universal.zip
+            dist/Lisan-Studio-macOS-universal.zip.sha256
 
   publish-github-release:
     name: Publish GitHub Release
-    needs: build-release
+    needs:
+      - build-linux-x86_64
+      - build-linux-arm64-raspberrypi
+      - build-windows-x86_64
+      - build-macos-universal
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all built assets
+      - name: Download all built platform assets
         uses: actions/download-artifact@v4
         with:
           path: release-assets
           merge-multiple: true
+
+      - name: List release assets
+        run: ls -lh release-assets/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

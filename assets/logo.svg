@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="شعار لغة البرمجة العربية لسان - Lisan Logo">
+  <defs>
+    <!-- خلفية منتصف الليل الداكنة -->
+    <linearGradient id="bgSquircle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#131f38"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#080d1a"/>
+    </linearGradient>
+
+    <!-- إطار متوهج خفيف -->
+    <linearGradient id="borderGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.55"/>
+      <stop offset="50%" stop-color="#334155" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.55"/>
+    </linearGradient>
+
+    <!-- تدرج الزمرد للأقواس البرمجية -->
+    <linearGradient id="emeraldBracket" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="55%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+
+    <!-- تدرج حرف اللام الهندسي -->
+    <linearGradient id="lamGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="38%" stop-color="#6ee7b7"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+
+    <!-- تدرج الذهب الملكي للنقطة المعينية وعقد الدارات -->
+    <linearGradient id="royalGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="45%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+
+    <!-- إضاءة محيطية خلفية -->
+    <radialGradient id="ambientEmerald" cx="50%" cy="48%" r="44%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.18"/>
+      <stop offset="65%" stop-color="#10b981" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="ambientGold" cx="46%" cy="42%" r="26%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- مرشح توهج ناعم -->
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- الخلفية المربعة الدائرية (Squircle) -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bgSquircle)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#ambientEmerald)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#ambientGold)"/>
+  <rect x="18" y="18" width="476" height="476" rx="110" fill="none" stroke="url(#borderGlow)" stroke-width="3"/>
+
+  <!-- شبكة هندسية دقيقة للشريحة الإلكترونية في الخلفية -->
+  <g stroke="#1e293b" stroke-width="1.5" opacity="0.55">
+    <line x1="76" y1="256" x2="436" y2="256" stroke-dasharray="4 8"/>
+    <line x1="256" y1="64" x2="256" y2="448" stroke-dasharray="4 8"/>
+    <rect x="64" y="64" width="384" height="384" rx="76" fill="none"/>
+  </g>
+
+  <!-- مسارات وعقد الشريحة الدقيقة (Microchip Circuit Nodes) -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- المسارات الزمردية العلوية والسفلية -->
+    <path d="M 96 92 L 126 122 L 164 122" stroke="#10b981" stroke-width="3.5" opacity="0.65"/>
+    <path d="M 416 420 L 386 390 L 348 390" stroke="#10b981" stroke-width="3.5" opacity="0.65"/>
+    <!-- المسارات الذهبية العلوية والسفلية -->
+    <path d="M 416 92 L 386 122 L 348 122" stroke="#f59e0b" stroke-width="3.5" opacity="0.65"/>
+    <path d="M 96 420 L 126 390 L 164 390" stroke="#f59e0b" stroke-width="3.5" opacity="0.65"/>
+
+    <!-- دبابيس الشريحة الدقيقة أعلى وأسفل الإطار -->
+    <g stroke="#334155" stroke-width="4">
+      <line x1="216" y1="52" x2="216" y2="68"/>
+      <line x1="256" y1="46" x2="256" y2="68" stroke="#10b981" opacity="0.7"/>
+      <line x1="296" y1="52" x2="296" y2="68"/>
+      <line x1="216" y1="444" x2="216" y2="460"/>
+      <line x1="256" y1="444" x2="256" y2="466" stroke="#f59e0b" opacity="0.7"/>
+      <line x1="296" y1="444" x2="296" y2="460"/>
+    </g>
+  </g>
+
+  <!-- نقاط اللحام الإلكترونية (Circuit Pads) -->
+  <g>
+    <circle cx="96" cy="92" r="7" fill="#0f172a" stroke="#10b981" stroke-width="3.5"/>
+    <circle cx="164" cy="122" r="4" fill="#10b981"/>
+
+    <circle cx="416" cy="92" r="7" fill="#0f172a" stroke="#f59e0b" stroke-width="3.5"/>
+    <circle cx="348" cy="122" r="4" fill="#f59e0b"/>
+
+    <circle cx="96" cy="420" r="7" fill="#0f172a" stroke="#f59e0b" stroke-width="3.5"/>
+    <circle cx="164" cy="390" r="4" fill="#f59e0b"/>
+
+    <circle cx="416" cy="420" r="7" fill="#0f172a" stroke="#10b981" stroke-width="3.5"/>
+    <circle cx="348" cy="390" r="4" fill="#10b981"/>
+  </g>
+
+  <!-- الأقواس البرمجية المعقوفة { } -->
+  <g fill="none" stroke="url(#emeraldBracket)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)">
+    <!-- القوس الأيسر { -->
+    <path d="M 152 140 C 120 140, 110 156, 110 186 L 110 224 C 110 244, 96 256, 74 256 C 96 256, 110 268, 110 288 L 110 326 C 110 356, 120 372, 152 372"/>
+    <!-- القوس الأيمن } -->
+    <path d="M 360 140 C 392 140, 402 156, 402 186 L 402 224 C 402 244, 416 256, 438 256 C 416 256, 402 268, 402 288 L 402 326 C 402 356, 392 372, 360 372"/>
+  </g>
+
+  <!-- حرف اللام العربي الهندسي الفصيح "ل" -->
+  <path d="
+    M 322 118
+    L 322 284
+    C 322 344, 286 378, 238 378
+    C 194 378, 174 348, 174 304
+    L 206 288
+    C 206 324, 216 344, 240 344
+    C 270 344, 288 322, 288 282
+    L 288 144
+    Z
+  " fill="url(#lamGrad)" filter="url(#softGlow)"/>
+
+  <!-- مسار دارة دقيقة داخل ساق حرف اللام مع عقدة ذهبية -->
+  <path d="M 305 158 L 305 268" stroke="#0f172a" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+  <circle cx="305" cy="274" r="4.5" fill="#f59e0b"/>
+
+  <!-- النقطة الخطية المعينية الذهبية (Calligraphic Diamond Nuqta) -->
+  <g filter="url(#softGlow)">
+    <polygon points="236,196 264,224 236,252 208,224" fill="url(#royalGold)"/>
+    <polygon points="236,207 253,224 236,241 219,224" fill="none" stroke="#fef3c7" stroke-width="1.5" opacity="0.7"/>
+    <circle cx="236" cy="224" r="4.5" fill="#0f172a"/>
+  </g>
+</svg>

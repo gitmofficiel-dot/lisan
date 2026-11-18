@@ -11,6 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Validate cross-platform installer and packaging scripts (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          sh -n install.sh
+          bash -n scripts/package-linux.sh
+          bash -n scripts/package-macos.sh
+          bash -n scripts/build-all.sh
+          test -f desktop/lisan.desktop
+          test -f desktop/Info.plist
+          test -f install.ps1
       - name: Run unit and integration tests
         run: cargo test --all-targets
       - name: Compile and execute real native Lisan binary (Linux)
@@ -50,7 +61,7 @@ jobs:
         with:
           name: lisan-genuine-native-Linux
           path: native-sample
-      - name: Compile optimized interpreter
+      - name: Compile optimized interpreter and Desktop Studio
         run: cargo build --release
       - name: Run Arabic samples
         run: |

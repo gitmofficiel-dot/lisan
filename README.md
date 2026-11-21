@@ -2,7 +2,38 @@
 
 **لسان 1.0.0 — لغة البرمجة العربية الشاملة والمنظومة العتادية والسحابية**
 
-[[https://github.com/codespaces/badge.svg]](https://codespaces.new/gitmofficiel-dot/lisan)
+[![CI](https://github.com/gitmofficiel-dot/lisan/actions/workflows/rust.yml/badge.svg)](https://github.com/gitmofficiel-dot/lisan/actions/workflows/rust.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/gitmofficiel-dot/lisan)](https://github.com/gitmofficiel-dot/lisan/releases/latest)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/gitmofficiel-dot/lisan)
+
+## English summary
+
+**Lisan (لسان)** is an Arabic programming language written in Rust. You write code with Arabic keywords, Arabic identifiers and right-to-left text. It accepts Western (`0-9`), Arabic-Indic (`٠-٩`) and Persian (`۰-۹`) digits. Programs run on a built-in interpreter or a VM, and can be compiled natively through LLVM/Clang. It targets Linux, macOS and Windows.
+
+**Quick start**
+
+```sh
+# Linux / macOS / Raspberry Pi
+curl -sSf https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.ps1 | iex
+```
+
+Or build from source (needs a Rust toolchain):
+
+```sh
+git clone https://github.com/gitmofficiel-dot/lisan.git
+cd lisan
+cargo run -- examples/hello.lsn
+```
+
+Prebuilt packages are on the [Releases page](https://github.com/gitmofficiel-dot/lisan/releases/latest). Docs are in [`docs/`](docs/), starting with [SYNTAX](docs/SYNTAX.md). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
 
 **لسان (Lisan)** هي لغة برمجة عربية فصيحة وعصرية عالية الأداء تجمع بين سهولة وخفة بايثون، وقوة وأمان لغة **Rust**، وسرعة البرامج المترجمة عبر **LLVM/Clang**، مع دعم أصيل لأنظمة **Linux** و**Windows** و**macOS**، واللوحات المدمجة **Arduino** و**ESP32** و**STM32** و**Raspberry Pi**.
 
@@ -13,11 +44,11 @@
 ### التثبيت الفوري بأمر واحد
 * **Linux وmacOS وRaspberry Pi (`x86_64` و`ARM64`):**
   ```sh
-  curl -sSf [https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.sh](https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.sh) | sh
+  curl -sSf https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.sh | sh
   ```
 * **Windows (PowerShell):**
   ```powershell
-  irm [https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.ps1](https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.ps1) | iex
+  irm https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.ps1 | iex
   ```
 * **حزم الإصدار الجاهزة:** راجع صفحة [Releases (`v1.0.0`)](https://github.com/gitmofficiel-dot/lisan/releases/tag/v1.0.0) لتحميل حزم `.deb` و`.tar.gz` و`.zip` وتطبيق سطح المكتب `Lisan Studio`.
 

@@ -538,7 +538,7 @@ impl<'a> FunctionWriter<'a> {
     }
 }
 
-struct Module { strings: Vec<(String,Vec<u8>)>, functions: HashMap<String, (usize, Function)>, specializations: HashMap<(String, Vec<Type>), (String, Type)>, emitted_functions: Vec<String>>, needs_pow:bool, intrinsics:std::collections::HashSet<String> }
+struct Module { strings: Vec<(String,Vec<u8>)>, functions: HashMap<String, (usize, Function)>, specializations: HashMap<(String, Vec<Type>), (String, Type)>, emitted_functions: Vec<String>, needs_pow:bool, intrinsics:std::collections::HashSet<String> }
 impl Module {
     fn new() -> Self { Self { strings: Vec::new(), functions: HashMap::new(), specializations: HashMap::new(), emitted_functions: Vec::new(), needs_pow: false, intrinsics: std::collections::HashSet::new() } }
     fn intern_text(&mut self, value:&str)->String {

@@ -108,6 +108,15 @@ SVG
     fi
     chmod 644 "$DEB_STAGE/usr/share/icons/hicolor/scalable/apps/lisan.svg"
 
+    # PNG icons (identical on every desktop, no font dependency)
+    for SZ in 64 128 256 512; do
+        if [ -f "$ROOT_DIR/assets/icon-$SZ.png" ]; then
+            mkdir -p "$DEB_STAGE/usr/share/icons/hicolor/${SZ}x${SZ}/apps"
+            cp "$ROOT_DIR/assets/icon-$SZ.png" "$DEB_STAGE/usr/share/icons/hicolor/${SZ}x${SZ}/apps/lisan.png"
+            chmod 644 "$DEB_STAGE/usr/share/icons/hicolor/${SZ}x${SZ}/apps/lisan.png"
+        fi
+    done
+
     cp -r "$ROOT_DIR/examples/"* "$DEB_STAGE/usr/share/lisan/examples/" 2>/dev/null || true
     cp -r "$ROOT_DIR/editors/vscode/"* "$DEB_STAGE/usr/share/lisan/vscode/" 2>/dev/null || true
     cp "$ROOT_DIR/README.md" "$DEB_STAGE/usr/share/doc/lisan/README.md"

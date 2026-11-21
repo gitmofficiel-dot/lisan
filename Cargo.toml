@@ -3,6 +3,10 @@ name = "lisan"
 version = "1.0.0"
 edition = "2021"
 license = "MIT"
+repository = "https://github.com/gitmofficiel-dot/lisan"
+homepage = "https://github.com/gitmofficiel-dot/lisan"
+authors = ["GITM"]
+readme = "README.md"
 description = "لسان: نواة لغة برمجة عربية مكتوبة بلغة Rust"
 
 [lib]

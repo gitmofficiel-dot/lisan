@@ -69,7 +69,7 @@ impl<'a> FunctionWriter<'a> {
             }
             Type::Number => {
                 let ptr=self.new_reg();
-                self.instruction(format!("{} = call ptr @malloc(i64 64)",ptr));
+                self.instruction(format!("{} = call ptr @lisan_alloc(i64 64)",ptr));
                 self.instruction(format!("call i32 (ptr, i64, ptr, ...) @snprintf(ptr {}, i64 64, ptr @.number_text_format, double {})",ptr,value.operand));
                 Ok(Value{ty:Type::Text,operand:ptr})
             }
@@ -113,7 +113,7 @@ impl<'a> FunctionWriter<'a> {
     fn build_numeric_list(&mut self,items:&[Expr])->Result<Value,String> {
         if items.len()>100_000{return Err("تجاوزت القائمة الحد الأقصى المسموح".into());}
         let cap=items.len().max(1);
-        let arr=self.new_reg();self.entry_alloca(format!("{} = alloca [{} x double]",arr,cap));
+        let arr=self.new_reg();let byte_size = cap * 8; self.instruction(format!("{} = call ptr @lisan_alloc(i64 {})", arr, byte_size));
         for (idx,element) in items.iter().enumerate(){
             let item=self.generate_expr(element)?;
             self.requires(&item,Type::Number,"عنصر القائمة")?;
@@ -267,7 +267,7 @@ impl<'a> FunctionWriter<'a> {
                     let size_b=self.new_reg();self.instruction(format!("{} = call i64 @strlen(ptr {})",size_b,b.operand));
                     let sum=self.new_reg();self.instruction(format!("{} = add i64 {}, {}",sum,size_a,size_b));
                     let length=self.new_reg();self.instruction(format!("{} = add i64 {}, 1",length,sum));
-                    let buf=self.new_reg();self.instruction(format!("{} = call ptr @malloc(i64 {})",buf,length));
+                    let buf=self.new_reg();self.instruction(format!("{} = call ptr @lisan_alloc(i64 {})",buf,length));
                     self.instruction(format!("call ptr @strcpy(ptr {}, ptr {})",buf,a.operand));
                     self.instruction(format!("call ptr @strcat(ptr {}, ptr {})",buf,b.operand));
                     return Ok(Value{ty:Type::Text,operand:buf});
@@ -562,13 +562,13 @@ pub fn generate_llvm(stmts:&[Stmt])->Result<String,String>{
             _ => main_stmts.push(stmt.clone()),
         }
     }
-    let main_fn = { let mut writer = FunctionWriter::new(&mut module, false); writer.statements(&main_stmts)?; if !writer.terminated { writer.instruction("ret i32 0"); } format!("define i32 @main() {{\n{}\n}}", writer.lines.join("\n")) }; for fn_name in &fn_names { if !module.specializations.keys().any(|(n, _)| n == fn_name) { let arity = module.functions[fn_name].1.params.len(); module.specialize(fn_name, &vec![Type::Number; arity])?; } }
+    let main_fn = { let mut writer = FunctionWriter::new(&mut module, false); writer.statements(&main_stmts)?; if !writer.terminated { writer.instruction("call void @lisan_free_all()"); writer.instruction("ret i32 0"); } format!("define i32 @main() {{\n{}\n}}", writer.lines.join("\n")) }; for fn_name in &fn_names { if !module.specializations.keys().any(|(n, _)| n == fn_name) { let arity = module.functions[fn_name].1.params.len(); module.specialize(fn_name, &vec![Type::Number; arity])?; } }
     let mut ir=String::from("; Native Lisan: source language compiled to LLVM IR, not interpreted\nsource_filename = \"lisan_native\"\n\n");
-    ir.push_str("declare i32 @puts(ptr)\ndeclare i32 @printf(ptr, ...)\ndeclare i32 @snprintf(ptr, i64, ptr, ...)\ndeclare ptr @malloc(i64)\ndeclare ptr @strcpy(ptr, ptr)\ndeclare ptr @strcat(ptr, ptr)\ndeclare i64 @strlen(ptr)\ndeclare i32 @strcmp(ptr, ptr)\ndeclare void @exit(i32)\ndeclare double @llvm.floor.f64(double)\n");
+    ir.push_str("declare i32 @puts(ptr)\ndeclare i32 @printf(ptr, ...)\ndeclare i32 @snprintf(ptr, i64, ptr, ...)\ndeclare ptr @malloc(i64)\ndeclare void @free(ptr)\ndeclare ptr @strcpy(ptr, ptr)\ndeclare ptr @strcat(ptr, ptr)\ndeclare i64 @strlen(ptr)\ndeclare i32 @strcmp(ptr, ptr)\ndeclare void @exit(i32)\ndeclare double @llvm.floor.f64(double)\n");
     for intrinsic in ["fabs","sqrt","round","floor","ceil"] {if module.intrinsics.contains(intrinsic){ir.push_str(&format!("declare double @llvm.{}.f64(double)\n",intrinsic));}}
     if module.needs_pow {ir.push_str("declare double @llvm.pow.f64(double, double)\n");}
     // UTF-8 length counts Unicode scalar values, not bytes.
-    ir.push_str("define i64 @lisan_utf8_len(ptr %str) {\nentry:\n  br label %loop\nloop:\n  %p = phi ptr [ %str, %entry ], [ %next, %body ]\n  %count = phi i64 [ 0, %entry ], [ %add, %body ]\n  %byte = load i8, ptr %p\n  %end = icmp eq i8 %byte, 0\n  br i1 %end, label %done, label %body\nbody:\n  %mask = and i8 %byte, -64\n  %continuation = icmp eq i8 %mask, -128\n  %increment = zext i1 %continuation to i64\n  %amount = sub i64 1, %increment\n  %add = add i64 %count, %amount\n  %next = getelementptr i8, ptr %p, i64 1\n  br label %loop\ndone:\n  ret i64 %count\n}\n");
+    ir.push_str("@.lisan_alloc_head = internal global ptr null\ndefine internal ptr @lisan_alloc(i64 %size) {\nentry:\n  %total = add i64 %size, 8\n  %raw = call ptr @malloc(i64 %total)\n  %is_null = icmp eq ptr %raw, null\n  br i1 %is_null, label %oom, label %ok\noom:\n  call void @exit(i32 1)\n  unreachable\nok:\n  %prev = load ptr, ptr @.lisan_alloc_head\n  store ptr %prev, ptr %raw\n  store ptr %raw, ptr @.lisan_alloc_head\n  %payload = getelementptr i8, ptr %raw, i64 8\n  ret ptr %payload\n}\ndefine internal void @lisan_free_all() {\nentry:\n  %start = load ptr, ptr @.lisan_alloc_head\n  br label %loop\nloop:\n  %cur = phi ptr [ %start, %entry ], [ %next, %body ]\n  %done = icmp eq ptr %cur, null\n  br i1 %done, label %exit, label %body\nbody:\n  %next = load ptr, ptr %cur\n  call void @free(ptr %cur)\n  br label %loop\nexit:\n  store ptr null, ptr @.lisan_alloc_head\n  ret void\n}\n"); ir.push_str("define i64 @lisan_utf8_len(ptr %str) {\nentry:\n  br label %loop\nloop:\n  %p = phi ptr [ %str, %entry ], [ %next, %body ]\n  %count = phi i64 [ 0, %entry ], [ %add, %body ]\n  %byte = load i8, ptr %p\n  %end = icmp eq i8 %byte, 0\n  br i1 %end, label %done, label %body\nbody:\n  %mask = and i8 %byte, -64\n  %continuation = icmp eq i8 %mask, -128\n  %increment = zext i1 %continuation to i64\n  %amount = sub i64 1, %increment\n  %add = add i64 %count, %amount\n  %next = getelementptr i8, ptr %p, i64 1\n  br label %loop\ndone:\n  ret i64 %count\n}\n");
     let text_fmt=b"%.15g\0";
     ir.push_str(&format!("@.number_text_format = private constant [{} x i8] c\"{}\"\n",text_fmt.len(),escape_llvm(text_fmt)));
     let number_fmt=b"%.15g\n\0";

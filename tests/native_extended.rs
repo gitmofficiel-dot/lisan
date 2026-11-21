@@ -135,3 +135,59 @@ fn native_functions_support_mixed_params_and_recursion() {
     assert!(ir.contains("define double @lisan_fn_1(double %arg0)"));
     assert!(ir.contains("call double @lisan_fn_1(double "));
 }
+
+#[test]
+fn native_arena_memory_cleanup_ir() {
+    let source = r#"
+دالة كوّن_قائمة(س) {
+    أرجع [س, س + 1, س + 2]؛
+}
+دع ق = كوّن_قائمة(5)؛
+اطبع("النتيجة: " + نص(مجموع(ق)))؛
+"#;
+    let ir = compile_ir(source).expect("arena IR should compile");
+    assert!(ir.contains("declare void @free(ptr)"));
+    assert!(ir.contains("define internal ptr @lisan_alloc(i64 %size)"));
+    assert!(ir.contains("define internal void @lisan_free_all()"));
+    assert!(ir.contains("call ptr @lisan_alloc("));
+    assert!(ir.contains("call void @lisan_free_all()"));
+}
+
+#[cfg(unix)]
+#[test]
+fn native_functions_strings_and_lists_binary_executes() {
+    if std::process::Command::new("clang").arg("--version").output().is_err() {
+        return;
+    }
+    let source_code = r#"
+دالة تحية(اسم) {
+    أرجع "مرحبا " + اسم؛
+}
+دالة أنشئ_قائمة(أ, ب) {
+    أرجع [أ, ب, أ + ب]؛
+}
+دالة مجموع_قائمة(ق) {
+    دع إجمالي = 0؛
+    لكل س في ق {
+        إجمالي = إجمالي + س؛
+    }
+    أرجع إجمالي؛
+}
+دع رسالة = تحية("لسان")؛
+دع قائمة = أنشئ_قائمة(4, 6)؛
+اطبع(رسالة)؛
+اطبع(مجموع_قائمة(قائمة))؛
+"#;
+    let tmp = std::env::temp_dir();
+    let src_path = tmp.join("lisan_native_fn_strings_lists.lsn");
+    let bin_path = tmp.join("lisan_native_fn_strings_lists_bin");
+    std::fs::write(&src_path, source_code).expect("write temp lsn source");
+    let built = native::build_native(&src_path, &bin_path).expect("build native binary");
+    let output = std::process::Command::new(&built).output().expect("execute native binary");
+    let _ = std::fs::remove_file(&src_path);
+    let _ = std::fs::remove_file(&built);
+    assert!(output.status.success(), "binary failed: {}", String::from_utf8_lossy(&output.stderr));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines, vec!["مرحبا لسان", "20"]);
+}

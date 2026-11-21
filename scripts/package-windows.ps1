@@ -54,6 +54,12 @@ title استوديو لسان لسطح المكتب - Lisan Studio
 "@
     Set-Content -Path (Join-Path $StageDir "Lisan-Studio.bat") -Value $StudioBat -Encoding UTF8
 
+    # أيقونة لسان (ICO): صورة فقط، متطابقة على كل الأنظمة
+    $IconSrc = Join-Path $RootDir "assets\favicon.ico"
+    if (Test-Path $IconSrc) {
+        Copy-Item $IconSrc (Join-Path $StageDir "lisan.ico") -Force
+    }
+
     $ZipPath = Join-Path $DistDir $ZipName
     if (Test-Path $ZipPath) {
         Remove-Item $ZipPath -Force

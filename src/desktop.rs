@@ -992,7 +992,7 @@ fn api_list_examples() -> String {
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
-                if p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("lsn") {
+                if p.is_file() && p.extension().and_then(|s| s.to_str()).map(crate::modules::is_source_ext).unwrap_or(false) {
                     if let Some(fname) = p.file_name().and_then(|s| s.to_str()) {
                         let s = fname.to_string();
                         if !names.contains(&s) {
@@ -1021,11 +1021,11 @@ fn api_read_example(query: &str) -> (u16, String) {
         || name.contains("..")
         || name.contains('/')
         || name.contains('\\')
-        || !name.ends_with(".lsn")
+        || !crate::modules::is_source_name(name)
     {
         return (
             400,
-            r#"{"ok":false,"error":"اسم ملف المثال غير صالح؛ يجب أن ينتهي بـ .lsn دون مسارات نسبية"}"#
+            r#"{"ok":false,"error":"اسم ملف المثال غير صالح؛ يجب أن ينتهي بـ .lsn أو .lisan دون مسارات نسبية"}"#
                 .to_string(),
         );
     }

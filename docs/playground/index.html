@@ -1,0 +1,1886 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="description" content="استوديو لسان المتكامل 2.0 — بيئة التطوير العربية الشاملة للبرمجة الكائنية، أردوينو، ESP32، STM32، راسبيري باي، قواعد البيانات، ومواقع الويب">
+    <title>استوديو لسان المتكامل 2.0 | Lisan Studio IDE</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='2' y='2' width='60' height='60' rx='14' fill='%230f172a' stroke='%2310b981' stroke-width='2'/%3E%3Cg fill='none' stroke='%2310b981' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 16C14 16 13 18 13 22v6c0 2.5-2 4-4.5 4 2.5 0 4.5 1.5 4.5 4v6c0 4 1 6 5 6'/%3E%3Cpath d='M46 16c4 0 5 2 5 6v6c0 2.5 2 4 4.5 4-2.5 0-4.5 1.5-4.5 4v6c0 4-1 6-5 6'/%3E%3C/g%3E%3Cpath d='M41 13v22c0 9-5 14-11.5 14-6 0-8.5-4.5-8.5-10.5l5-2.5c0 5 1.2 7.5 4 7.5 3.8 0 5.5-3 5.5-8.5V16.5z' fill='%23f8fafc'/%3E%3Cpolygon points='29,23 34,28 29,33 24,28' fill='%23f59e0b'/%3E%3C/svg%3E">
+    <style>
+        :root, [data-theme="dark"] {
+            --bg-app: #090e1a;
+            --bg-surface: #0f172a;
+            --bg-panel: #152036;
+            --bg-elevated: #1e293b;
+            --bg-editor: #0b1120;
+            --bg-gutter: #0d1527;
+            --text-main: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: #26354d;
+            --border-strong: #334155;
+            --emerald: #10b981;
+            --emerald-hover: #059669;
+            --emerald-soft: rgba(16, 185, 129, 0.14);
+            --gold: #f59e0b;
+            --gold-hover: #d97706;
+            --gold-soft: rgba(245, 158, 11, 0.15);
+            --blue: #0ea5e9;
+            --purple: #8b5cf6;
+            --rose: #f43f5e;
+            --error: #ef4444;
+            --code-text: #e2e8f0;
+            --console-text: #38bdf8;
+            --shadow-lg: 0 18px 42px rgba(0, 0, 0, 0.45);
+        }
+
+        [data-theme="light"] {
+            --bg-app: #f1f5f9;
+            --bg-surface: #ffffff;
+            --bg-panel: #ffffff;
+            --bg-elevated: #f8fafc;
+            --bg-editor: #fcfdff;
+            --bg-gutter: #f1f5f9;
+            --text-main: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --border-strong: #cbd5e1;
+            --emerald: #059669;
+            --emerald-hover: #047857;
+            --emerald-soft: rgba(5, 150, 105, 0.12);
+            --gold: #d97706;
+            --gold-hover: #b45309;
+            --gold-soft: rgba(217, 119, 6, 0.12);
+            --blue: #0284c7;
+            --purple: #7c3aed;
+            --rose: #e11d48;
+            --error: #dc2626;
+            --code-text: #0f172a;
+            --console-text: #0369a1;
+            --shadow-lg: 0 16px 36px rgba(15, 23, 42, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, 'Noto Sans Arabic', Arial, sans-serif;
+            background-color: var(--bg-app);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            line-height: 1.5;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        /* ==================== الشريط العلوي (Navbar) ==================== */
+        .top-navbar {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0.7rem 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .brand-group {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .brand-logo-svg {
+            width: 44px;
+            height: 44px;
+            flex-shrink: 0;
+            filter: drop-shadow(0 3px 8px rgba(16, 185, 129, 0.22));
+        }
+
+        .brand-titles {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand-name-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .brand-name {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            color: var(--text-main);
+        }
+
+        .version-pill {
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 0.12rem 0.5rem;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--emerald-soft), var(--gold-soft));
+            color: var(--emerald);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+
+        .brand-subtitle {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
+        .engine-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.38rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            background-color: var(--emerald-soft);
+            color: var(--emerald);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.15s ease;
+        }
+
+        .engine-badge:hover {
+            transform: translateY(-1px);
+        }
+
+        .engine-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--emerald);
+            box-shadow: 0 0 8px var(--emerald);
+        }
+
+        .example-select-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        select.studio-select {
+            background-color: var(--bg-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-strong);
+            padding: 0.48rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.86rem;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            max-width: 340px;
+            transition: border-color 0.2s;
+        }
+
+        select.studio-select:focus,
+        select.studio-select:hover {
+            border-color: var(--emerald);
+        }
+
+        .nav-btn {
+            background-color: var(--bg-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-strong);
+            padding: 0.48rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.84rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.18s ease;
+        }
+
+        .nav-btn:hover {
+            border-color: var(--emerald);
+            color: var(--emerald);
+        }
+
+        .download-desktop-btn {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #0f172a;
+            border: none;
+            padding: 0.5rem 0.95rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+
+        .download-desktop-btn:hover {
+            filter: brightness(1.06);
+            transform: translateY(-1px);
+        }
+
+        /* ==================== شريط أوضاع التشغيل والترجمة ==================== */
+        .modes-toolbar {
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            padding: 0.55rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+
+        .modes-group {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+        }
+
+        .tool-btn {
+            background-color: var(--bg-elevated);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-strong);
+            padding: 0.46rem 0.82rem;
+            border-radius: 8px;
+            font-size: 0.83rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.38rem;
+            transition: all 0.16s ease;
+            white-space: nowrap;
+        }
+
+        .tool-btn:hover {
+            border-color: var(--emerald);
+            color: var(--text-main);
+            transform: translateY(-1px);
+        }
+
+        .tool-btn.primary-run {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #ffffff;
+            border-color: transparent;
+            box-shadow: 0 3px 12px rgba(16, 185, 129, 0.28);
+        }
+
+        .tool-btn.primary-run:hover {
+            filter: brightness(1.07);
+        }
+
+        .tool-btn.active-mode {
+            border-color: var(--emerald);
+            background-color: var(--emerald-soft);
+            color: var(--emerald);
+        }
+
+        .tool-btn.primary-run.active-mode {
+            background: linear-gradient(135deg, #10b981, #047857);
+            color: #ffffff;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 24px;
+            background-color: var(--border-strong);
+            margin: 0 0.2rem;
+        }
+
+        /* ==================== مساحة العمل الثنائية ==================== */
+        .workspace-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            min-height: 0;
+        }
+
+        @media (max-width: 980px) {
+            .workspace-grid {
+                grid-template-columns: 1fr;
+            }
+            select.studio-select {
+                max-width: 100%;
+            }
+        }
+
+        .ide-pane {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 520px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+        }
+
+        .pane-header {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0.6rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .pane-title-group {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            font-size: 0.88rem;
+            font-weight: 700;
+        }
+
+        .file-tag {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            padding: 0.14rem 0.5rem;
+            border-radius: 5px;
+            background-color: var(--bg-elevated);
+            color: var(--gold);
+            border: 1px solid var(--border-strong);
+            direction: ltr;
+        }
+
+        .pane-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .mini-btn {
+            background-color: var(--bg-elevated);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 0.26rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .mini-btn:hover {
+            border-color: var(--emerald);
+            color: var(--emerald);
+        }
+
+        .mini-btn.active {
+            background-color: var(--emerald-soft);
+            border-color: var(--emerald);
+            color: var(--emerald);
+        }
+
+        /* المحرر مع ترقيم الأسطر */
+        .editor-body {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            background-color: var(--bg-editor);
+            position: relative;
+            min-height: 430px;
+        }
+
+        .line-numbers {
+            width: 48px;
+            background-color: var(--bg-gutter);
+            border-left: 1px solid var(--border);
+            color: var(--text-muted);
+            font-family: 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.92rem;
+            line-height: 1.68;
+            padding: 0.9rem 0.45rem;
+            text-align: center;
+            user-select: none;
+            overflow: hidden;
+            direction: ltr;
+        }
+
+        textarea#codeEditor {
+            flex: 1;
+            background-color: var(--bg-editor);
+            color: var(--code-text);
+            border: none;
+            padding: 0.9rem 1rem;
+            font-family: 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.98rem;
+            line-height: 1.68;
+            resize: none;
+            outline: none;
+            direction: rtl;
+            tab-size: 4;
+            white-space: pre;
+            overflow: auto;
+        }
+
+        .pane-statusbar {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border);
+            padding: 0.4rem 0.95rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        /* شاشة المخرجات والمعاينة الحية */
+        .output-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-editor);
+            position: relative;
+            min-height: 430px;
+        }
+
+        pre#outputConsole {
+            flex: 1;
+            background-color: var(--bg-editor);
+            color: var(--console-text);
+            padding: 1rem 1.15rem;
+            font-family: 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.94rem;
+            line-height: 1.65;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            direction: rtl;
+            margin: 0;
+        }
+
+        .preview-wrapper {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: stretch;
+            background-color: var(--bg-app);
+            overflow: hidden;
+        }
+
+        iframe#visualPreview {
+            width: 100%;
+            flex: 1;
+            border: none;
+            background-color: #ffffff;
+            transition: max-width 0.25s ease;
+        }
+
+        iframe#visualPreview.mobile-viewport {
+            max-width: 412px;
+            margin: 10px auto;
+            border: 4px solid var(--border-strong);
+            border-radius: 24px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* ==================== نافذة التحميل لسطح المكتب (Modal) ==================== */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(2, 6, 23, 0.76);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+            z-index: 1000;
+        }
+
+        .modal-backdrop.open {
+            display: flex;
+        }
+
+        .modal-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-strong);
+            border-radius: 16px;
+            max-width: 880px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 1.15rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1.2rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .modal-close {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-strong);
+            color: var(--text-main);
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 1.35rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.15rem;
+        }
+
+        .modal-lead {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .platforms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 1rem;
+        }
+
+        @media (max-width: 520px) {
+            .platforms-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .platform-box {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-strong);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+            position: relative;
+        }
+
+        .platform-box.detected {
+            border-color: var(--emerald);
+            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
+        }
+
+        .platform-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .platform-name {
+            font-size: 1rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .os-detected-tag {
+            display: none;
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            background-color: var(--emerald-soft);
+            color: var(--emerald);
+        }
+
+        .platform-box.detected .os-detected-tag {
+            display: inline-block;
+        }
+
+        .cmd-box {
+            background-color: var(--bg-editor);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.55rem 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            direction: ltr;
+        }
+
+        .cmd-box code {
+            font-family: 'Cascadia Code', 'Courier New', monospace;
+            font-size: 0.77rem;
+            color: var(--emerald);
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .copy-cmd-btn {
+            background-color: var(--bg-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-strong);
+            border-radius: 6px;
+            padding: 0.25rem 0.55rem;
+            font-size: 0.73rem;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .copy-cmd-btn:hover {
+            border-color: var(--emerald);
+            color: var(--emerald);
+        }
+
+        .release-links {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .release-link {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-decoration: none;
+            padding: 0.35rem 0.7rem;
+            border-radius: 7px;
+            background-color: var(--bg-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-strong);
+            transition: border-color 0.15s, color 0.15s;
+        }
+
+        .release-link:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .studio-tip-banner {
+            background: linear-gradient(135deg, var(--emerald-soft), var(--gold-soft));
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            font-size: 0.84rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        /* تذييل الصفحة والإشعارات */
+        footer.studio-footer {
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border);
+            padding: 0.65rem 1.25rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .toast-banner {
+            position: fixed;
+            bottom: 22px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background-color: var(--bg-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--emerald);
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            box-shadow: var(--shadow-lg);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 2000;
+        }
+
+        .toast-banner.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- الشريط العلوي مع الشعار المتجه الرسمي -->
+    <header class="top-navbar">
+        <div class="brand-group">
+            <svg class="brand-logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="شعار لسان">
+                <defs>
+                    <linearGradient id="navBg" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#152238"/>
+                        <stop offset="100%" stop-color="#0f172a"/>
+                    </linearGradient>
+                    <linearGradient id="navEmerald" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#34d399"/>
+                        <stop offset="100%" stop-color="#059669"/>
+                    </linearGradient>
+                    <linearGradient id="navLam" x1="20%" y1="0%" x2="80%" y2="100%">
+                        <stop offset="0%" stop-color="#ffffff"/>
+                        <stop offset="50%" stop-color="#6ee7b7"/>
+                        <stop offset="100%" stop-color="#10b981"/>
+                    </linearGradient>
+                    <linearGradient id="navGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#fde68a"/>
+                        <stop offset="100%" stop-color="#f59e0b"/>
+                    </linearGradient>
+                </defs>
+                <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#navBg)" stroke="#10b981" stroke-opacity="0.45" stroke-width="8"/>
+                <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M 96 92 L 126 122 L 164 122" stroke="#10b981" stroke-width="8" opacity="0.7"/>
+                    <path d="M 416 92 L 386 122 L 348 122" stroke="#f59e0b" stroke-width="8" opacity="0.7"/>
+                    <path d="M 96 420 L 126 390 L 164 390" stroke="#f59e0b" stroke-width="8" opacity="0.7"/>
+                    <path d="M 416 420 L 386 390 L 348 390" stroke="#10b981" stroke-width="8" opacity="0.7"/>
+                </g>
+                <circle cx="96" cy="92" r="11" fill="#10b981"/>
+                <circle cx="416" cy="92" r="11" fill="#f59e0b"/>
+                <circle cx="96" cy="420" r="11" fill="#f59e0b"/>
+                <circle cx="416" cy="420" r="11" fill="#10b981"/>
+                <g fill="none" stroke="url(#navEmerald)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M 152 140 C 120 140, 110 156, 110 186 L 110 224 C 110 244, 96 256, 74 256 C 96 256, 110 268, 110 288 L 110 326 C 110 356, 120 372, 152 372"/>
+                    <path d="M 360 140 C 392 140, 402 156, 402 186 L 402 224 C 402 244, 416 256, 438 256 C 416 256, 402 268, 402 288 L 402 326 C 402 356, 392 372, 360 372"/>
+                </g>
+                <path d="M 322 118 L 322 284 C 322 344, 286 378, 238 378 C 194 378, 174 348, 174 304 L 206 288 C 206 324, 216 344, 240 344 C 270 344, 288 322, 288 282 L 288 144 Z" fill="url(#navLam)"/>
+                <polygon points="236,194 266,224 236,254 206,224" fill="url(#navGold)"/>
+                <circle cx="236" cy="224" r="6" fill="#0f172a"/>
+            </svg>
+            <div class="brand-titles">
+                <div class="brand-name-row">
+                    <span class="brand-name">استوديو لسان المتكامل</span>
+                    <span class="version-pill">الإصدار 2.0</span>
+                </div>
+                <span class="brand-subtitle">برمجة عربية أصيلة • أردوينو • ESP32 • STM32 • راسبيري باي • تشفير وقواعد بيانات • ويب</span>
+            </div>
+        </div>
+
+        <div class="nav-controls">
+            <div class="engine-badge" id="engineStatusBadge" title="اضغط للتبديل بين المحرك الأصلي ومحرك WebAssembly عند توفر الاستوديو المحلي">
+                <span class="engine-dot" id="engineDot"></span>
+                <span id="wasmStatus">جاري تهيئة محرك لسان...</span>
+            </div>
+
+            <div class="example-select-wrap">
+                <select id="exampleSelector" class="studio-select" aria-label="اختر مثالاً برمجياً جاهزاً">
+                    <option value="oop_basics">1. أساسيات لسان والبرمجة الكائنية (OOP)</option>
+                    <option value="arduino_all">2. أردوينو: كافة الحساسات (RFID، OLED، GPS، مرحل، HX711)</option>
+                    <option value="esp32_iot">3. متحكم ESP32: إنترنت الأشياء والكاميرا و ESP-NOW و MQTT</option>
+                    <option value="stm32_industrial">4. متحكم STM32: الأتمتة الصناعية وناقل CAN Bus و DMA</option>
+                    <option value="raspberry_pi5">5. راسبيري باي 5: GPIO وكاميرا و SenseHAT والذكاء الاصطناعي</option>
+                    <option value="crypto_regex_db">6. التشفير، الأنماط (Regex)، وقاعدة البيانات المحلية</option>
+                    <option value="arabic_website">7. بناء موقع ويب عربي متكامل (مع معاينة حية مباشرة!)</option>
+                    <option value="mobile_pwa">8. تطبيق هاتف ذكي تفاعلي بالأيقونات (PWA)</option>
+                </select>
+            </div>
+
+            <button type="button" class="download-desktop-btn" id="openDownloadsBtn">
+                <span>📥 تحميل لسان لسطح المكتب</span>
+            </button>
+
+            <button type="button" class="nav-btn" id="themeToggleBtn" title="تبديل المظهر الداكن / الفاتح">
+                <span id="themeIcon">☀️</span>
+                <span id="themeLabel">الوضع الفاتح</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- شريط أوضاع التشغيل والترجمة الشامل -->
+    <nav class="modes-toolbar" aria-label="شريط أدوات التشغيل والترجمة">
+        <div class="modes-group">
+            <button type="button" class="tool-btn primary-run active-mode" id="runDirectBtn" title="تشغيل مباشر عبر المفسر أو الخادم المحلي (Ctrl+Enter)">
+                <span>▶ تشغيل مباشر (المفسر / Native)</span>
+            </button>
+            <button type="button" class="tool-btn" id="runVmBtn" title="تنفيذ عالي السرعة عبر آلة البايت كود الافتراضية">
+                <span>⚡ تشغيل VM (بايت كود)</span>
+            </button>
+
+            <span class="toolbar-divider"></span>
+
+            <button type="button" class="tool-btn" id="arduinoBtn" title="توليد كود Arduino C++ (.ino)">
+                <span>🤖 أردوينو C++</span>
+            </button>
+            <button type="button" class="tool-btn" id="esp32Btn" title="توليد كود متحكمات ESP32 / ESP8266 C++ (.ino)">
+                <span>📡 متحكم ESP32 C++</span>
+            </button>
+            <button type="button" class="tool-btn" id="stm32Btn" title="توليد كود متحكمات STM32 ARM Cortex-M C++ (.ino)">
+                <span>⚙️ متحكم STM32 C++</span>
+            </button>
+            <button type="button" class="tool-btn" id="raspberryBtn" title="توليد سكربت Raspberry Pi Python 3 (.py)">
+                <span>🍓 راسبيري باي Python</span>
+            </button>
+        </div>
+
+        <div class="modes-group">
+            <button type="button" class="tool-btn" id="livePreviewBtn" title="معاينة حية لمواقع الويب وتطبيقات الهواتف المولّدة">
+                <span>🌐 معاينة موقع / تطبيق</span>
+            </button>
+            <button type="button" class="tool-btn" id="fmtBtn" title="تنسيق الشيفرة العربية وضبط المحاذاة تلقائياً (نسّق)">
+                <span>✨ تنسيق الشيفرة (نسّق)</span>
+            </button>
+            <button type="button" class="tool-btn" id="saveDownloadBtn" title="حفظ وتنزيل الملف الناتج (.lsn / .ino / .py / .html)">
+                <span>💾 حفظ وتنزيل (<span id="downloadExtBadge">.lsn</span>)</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- مساحة العمل الثنائية -->
+    <main class="workspace-grid">
+        <!-- لوحة المحرر العربي -->
+        <section class="ide-pane">
+            <div class="pane-header">
+                <div class="pane-title-group">
+                    <span>📝 محرر شيفرة لسان</span>
+                    <span class="file-tag" id="currentFileTag">مشروع_لسان.lsn</span>
+                </div>
+                <div class="pane-actions">
+                    <input type="file" id="openFileInput" accept=".lsn,.txt" style="display:none">
+                    <button type="button" class="mini-btn" id="openLocalFileBtn" title="فتح ملف .lsn من جهازك">📂 فتح ملف</button>
+                    <button type="button" class="mini-btn" id="downloadSourceBtn" title="تنزيل الشيفرة المصدرية بصيغة .lsn">⬇️ مصدر .lsn</button>
+                    <button type="button" class="mini-btn" id="copySourceBtn" title="نسخ الشيفرة المصدرية">📋 نسخ الكود</button>
+                </div>
+            </div>
+
+            <div class="editor-body">
+                <div class="line-numbers" id="lineNumbers" aria-hidden="true">1</div>
+                <textarea id="codeEditor" spellcheck="false" placeholder="اكتب شيفرتك البرمجية العربية بلغة لسان هنا..."></textarea>
+            </div>
+
+            <div class="pane-statusbar">
+                <span id="cursorStatus">السطر 1، العمود 1 | عدد الأسطر: 1</span>
+                <span>ترميز UTF-8 • الأرقام اللاتينية (0-9) • اختصار التشغيل: Ctrl+Enter</span>
+            </div>
+        </section>
+
+        <!-- لوحة المخرجات والترجمة والمعاينة الحية -->
+        <section class="ide-pane">
+            <div class="pane-header">
+                <div class="pane-title-group">
+                    <span id="outputTitle">🖥️ شاشة المخرجات والتنفيذ</span>
+                    <span class="file-tag" id="execTimingBadge">جاهز</span>
+                </div>
+                <div class="pane-actions">
+                    <button type="button" class="mini-btn" id="viewportToggleBtn" style="display:none;" title="التبديل بين عرض سطح المكتب وعرض الهاتف">📱 إطار جوال</button>
+                    <button type="button" class="mini-btn" id="toggleViewBtn" style="display:none;" title="التبديل بين المعاينة البصرية وكود HTML الخام">📄 عرض شيفرة HTML</button>
+                    <button type="button" class="mini-btn" id="copyOutputBtn" title="نسخ المخرجات إلى الحافظة">📋 نسخ الناتج</button>
+                    <button type="button" class="mini-btn" id="clearBtn" title="مسح شاشة المخرجات">🗑️ مسح</button>
+                </div>
+            </div>
+
+            <div class="output-body">
+                <pre id="outputConsole">مرحباً بك في استوديو لسان المتكامل 2.0! اختر مثالاً أو اضغط "تشغيل مباشر" للبدء.</pre>
+                <div class="preview-wrapper" id="previewWrapper">
+                    <iframe id="visualPreview" title="المعاينة الحية لموقع وتطبيق لسان" sandbox="allow-scripts allow-forms allow-modals"></iframe>
+                </div>
+            </div>
+
+            <div class="pane-statusbar">
+                <span id="outputModeHint">الوضع الحالي: المفسر القياسي</span>
+                <span id="offlineReadyLabel">يعمل محلياً 100% دون اعتماديات خارجية</span>
+            </div>
+        </section>
+    </main>
+
+    <!-- نافذة تحميل برنامج لسان لسطح المكتب والأنظمة المتعددة -->
+    <div class="modal-backdrop" id="downloadsModal" role="dialog" aria-modal="true" aria-labelledby="downloadsModalTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 id="downloadsModalTitle">📥 تحميل برنامج لسان لسطح المكتب (Lisan Desktop &amp; CLI)</h2>
+                <button type="button" class="modal-close" id="closeDownloadsBtn" aria-label="إغلاق النافذة">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-lead">
+                    ثبّت مترجم واستوديو <strong>لسان 1.0</strong> الأصلي على جهازك بضغطة زر للوصول الكامل إلى نظام الملفات، قواعد البيانات المستديمة، الترجمة الأصلية عبر LLVM/Clang، وبرمجة العتاد المباشرة.
+                </p>
+
+                <div class="platforms-grid">
+                    <!-- Linux -->
+                    <div class="platform-box" id="plat-linux">
+                        <div class="platform-top">
+                            <span class="platform-name">🐧 لينكس (Ubuntu / Debian / Fedora)</span>
+                            <span class="os-detected-tag">نظامك الحالي</span>
+                        </div>
+                        <div class="cmd-box">
+                            <code id="cmdLinux">curl -sSf https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.sh | sh</code>
+                            <button type="button" class="copy-cmd-btn" data-copy-target="cmdLinux">نسخ الأمر</button>
+                        </div>
+                        <div class="release-links">
+                            <a class="release-link" href="https://github.com/gitmofficiel-dot/lisan/releases/latest/download/lisan-linux-x86_64.deb" target="_blank" rel="noopener">📦 حزمة Ubuntu/Debian (.deb)</a>
+                            <a class="release-link" href="https://github.com/gitmofficiel-dot/lisan/releases/latest/download/lisan-linux-x86_64.tar.gz" target="_blank" rel="noopener">🗜️ أرشيف Linux x64 (.tar.gz)</a>
+                        </div>
+                    </div>
+
+                    <!-- Windows -->
+                    <div class="platform-box" id="plat-windows">
+                        <div class="platform-top">
+                            <span class="platform-name">🪟 ويندوز (Windows 10 / 11 x64)</span>
+                            <span class="os-detected-tag">نظامك الحالي</span>
+                        </div>
+                        <div class="cmd-box">
+                            <code id="cmdWindows">irm https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.ps1 | iex</code>
+                            <button type="button" class="copy-cmd-btn" data-copy-target="cmdWindows">نسخ الأمر</button>
+                        </div>
+                        <div class="release-links">
+                            <a class="release-link" href="https://github.com/gitmofficiel-dot/lisan/releases/latest/download/lisan-windows-x86_64.exe" target="_blank" rel="noopener">⚡ الملف التنفيذي المباشر (.exe)</a>
+                            <a class="release-link" href="https://github.com/gitmofficiel-dot/lisan/releases/latest/download/lisan-windows-x86_64.zip" target="_blank" rel="noopener">🗜️ حزمة Windows الكاملة (.zip)</a>
+                        </div>
+                    </div>
+
+                    <!-- macOS -->
+                    <div class="platform-box" id="plat-macos">
+                        <div class="platform-top">
+                            <span class="platform-name">🍎 ماك (macOS Apple Silicon &amp; Intel)</span>
+                            <span class="os-detected-tag">نظامك الحالي</span>
+                        </div>
+                        <div class="cmd-box">
+                            <code id="cmdMac">curl -sSf https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.sh | sh</code>
+                            <button type="button" class="copy-cmd-btn" data-copy-target="cmdMac">نسخ الأمر</button>
+                        </div>
+                        <div class="release-links">
+                            <a class="release-link" href="https://github.com/gitmofficiel-dot/lisan/releases/latest/download/lisan-macos-arm64.tar.gz" target="_blank" rel="noopener">🍏 Apple Silicon M1–M4 (.app / arm64)</a>
+                            <a class="release-link" href="https://github.com/gitmofficiel-dot/lisan/releases/latest/download/lisan-macos-x86_64.tar.gz" target="_blank" rel="noopener">💻 macOS Intel (.app / x86_64)</a>
+                        </div>
+                    </div>
+
+                    <!-- Raspberry Pi -->
+                    <div class="platform-box" id="plat-rpi">
+                        <div class="platform-top">
+                            <span class="platform-name">🍓 راسبيري باي (Raspberry Pi ARM64)</span>
+                            <span class="os-detected-tag">نظامك الحالي</span>
+                        </div>
+                        <div class="cmd-box">
+                            <code id="cmdRpi">curl -sSf https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.sh | sh</code>
+                            <button type="button" class="copy-cmd-btn" data-copy-target="cmdRpi">نسخ الأمر</button>
+                        </div>
+                        <div class="release-links">
+                            <a class="release-link" href="https://github.com/gitmofficiel-dot/lisan/releases/latest/download/lisan-linux-aarch64.deb" target="_blank" rel="noopener">🍓 حزمة Raspberry Pi OS (.deb ARM64)</a>
+                            <a class="release-link" href="https://github.com/gitmofficiel-dot/lisan/releases/latest/download/lisan-linux-aarch64.tar.gz" target="_blank" rel="noopener">🗜️ أرشيف ARM64 (.tar.gz)</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="studio-tip-banner">
+                    <span>🚀 <strong>نصيحة بعد التثبيت:</strong> شغّل الأمر <code style="direction:ltr;display:inline-block;padding:2px 6px;border-radius:4px;background:var(--bg-editor);color:var(--emerald);">lisan --studio</code> لفتح هذا الاستوديو محلياً بكامل قدرات النظام والعتاد!</span>
+                    <a class="release-link" href="https://github.com/gitmofficiel-dot/lisan/releases" target="_blank" rel="noopener">جميع الإصدارات على GitHub ↗</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="studio-footer">
+        <span><strong>لسان (Lisan 2.0)</strong> — لغة برمجة عربية شاملة للمتحكمات الدقيقة، الحواسيب اللوحية، الأمن السيبراني، والويب الحديث</span>
+        <span>مفتوحة المصدر بترخيص MIT • مبنية بنواة Rust و WebAssembly</span>
+    </footer>
+
+    <div class="toast-banner" id="toastBanner" role="status" aria-live="polite"></div>
+
+    <script src="lisan.js"></script>
+    <script>
+        /* ==================== الأمثلة المتكاملة لجميع مجالات لغة لسان ==================== */
+        const examples = {
+            oop_basics: String.raw`# 1. أساسيات لسان العصرية والبرمجة الكائنية (OOP)
+صنف جهاز_ذكي {
+    دالة بناء(الاسم، الطاقة_واط) {
+        هذا.الاسم = الاسم
+        هذا.الطاقة = الطاقة_واط
+        هذا.يعمل = خطأ
+    }
+
+    دالة شغّل() {
+        هذا.يعمل = صحيح
+        أرجع ن"تم تشغيل [{هذا.الاسم}] بقدرة {هذا.الطاقة} واط"
+    }
+}
+
+صنف روبوت_جراحي يرث جهاز_ذكي {
+    دالة بناء(الاسم، الطاقة_واط، الدقة_مليمتر) {
+        أصل.بناء(الاسم، الطاقة_واط)
+        هذا.الدقة = الدقة_مليمتر
+    }
+
+    دالة تقرير() {
+        دع الحالة = "متوقف"
+        إذا (هذا.يعمل) {
+            الحالة = "نشط وجاهز"
+        }
+        أرجع ن"الروبوت: {هذا.الاسم} | الحالة: {الحالة} | الدقة: {هذا.الدقة} ملم"
+    }
+}
+
+دع روبوت = جديد روبوت_جراحي("ابن سينا الذكي"، 120، 0.05)
+اطبع(روبوت.شغّل())
+اطبع(روبوت.تقرير())
+
+# التقطيع، التوليد المختصر، والدوال العليا
+دع قراءات = [12، 18، 25، 30، 42، 55]
+اطبع("شريحة القراءات الوسطى: " + نص(قراءات[1:5]))
+اطبع("عكس القائمة: " + نص(قراءات[::-1]))
+
+دع مضاعفات_الزوجية = [س * 2 لكل س في قراءات إذا س % 2 == 0]
+اطبع("مضاعفات القيم الزوجية: " + نص(مضاعفات_الزوجية))
+اطبع("مجموع القراءات = " + نص(مجموع(قراءات)) + " | المتوسط = " + نص(متوسط(قراءات)))
+`,
+
+            arduino_all: String.raw`# 2. أردوينو: كافة الحساسات والقطع (RFID، شاشة OLED، GPS، مرحل، ميزان HX711)
+استورد "اردوينو"
+
+دع منفذ_المرحل = 7
+دع منفذ_مصباح = 13
+
+دالة إعداد() {
+    تسلسلي_ابدأ(115200)
+    وضع_المنفذ(منفذ_مصباح، "مخرج")
+    تسلسلي_اطبع("بدء تشغيل محطة المستودع الذكي بالأردوينو")
+}
+
+دالة تكرار() {
+    اكتب_رقمي(منفذ_مصباح، 1)
+    انتظر_ملي(500)
+    اكتب_رقمي(منفذ_مصباح، 0)
+    انتظر_ملي(500)
+}
+
+# 1. قارئ البطاقات الذكية RFID (MFRC522)
+دع قارئ = جديد قارئ_rfid(10، 9)
+قارئ.ابدأ()
+قارئ.ضبط_محاكاة("E4:A8:19:7B")
+إذا (قارئ.هل_توجد_بطاقة()) {
+    اطبع("بطاقة RFID مصرحة — المعرف: " + قارئ.اقرأ_معرف())
+}
+
+# 2. شاشة العرض الرسومية OLED 128x64 عبر I2C
+دع شاشة = جديد شاشة_oled(60، 128، 64)
+شاشة.ابدأ()
+شاشة.امسح()
+شاشة.اكتب_نص(0، 0، "مستودع لسان الذكي"، 1)
+شاشة.اكتب_نص(0، 20، "البطاقة: مصرحة"، 1)
+شاشة.شريط_تقدم(0، 44، 120، 10، 90)
+شاشة.اعرض()
+اطبع("تم تحديث شاشة OLED الرسومية بنجاح")
+
+# 3. وحدة تحديد المواقع بالأقمار الصناعية GPS
+دع موقع = جديد محدد_مواقع_gps(4، 3، 9600)
+موقع.ابدأ()
+موقع.ضبط_محاكاة(24.7136، 46.6753، 42.5)
+اطبع("إحداثيات GPS: " + نص(موقع.خط_العرض()) + " شمالاً، " + نص(موقع.خط_الطول()) + " شرقاً | الأقمار: " + نص(موقع.الأقمار()))
+
+# 4. المرحل الكهربائي (Relay) لفتح البوابة الآلية
+دع بوابة = جديد مرحل_كهربائي(منفذ_المرحل)
+بوابة.شغّل()
+اطبع("المرحل الكهربائي للبوابة يعمل؟ " + نص(بوابة.هل_يعمل()))
+
+# 5. خلية الوزن الدقيقة ومضخم HX711
+دع ميزان = جديد خلية_وزن_hx711(5، 6)
+ميزان.تصفير()
+ميزان.معايرة(420.0)
+ميزان.ضبط_محاكاة(2750.0)
+اطبع("وزن الشحنة (HX711): " + نص(ميزان.اقرأ_جرام()) + " جرام (" + نص(ميزان.اقرأ_كيلوجرام()) + " كجم)")
+`,
+
+            esp32_iot: String.raw`# 3. متحكم ESP32: إنترنت الأشياء والكاميرا و ESP-NOW و MQTT
+استورد "esp32"
+
+# 1. الاتصال بشبكة الواي فاي وتفعيل التحديث الهوائي OTA
+دع واي_فاي = جديد واي_فاي_esp()
+واي_فاي.اتصل("Lisan_IoT_Hub"، "SecurePass2026")
+اطبع("عنوان IP لشريحة ESP32: " + واي_فاي.عنوان_ip())
+
+دع تحديث = جديد تحديث_هوائي_ota("Lisan-ESP32-CamNode")
+تحديث.ابدأ()
+
+# 2. تشغيل كاميرا المراقبة الذكية ESP32-CAM والبث المباشر
+دع كاميرا = جديد كاميرا_esp32(10)
+كاميرا.ابدأ()
+كاميرا.شغّل_فلاش(صحيح)
+دع لقطة = كاميرا.التقط_إطار()
+اطبع("تم التقاط صورة ESP32-CAM بدقة " + نص(لقطة["عرض"]) + "x" + نص(لقطة["ارتفاع"]) + " (" + نص(لقطة["حجم_بايت"]) + " بايت)")
+اطبع("رابط البث المرئي المباشر: " + كاميرا.ابدأ_بث_مباشر(81))
+
+# 3. بروتوكول الاتصال المباشر السريع بين الشرائح ESP-NOW
+دع اتصال_مباشر = جديد اتصال_مباشر_espnow()
+اتصال_مباشر.ابدأ()
+اتصال_مباشر.أضف_نظير("24:6F:28:AB:CD:EF")
+اتصال_مباشر.أرسل("24:6F:28:AB:CD:EF"، "تنبيه_حركة=نشط؛إضاءة=100")
+
+# 4. النشر والاشتراك السحابي عبر وسيط MQTT
+دع عميل = جديد عميل_mqtt("broker.hivemq.com"، 1883)
+عميل.اتصل("Lisan_ESP32_Gateway")
+عميل.اشترك("lisan/home/commands")
+عميل.انشر("lisan/home/telemetry"، "{\"ip\":\"192.168.1.150\",\"camera\":\"streaming\",\"temp\":26.4}")
+
+# 5. مهمة متوازية على النواة الثانية عبر FreeRTOS
+دع مهمة = جديد مهمة_متوازية_rtos("مراقب_الحساسات"، 1، 4096)
+مهمة.شغّل()
+`,
+
+            stm32_industrial: String.raw`# 4. متحكم STM32: الأتمتة الصناعية وناقل CAN Bus و DMA
+استورد "stm32"
+
+# 1. مؤقت عتادي دقيق (Hardware Timer) لتوليد نبضات PWM صناعية
+دع مؤقت = جديد مؤقت_عتادي_stm32(1)
+مؤقت.اضبط_تردد(25000)
+مؤقت.اضبط_pwm(9، 75)
+مؤقت.ابدأ()
+اطبع("تم ضبط مؤقت STM32 العتادي على تردد 25 كيلوهرتز بنسبة نبضة 75%")
+
+# 2. النقل المباشر للذاكرة (DMA) لقراءة عينات الحساسات دون إشغال المعالج
+دع قناة_dma = جديد ناقل_مباشر_dma(1)
+دع عدد_العينات = قناة_dma.نقل_ذاكرة(1024)
+اطبع("اكتمل نقل DMA العتادي؟ " + نص(قناة_dma.هل_اكتمل()) + " — العينات المنقولة: " + نص(عدد_العينات))
+
+# 3. شبكة الأتمتة الصناعية والمركبات CAN Bus بسرعة 500kbps
+دع شبكة_كان = جديد ناقل_can_stm32(500)
+شبكة_كان.ابدأ()
+شبكة_كان.أرسل_إطار(291، [10، 20، 45، 90])
+دع إطار_وارد = شبكة_كان.استقبل_إطار()
+اطبع("تم استقبال إطار CAN صناعي من المعرف: " + نص(إطار_وارد["معرف"]) + " بطول " + نص(إطار_وارد["طول"]) + " بايت")
+
+# 4. المحول الرقمي التماثلي الحقيقي (12-bit DAC) وحرارة المعالج
+دع مخرج_تماثلي = جديد محول_رقمي_stm32(1)
+مخرج_تماثلي.اكتب_جهد(2.5)
+دع حساس_معالج = جديد محول_تماثلي_stm32(0)
+اطبع("جهد DAC المخرج: 2.5V | حرارة شريحة STM32 الداخلية: " + نص(حساس_معالج.اقرأ_حرارة_المعالج_الداخلية()) + "°C")
+
+# 5. ساعة الوقت الحقيقي RTC ومراقب الأمان المستقل Watchdog (IWDG)
+دع ساعة = جديد ساعة_الوقت_الحقيقي_rtc()
+ساعة.ضبط_الوقت(14، 45، 30)
+دع حارس = جديد مراقب_النظام_iwdg(2000)
+حارس.ابدأ()
+حارس.تغذية()
+اطبع("توقيت النظام الصناعي RTC: " + ساعة.اقرأ_تاريخ_نصي() + " " + ساعة.اقرأ_وقت_نصي())
+`,
+
+            raspberry_pi5: String.raw`# 5. راسبيري باي 5 (Raspberry Pi): GPIO وكاميرا و SenseHAT والذكاء الاصطناعي
+استورد "راسبيري"
+
+# 1. فحص حالة لوحة Raspberry Pi 5 وحرارة المعالج
+دع لوحة = جديد لوحة_راسبيري("Raspberry Pi 5")
+اطبع("اللوحة العاملة: " + لوحة.اسم_الطراز() + " | الأنوية: " + نص(لوحة.عدد_الأنوية()) + " | حرارة المعالج: " + نص(لوحة.حرارة_المعالج()) + "°C")
+
+# 2. التحكم بمنافذ GPIO ومروحة التبريد عبر PWM
+دع مؤشر_الذكاء = جديد منفذ_gpio_راسبيري(17، "مخرج")
+مؤشر_الذكاء.شغّل()
+دع مروحة = جديد نبضة_pwm_راسبيري(18، 1000)
+مروحة.ابدأ(60)
+اطبع("حالة منفذ GPIO 17: " + نص(مؤشر_الذكاء.اقرأ()) + " | سرعة مروحة PWM: 60%")
+
+# 3. التقاط إطار رؤية حاسوبية عبر كاميرا CSI (Picamera2)
+دع كاميرا = جديد كاميرا_راسبيري(1920، 1080)
+كاميرا.ابدأ()
+كاميرا.التقط_صورة("rpi5_ai_frame.jpg")
+اطبع("تم التقاط صورة عالية الدقة 1080p لتحليلها بالذكاء الاصطناعي")
+
+# 4. قراءة البيئة المحيطة وعرض التنبيه على مصفوفة SenseHAT
+دع حساسات = جديد قبعة_الحساسات_sensehat()
+حساسات.ضبط_محاكاة_بيئة(27.8، 44.0، 1012.5)
+اطبع("بيانات SenseHAT — الحرارة: " + نص(حساسات.اقرأ_حرارة()) + "°C، الرطوبة: " + نص(حساسات.اقرأ_رطوبة()) + "%")
+
+# 5. مصنف ذكاء اصطناعي طرفي (Edge AI) مع نطق صوتي عربي
+صنف مصنف_ذكاء_طرفي {
+    دالة بناء(عتبة_الثقة) {
+        هذا.عتبة = عتبة_الثقة
+    }
+
+    دالة صنف_المشهد(درجة_الثقة، حرارة_المحيط) {
+        إذا (درجة_الثقة >= هذا.عتبة && حرارة_المحيط < 40.0) {
+            أرجع "مسار آمن — تم التعرف على المشغل بنجاح"
+        }
+        أرجع "تنبيه — يرجى التحقق البشري"
+    }
+}
+
+دع نموذج = جديد مصنف_ذكاء_طرفي(0.85)
+دع قرار = نموذج.صنف_المشهد(0.94، حساسات.اقرأ_حرارة())
+حساسات.اعرض_رسالة("AI OK"، 0.08)
+
+دع صوت = جديد صوت_راسبيري(85)
+صوت.انطق_عربي(قرار)
+اطبع("قرار محرك الذكاء الاصطناعي: " + قرار)
+`,
+
+            crypto_regex_db: String.raw`# 6. التشفير، الأنماط (Regex)، وقاعدة البيانات المحلية
+استورد "قاعدة_بيانات"
+
+# 1. التشفير القياسي: تجزئة SHA-256، توقيع HMAC، وتشفير النصوص العربية
+دع خزنة = جديد تشفير_أمان("مفتاح_لسان_السيادي_2026")
+دع معرف_العملية = خزنة.معرف_جديد()
+اطبع("المعرف الفريد للجلسة (UUID v4): " + معرف_العملية)
+
+دع بصمة = خزنة.تجزئة("لغة لسان العربية 2.0")
+اطبع("بصمة SHA-256: " + بصمة[0:32] + "...")
+
+دع رسالة_سرية = "تحويل رصيد بقيمة 4500 ريال إلى حساب المشروع"
+دع مشفر = خزنة.شفر(رسالة_سرية)
+دع مفكوك = خزنة.فك_تشفير(مشفر)
+دع توقيع = خزنة.وقع(رسالة_سرية)
+اطبع("تطابق التوقيع الرقمي HMAC؟ " + نص(خزنة.تحقق_توقيع(رسالة_سرية، توقيع)))
+اطبع("النص بعد فك التشفير الآمن: " + مفكوك)
+
+# 2. محرك الأنماط والتعابير النمطية (Unicode Regex)
+دع محلل_بريد = جديد محلل_أنماط("[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]+")
+دع نص_تواصل = "للتواصل مع الإدارة: salam@lisan.dev أو فريق الهندسة core@arabic-lang.org"
+دع إيميلات = محلل_بريد.استخرج(نص_تواصل)
+اطبع("العناوين البريدية المستخرجة بالأنماط: " + نص(إيميلات))
+
+دع إخفاء_أرقام = استبدل_نمط("بطاقة رقم: 4532-8810-9921"، "\\d+"، "XXXX")
+اطبع("إخفاء البيانات الحساسة: " + إخفاء_أرقام)
+
+# 3. قاعدة البيانات المحلية المدمجة (إنشاء جداول، إدراج، وبحث فوري)
+دع قاعدة = جديد قاعدة_بيانات()
+قاعدة.أنشئ_جدول("المطورون")
+قاعدة.أدرج("المطورون"، {"الاسم": "ليلى المنصور"، "التخصص": "أنظمة مدمجة"، "الخبرة": 6})
+قاعدة.أدرج("المطورون"، {"الاسم": "طارق العلي"، "التخصص": "أمن سيبراني"، "الخبرة": 8})
+قاعدة.أدرج("المطورون"، {"الاسم": "ندى الحسن"، "التخصص": "أنظمة مدمجة"، "الخبرة": 4})
+
+دع مهندسو_العتاد = قاعدة.ابحث_بحقل("المطورون"، "التخصص"، "أنظمة مدمجة")
+اطبع("إجمالي سجلات قاعدة البيانات: " + نص(قاعدة.عدد_السجلات("المطورون")))
+اطبع("نتائج البحث عن مهندسي الأنظمة المدمجة: " + نص(طول(مهندسو_العتاد)) + " مطورين")
+لكل مطور في مهندسو_العتاد {
+    اطبع(" - " + مطور["الاسم"] + " (خبرة " + نص(مطور["الخبرة"]) + " سنوات)")
+}
+`,
+
+            arabic_website: String.raw`# 7. بناء موقع ويب عربي متكامل (مع معاينة حية مباشرة!)
+استورد "موقع"
+
+دع موقعي = جديد موقع_ويب("بوابة لسان السحابية 2.0"، "زمردي")
+
+# 1. شريط التنقل المتجاوب مع زر تبديل النسق الليلي والنهاري
+موقعي.شريط_تنقل("بوابة لسان العربية"، "كود")
+
+# 2. القسم الترحيبي الرئيسي (Hero Section)
+موقعي.قسم_رئيسي(
+    "برمج كل شيء بلغتك العربية الفصيحة"،
+    "من شرائح الأردوينو و ESP32 و STM32 وراسبيري باي 5 إلى التشفير وقواعد البيانات ومواقع الويب العصرية"،
+    "ابدأ مشروعك الآن"،
+    "روبوت"
+)
+
+# 3. شبكة الإحصائيات الحية
+موقعي.أضف_إحصائيات([
+    ["منصات العتاد", "4 معماريات", "أردوينو"]،
+    ["الأمان الرقمي", "SHA-256", "درع"]،
+    ["الاعتماديات الخارجية", "0 حزم", "شريحة"]،
+    ["الكفاءة والسرعة", "100%", "شمس"]
+])
+
+# 4. بطاقات الميزات والمنظومة الهندسية
+موقعي.أضف_شبكة([
+    ["المتحكمات وإنترنت الأشياء", "ترجمة فورية إلى C++ للوحات Arduino و ESP32 و STM32 مع دعم الحساسات وشبكات CAN و MQTT.", "أردوينو"]،
+    ["راسبيري باي والذكاء الاصطناعي", "توليد سكربتات Python 3 جاهزة للتشغيل على Raspberry Pi 5 مع الكاميرا ومصفوفة SenseHAT.", "روبوت"]،
+    ["تشفير وقواعد بيانات مدمجة", "خوارزميات SHA-256 و HMAC ومحرك أنماط Regex وقاعدة بيانات محلية مدمجة في النواة.", "قاعدة_بيانات"]،
+    ["واجهات متجاوبة وتطبيقات جوال", "توليد مواقع عربية متكاملة وتطبيقات هواتف ذكية PWA بدون أي مكتبات خارجية.", "هاتف"]
+])
+
+# 5. قسم تعريفي ونموذج تواصل تفاعلي
+موقعي.أضف_قسم(
+    "هندسة عربية بمعايير عالمية"،
+    "بُنيت لغة لسان بنواة Rust عالية الموثوقية لتعمل بسلاسة تامة في المتصفح عبر WebAssembly وعلى سطح المكتب والخوادم والشرائح المدمجة."،
+    "معلومات"
+)
+
+موقعي.أضف_نموذج_تواصل(
+    "تواصل مع مجتمع لسان"،
+    "شاركنا أفكارك ومشاريعك الهندسية وسنسعد بالتواصل معك"،
+    "إرسال الرسالة"
+)
+
+موقعي.أضف_تذييل("جميع الحقوق محفوظة © 2026 — صُنع بكل فخر بلغة لسان العربية 2.0")
+
+# طباعة كود الموقع لتفعيل المعاينة البصرية الحية فوراً!
+اطبع(موقعي.بناء_html())
+`,
+
+            mobile_pwa: String.raw`# 8. تطبيق هاتف ذكي تفاعلي بالأيقونات المتجهة (PWA)
+استورد "هاتف"
+
+دع تطبيقي = جديد تطبيق_هاتف("منزلي الذكي 2.0"، "ملكي")
+
+تطبيقي.أضف_إحصائية("درجة الحرارة"، "23.5°C"، "حرارة")
+تطبيقي.أضف_بطاقة("بوابة ESP32 متصلة"، "البث المرئي وبروتوكول MQTT يعملان بكفاءة"، "واي_فاي")
+تطبيقي.أضف_بطاقة("حاسوب راسبيري باي 5"، "محرك الذكاء الاصطناعي الطرفي يراقب الحساسات"، "روبوت")
+تطبيقي.أضف_مفتاح_تحكم("إضاءة الصالة الذكية"، "شمس"، صحيح)
+تطبيقي.أضف_مفتاح_تحكم("القفل الإلكتروني RFID"، "قفل"، صحيح)
+تطبيقي.أضف_مفتاح_تحكم("نظام الري الآلي"، "بطارية"، خطأ)
+تطبيقي.أضف_زر("تفعيل درع الحماية الشامل"، "درع"، "تم تفعيل الحماية وتشفير السجلات بنجاح!")
+
+اطبع(تطبيقي.بناء_واجهة())
+`
+        };
+
+        /* ==================== عناصر واجهة الاستوديو ==================== */
+        let runtime = null;
+        let currentOutputText = '';
+        let currentDownloadExt = '.lsn';
+        let currentModeName = 'المفسر القياسي';
+        let lastHtmlOutput = '';
+
+        const editor = document.getElementById('codeEditor');
+        const lineNumbersEl = document.getElementById('lineNumbers');
+        const cursorStatusEl = document.getElementById('cursorStatus');
+        const consoleEl = document.getElementById('outputConsole');
+        const previewWrapper = document.getElementById('previewWrapper');
+        const previewEl = document.getElementById('visualPreview');
+        const outputTitleEl = document.getElementById('outputTitle');
+        const timingBadgeEl = document.getElementById('execTimingBadge');
+        const outputModeHintEl = document.getElementById('outputModeHint');
+        const downloadExtBadgeEl = document.getElementById('downloadExtBadge');
+
+        const statusEl = document.getElementById('wasmStatus');
+        const engineBadgeEl = document.getElementById('engineStatusBadge');
+        const engineDotEl = document.getElementById('engineDot');
+        const selector = document.getElementById('exampleSelector');
+
+        const runDirectBtn = document.getElementById('runDirectBtn');
+        const runVmBtn = document.getElementById('runVmBtn');
+        const arduinoBtn = document.getElementById('arduinoBtn');
+        const esp32Btn = document.getElementById('esp32Btn');
+        const stm32Btn = document.getElementById('stm32Btn');
+        const raspberryBtn = document.getElementById('raspberryBtn');
+        const livePreviewBtn = document.getElementById('livePreviewBtn');
+        const fmtBtn = document.getElementById('fmtBtn');
+        const saveDownloadBtn = document.getElementById('saveDownloadBtn');
+
+        const toggleViewBtn = document.getElementById('toggleViewBtn');
+        const viewportToggleBtn = document.getElementById('viewportToggleBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const copyOutputBtn = document.getElementById('copyOutputBtn');
+        const copySourceBtn = document.getElementById('copySourceBtn');
+        const downloadSourceBtn = document.getElementById('downloadSourceBtn');
+        const openLocalFileBtn = document.getElementById('openLocalFileBtn');
+        const openFileInput = document.getElementById('openFileInput');
+
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const themeIconEl = document.getElementById('themeIcon');
+        const themeLabelEl = document.getElementById('themeLabel');
+
+        const downloadsModal = document.getElementById('downloadsModal');
+        const openDownloadsBtn = document.getElementById('openDownloadsBtn');
+        const closeDownloadsBtn = document.getElementById('closeDownloadsBtn');
+        const toastBanner = document.getElementById('toastBanner');
+
+        const modeButtons = [runDirectBtn, runVmBtn, arduinoBtn, esp32Btn, stm32Btn, raspberryBtn, livePreviewBtn];
+
+        /* ==================== إشعارات سريعة ومظهر الصفحة ==================== */
+        let toastTimer = null;
+        function showToast(message) {
+            toastBanner.textContent = message;
+            toastBanner.classList.add('visible');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toastBanner.classList.remove('visible');
+            }, 2400);
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            if (theme === 'light') {
+                themeIconEl.textContent = '🌙';
+                themeLabelEl.textContent = 'الوضع الداكن';
+            } else {
+                themeIconEl.textContent = '☀️';
+                themeLabelEl.textContent = 'الوضع الفاتح';
+            }
+            try {
+                localStorage.setItem('lisan_studio_theme', theme);
+            } catch (_) {}
+        }
+
+        (function initSavedTheme() {
+            let saved = 'dark';
+            try {
+                saved = localStorage.getItem('lisan_studio_theme') || 'dark';
+            } catch (_) {}
+            applyTheme(saved);
+        })();
+
+        themeToggleBtn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            applyTheme(current === 'dark' ? 'light' : 'dark');
+        });
+
+        /* ==================== ترقيم الأسطر وحالة المؤشر ==================== */
+        function updateLineNumbers() {
+            const linesCount = Math.max(1, editor.value.split('\n').length);
+            let nums = '';
+            for (let i = 1; i <= linesCount; i++) {
+                nums += i + '\n';
+            }
+            lineNumbersEl.textContent = nums;
+            updateCursorInfo();
+        }
+
+        function updateCursorInfo() {
+            const val = editor.value;
+            const pos = editor.selectionStart || 0;
+            const upToCursor = val.slice(0, pos).split('\n');
+            const line = upToCursor.length;
+            const col = upToCursor[upToCursor.length - 1].length + 1;
+            const totalLines = Math.max(1, val.split('\n').length);
+            cursorStatusEl.textContent = `السطر ${line}، العمود ${col} | عدد الأسطر: ${totalLines}`;
+        }
+
+        editor.addEventListener('input', updateLineNumbers);
+        editor.addEventListener('click', updateCursorInfo);
+        editor.addEventListener('keyup', updateCursorInfo);
+        editor.addEventListener('scroll', () => {
+            lineNumbersEl.scrollTop = editor.scrollTop;
+        });
+
+        editor.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
+                editor.selectionStart = editor.selectionEnd = start + 4;
+                updateLineNumbers();
+            }
+        });
+
+        /* ==================== تهيئة محرك لسان (WASM + Desktop Studio) ==================== */
+        function refreshEngineBadge() {
+            if (!runtime) return;
+            if (runtime.nativeApiAvailable && runtime.useNativeBackend) {
+                const osName = (runtime.nativeInfo && runtime.nativeInfo.os) ? runtime.nativeInfo.os : 'Native';
+                statusEl.textContent = `استوديو سطح المكتب متصل (${osName})`;
+                engineDotEl.style.backgroundColor = '#10b981';
+            } else if (runtime.wasmReady) {
+                statusEl.textContent = 'محرك WebAssembly جاهز (دون إنترنت)';
+                engineDotEl.style.backgroundColor = '#38bdf8';
+            } else {
+                statusEl.textContent = 'المحرك غير متصل';
+                engineDotEl.style.backgroundColor = '#ef4444';
+            }
+        }
+
+        engineBadgeEl.addEventListener('click', () => {
+            if (!runtime || !runtime.nativeApiAvailable || !runtime.wasmReady) return;
+            runtime.useNativeBackend = !runtime.useNativeBackend;
+            refreshEngineBadge();
+            showToast(runtime.useNativeBackend
+                ? 'تم التبديل إلى المحرك الأصلي لسطح المكتب (Native Studio)'
+                : 'تم التبديل إلى محرك المتصفح المعزول (WebAssembly)');
+        });
+
+        async function initStudio() {
+            editor.value = examples.arabic_website;
+            selector.value = 'arabic_website';
+            updateLineNumbers();
+            detectUserPlatform();
+
+            try {
+                runtime = new LisanRuntime();
+                await runtime.init('./lisan.wasm');
+                refreshEngineBadge();
+                await executeDirect();
+            } catch (err) {
+                statusEl.textContent = 'تعذر تحميل المحرك: ' + err.message;
+                engineDotEl.style.backgroundColor = '#ef4444';
+                showConsoleOutput(
+                    'تعذر تحميل ملف WebAssembly (./lisan.wasm) عند الفتح المباشر من نظام الملفات.\n' +
+                    'لتشغيل الاستوديو بكامل قدراته، شغّل خادم لسان المحلي:\n' +
+                    '  lisan --studio\nأو أي خادم ملفات محلي داخل مجلد web/.',
+                    true
+                );
+            }
+        }
+
+        /* ==================== إدارة شاشة المخرجات والمعاينة الحية ==================== */
+        function setActiveToolbarBtn(activeBtn) {
+            modeButtons.forEach(btn => btn.classList.remove('active-mode'));
+            if (activeBtn) activeBtn.classList.add('active-mode');
+        }
+
+        function setDownloadTarget(ext, modeLabel) {
+            currentDownloadExt = ext;
+            currentModeName = modeLabel;
+            downloadExtBadgeEl.textContent = ext;
+            outputModeHintEl.textContent = 'الوضع الحالي: ' + modeLabel;
+        }
+
+        function isHtmlDocument(text) {
+            if (!text) return false;
+            const trimmed = text.trim();
+            return trimmed.includes('<!DOCTYPE html>') || trimmed.includes('<html') || trimmed.startsWith('<svg ');
+        }
+
+        function extractHtmlPortion(text) {
+            const docIdx = text.indexOf('<!DOCTYPE html>');
+            if (docIdx !== -1) return text.slice(docIdx);
+            const htmlIdx = text.indexOf('<html');
+            if (htmlIdx !== -1) return text.slice(htmlIdx);
+            return text;
+        }
+
+        function showVisualPreview(htmlContent, elapsedMs) {
+            lastHtmlOutput = extractHtmlPortion(htmlContent);
+            currentOutputText = lastHtmlOutput;
+            previewWrapper.style.display = 'flex';
+            consoleEl.style.display = 'none';
+            toggleViewBtn.style.display = 'inline-block';
+            toggleViewBtn.textContent = '📄 عرض شيفرة HTML';
+            viewportToggleBtn.style.display = 'inline-block';
+            outputTitleEl.textContent = '🌐 المعاينة البصرية الحية للموقع / التطبيق';
+            if (typeof elapsedMs === 'number') {
+                timingBadgeEl.textContent = elapsedMs.toFixed(1) + ' ms';
+            }
+            previewEl.srcdoc = lastHtmlOutput;
+            setDownloadTarget('.html', 'معاينة HTML5 حية');
+        }
+
+        function showConsoleOutput(text, isError = false, forceLtr = false, elapsedMs = null) {
+            currentOutputText = text || '';
+            previewWrapper.style.display = 'none';
+            consoleEl.style.display = 'block';
+
+            const looksLikeCode = forceLtr
+                || text.includes('#include <Arduino.h>')
+                || text.startsWith('#!/usr/bin/env python3')
+                || text.includes('<!DOCTYPE html>');
+
+            consoleEl.style.direction = looksLikeCode ? 'ltr' : 'rtl';
+            consoleEl.style.textAlign = looksLikeCode ? 'left' : 'right';
+            consoleEl.textContent = text || '(تم التنفيذ بنجاح بلا مخرجات نصية)';
+            consoleEl.style.color = isError ? 'var(--error)' : 'var(--console-text)';
+
+            if (!isHtmlDocument(text)) {
+                lastHtmlOutput = '';
+                toggleViewBtn.style.display = 'none';
+                viewportToggleBtn.style.display = 'none';
+            } else {
+                toggleViewBtn.style.display = 'inline-block';
+                toggleViewBtn.textContent = '👁️ المعاينة البصرية';
+            }
+
+            if (typeof elapsedMs === 'number') {
+                timingBadgeEl.textContent = elapsedMs.toFixed(1) + ' ms';
+            }
+        }
+
+        /* ==================== أوامر التشغيل والترجمة التسعة ==================== */
+        async function executeDirect() {
+            if (!runtime) return;
+            setActiveToolbarBtn(runDirectBtn);
+            const t0 = performance.now();
+            try {
+                const output = await runtime.runAsync(editor.value, 'interpret');
+                const dt = performance.now() - t0;
+                const isErr = output.startsWith('خطأ:') || output.startsWith('خطأ ');
+                if (!isErr && isHtmlDocument(output)) {
+                    consoleEl.textContent = output;
+                    showVisualPreview(output, dt);
+                } else {
+                    outputTitleEl.textContent = '🖥️ مخرجات التشغيل المباشر';
+                    setDownloadTarget('.lsn', runtime.nativeApiAvailable && runtime.useNativeBackend ? 'المحرك الأصلي (Native)' : 'المفسر القياسي (WASM)');
+                    showConsoleOutput(output, isErr, false, dt);
+                }
+            } catch (err) {
+                showConsoleOutput('خطأ تشغيل: ' + err.message, true);
+            }
+        }
+
+        async function executeVm() {
+            if (!runtime) return;
+            setActiveToolbarBtn(runVmBtn);
+            const t0 = performance.now();
+            try {
+                const output = runtime.wasmReady
+                    ? runtime.evalVm(editor.value)
+                    : await runtime.runAsync(editor.value, 'vm');
+                const dt = performance.now() - t0;
+                const isErr = output.startsWith('خطأ:') || output.startsWith('خطأ ');
+                if (!isErr && isHtmlDocument(output)) {
+                    consoleEl.textContent = output;
+                    showVisualPreview(output, dt);
+                } else {
+                    outputTitleEl.textContent = '⚡ مخرجات آلة البايت كود الافتراضية (VM)';
+                    setDownloadTarget('.lsn', 'آلة البايت كود الافتراضية (VM)');
+                    showConsoleOutput(output, isErr, false, dt);
+                }
+            } catch (err) {
+                showConsoleOutput('خطأ في آلة VM: ' + err.message, true);
+            }
+        }
+
+        async function runTranspiler(target, btnEl, titleText, ext, modeLabel) {
+            if (!runtime) return;
+            setActiveToolbarBtn(btnEl);
+            const t0 = performance.now();
+            try {
+                const generated = await runtime.transpileAsync(editor.value, target);
+                const dt = performance.now() - t0;
+                const isErr = generated.startsWith('خطأ:') || generated.startsWith('خطأ ');
+                outputTitleEl.textContent = titleText;
+                setDownloadTarget(isErr ? '.lsn' : ext, modeLabel);
+                showConsoleOutput(generated, isErr, !isErr, dt);
+            } catch (err) {
+                showConsoleOutput(`خطأ في الترجمة (${modeLabel}): ` + err.message, true);
+            }
+        }
+
+        runDirectBtn.addEventListener('click', executeDirect);
+        runVmBtn.addEventListener('click', executeVm);
+
+        arduinoBtn.addEventListener('click', () => {
+            runTranspiler('arduino', arduinoBtn, '🤖 كود الأردوينو المولّد C++ (.ino)', '.ino', 'مترجم Arduino C++');
+        });
+
+        esp32Btn.addEventListener('click', () => {
+            runTranspiler('esp32', esp32Btn, '📡 كود شريحة ESP32 المولّد C++ (.ino)', '.ino', 'مترجم ESP32 C++');
+        });
+
+        stm32Btn.addEventListener('click', () => {
+            runTranspiler('stm32', stm32Btn, '⚙️ كود متحكم STM32 المولّد C++ (.ino)', '.ino', 'مترجم STM32 C++');
+        });
+
+        raspberryBtn.addEventListener('click', () => {
+            runTranspiler('raspberry', raspberryBtn, '🍓 سكربت راسبيري باي المولّد Python 3 (.py)', '.py', 'مترجم Raspberry Pi Python 3');
+        });
+
+        livePreviewBtn.addEventListener('click', async () => {
+            if (!runtime) return;
+            setActiveToolbarBtn(livePreviewBtn);
+            const t0 = performance.now();
+            try {
+                const output = await runtime.runAsync(editor.value, 'interpret');
+                const dt = performance.now() - t0;
+                if (isHtmlDocument(output)) {
+                    showVisualPreview(output, dt);
+                } else {
+                    outputTitleEl.textContent = '🌐 معاينة الموقع / التطبيق';
+                    showConsoleOutput(
+                        output + '\n\n💡 ملاحظة: لتفعيل المعاينة البصرية الحية، استخدم صنف "موقع_ويب" أو "تطبيق_هاتف" (مثل المثال رقم 7 أو 8) ليقوم الكود بتوليد صفحة HTML5.',
+                        output.startsWith('خطأ:'),
+                        false,
+                        dt
+                    );
+                }
+            } catch (err) {
+                showConsoleOutput('خطأ في المعاينة: ' + err.message, true);
+            }
+        });
+
+        fmtBtn.addEventListener('click', async () => {
+            if (!runtime) return;
+            try {
+                const formatted = await runtime.transpileAsync(editor.value, 'fmt');
+                if (!formatted.startsWith('خطأ:')) {
+                    editor.value = formatted;
+                    updateLineNumbers();
+                    showToast('✨ تم تنسيق الشيفرة وضبط المحاذاة بنجاح');
+                } else {
+                    showConsoleOutput(formatted, true);
+                }
+            } catch (err) {
+                showConsoleOutput('خطأ في التنسيق: ' + err.message, true);
+            }
+        });
+
+        /* ==================== الحفظ والتنزيل وفتح الملفات ==================== */
+        function triggerDownload(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType + ';charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        saveDownloadBtn.addEventListener('click', () => {
+            const base = (selector.value || 'lisan_project').replace(/[^a-zA-Z0-9_-]/g, '_');
+            if (currentDownloadExt === '.ino' && currentOutputText) {
+                triggerDownload(base + '.ino', currentOutputText, 'text/x-c++src');
+                showToast('💾 تم تنزيل ملف المتحكم: ' + base + '.ino');
+            } else if (currentDownloadExt === '.py' && currentOutputText) {
+                triggerDownload(base + '_rpi.py', currentOutputText, 'text/x-python');
+                showToast('💾 تم تنزيل ملف راسبيري باي: ' + base + '_rpi.py');
+            } else if (currentDownloadExt === '.html' && (lastHtmlOutput || currentOutputText)) {
+                triggerDownload(base + '.html', lastHtmlOutput || currentOutputText, 'text/html');
+                showToast('💾 تم تنزيل صفحة الويب المستقلة: ' + base + '.html');
+            } else {
+                triggerDownload(base + '.lsn', editor.value, 'text/plain');
+                showToast('💾 تم تنزيل ملف شيفرة لسان: ' + base + '.lsn');
+            }
+        });
+
+        downloadSourceBtn.addEventListener('click', () => {
+            const base = (selector.value || 'lisan_source').replace(/[^a-zA-Z0-9_-]/g, '_');
+            triggerDownload(base + '.lsn', editor.value, 'text/plain');
+            showToast('⬇️ تم تنزيل الشيفرة المصدرية: ' + base + '.lsn');
+        });
+
+        openLocalFileBtn.addEventListener('click', () => openFileInput.click());
+        openFileInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                editor.value = String(reader.result || '');
+                document.getElementById('currentFileTag').textContent = file.name;
+                updateLineNumbers();
+                showToast('📂 تم فتح الملف: ' + file.name);
+            };
+            reader.readAsText(file, 'utf-8');
+            openFileInput.value = '';
+        });
+
+        /* ==================== أزرار النسخ والتبديل والمسح ==================== */
+        toggleViewBtn.addEventListener('click', () => {
+            if (previewWrapper.style.display === 'none') {
+                previewWrapper.style.display = 'flex';
+                consoleEl.style.display = 'none';
+                toggleViewBtn.textContent = '📄 عرض شيفرة HTML';
+            } else {
+                previewWrapper.style.display = 'none';
+                consoleEl.style.display = 'block';
+                consoleEl.style.direction = 'ltr';
+                consoleEl.style.textAlign = 'left';
+                consoleEl.textContent = lastHtmlOutput || currentOutputText;
+                toggleViewBtn.textContent = '👁️ المعاينة البصرية';
+            }
+        });
+
+        viewportToggleBtn.addEventListener('click', () => {
+            previewEl.classList.toggle('mobile-viewport');
+            const isMobile = previewEl.classList.contains('mobile-viewport');
+            viewportToggleBtn.classList.toggle('active', isMobile);
+            viewportToggleBtn.textContent = isMobile ? '🖥️ عرض كامل' : '📱 إطار جوال';
+        });
+
+        copySourceBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(editor.value);
+                showToast('📋 تم نسخ شيفرة لسان إلى الحافظة');
+            } catch (_) {
+                showToast('تعذر النسخ التلقائي');
+            }
+        });
+
+        copyOutputBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(currentOutputText || consoleEl.textContent);
+                showToast('📋 تم نسخ المخرجات إلى الحافظة');
+            } catch (_) {
+                showToast('تعذر النسخ التلقائي');
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            lastHtmlOutput = '';
+            showConsoleOutput('');
+            timingBadgeEl.textContent = 'جاهز';
+        });
+
+        selector.addEventListener('change', () => {
+            const key = selector.value;
+            if (examples[key]) {
+                editor.value = examples[key];
+                document.getElementById('currentFileTag').textContent = key + '.lsn';
+                updateLineNumbers();
+                executeDirect();
+            }
+        });
+
+        /* ==================== نافذة التحميل لسطح المكتب واختصارات لوحة المفاتيح ==================== */
+        function detectUserPlatform() {
+            const ua = (navigator.userAgent || '').toLowerCase();
+            if (ua.includes('aarch64') || ua.includes('arm64') && ua.includes('linux') || ua.includes('raspbian')) {
+                document.getElementById('plat-rpi').classList.add('detected');
+            } else if (ua.includes('win')) {
+                document.getElementById('plat-windows').classList.add('detected');
+            } else if (ua.includes('mac')) {
+                document.getElementById('plat-macos').classList.add('detected');
+            } else if (ua.includes('linux')) {
+                document.getElementById('plat-linux').classList.add('detected');
+            }
+        }
+
+        openDownloadsBtn.addEventListener('click', () => {
+            downloadsModal.classList.add('open');
+        });
+
+        closeDownloadsBtn.addEventListener('click', () => {
+            downloadsModal.classList.remove('open');
+        });
+
+        downloadsModal.addEventListener('click', (e) => {
+            if (e.target === downloadsModal) {
+                downloadsModal.classList.remove('open');
+            }
+        });
+
+        document.querySelectorAll('.copy-cmd-btn').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const targetId = btn.getAttribute('data-copy-target');
+                const codeEl = document.getElementById(targetId);
+                if (!codeEl) return;
+                try {
+                    await navigator.clipboard.writeText(codeEl.textContent.trim());
+                    showToast('✅ تم نسخ أمر التثبيت إلى الحافظة');
+                } catch (_) {
+                    showToast('يرجى تحديد الأمر ونسخه يدوياً');
+                }
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                executeDirect();
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+                saveDownloadBtn.click();
+            } else if (e.key === 'Escape' && downloadsModal.classList.contains('open')) {
+                downloadsModal.classList.remove('open');
+            }
+        });
+
+        initStudio();
+    </script>
+</body>
+</html>

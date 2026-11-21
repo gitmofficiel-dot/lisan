@@ -25,7 +25,8 @@
           "lisan"
         ],
         "extensions": [
-          ".lsn"
+          ".lsn",
+          ".lisan"
         ],
         "configuration": "./language-configuration.json"
       }

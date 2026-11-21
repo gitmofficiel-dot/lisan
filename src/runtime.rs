@@ -396,7 +396,7 @@ impl Interpreter {
             }
             Stmt::ImportModule { module, alias } => {
                 let target_name = alias.clone().unwrap_or_else(|| {
-                    if module.ends_with(".lsn") {
+                    if crate::modules::is_source_name(module) {
                         std::path::Path::new(module)
                             .file_stem()
                             .and_then(|s| s.to_str())
@@ -460,7 +460,7 @@ impl Interpreter {
                 }
 
                 let p = std::path::Path::new(module);
-                if p.exists() || module.ends_with(".lsn") {
+                if p.exists() || crate::modules::is_source_name(module) {
                     let stmts = crate::modules::load_file(p)?;
                     let mut child = Interpreter::for_cli();
                     child.run_program(&stmts)?;

@@ -96,6 +96,10 @@
 نمط = نمط + "#playground .btn2{align-self:flex-start}"
 نمط = نمط + ".web-footer{background:#091d37;color:#c9d5e8;border-radius:22px;padding:26px 18px;margin-top:56px;border:0}.web-footer a{color:#ffb98a}.web-footer p{color:#c9d5e8}"
 نمط = نمط + "::selection{background:#e65c1a;color:#fff}"
+نمط = نمط + ".stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:0;background:#fff;border:1px solid var(--border);border-radius:22px;margin-top:22px;box-shadow:0 6px 20px rgba(9,29,55,.06)}.stats>div{padding:22px 10px;text-align:center;border-inline-end:1px solid var(--border)}.stats>div:last-child{border:0}.stats b{display:block;font-size:clamp(34px,6vw,52px);font-weight:900;color:var(--primary);line-height:1.1}.stats small{color:var(--muted);font-weight:600}"
+نمط = نمط + ".tabs{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 4px}.tab{border:0;cursor:pointer;font:inherit;font-weight:700;padding:10px 20px;border-radius:999px;background:#13335c;color:#fff;transition:background .15s}.tab[aria-selected=true]{background:var(--primary)}"
+نمط = نمط + ".show{display:none;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}.show.on{display:grid}.show pre{font-family:ui-monospace,Consolas,monospace;margin:0;background:#06142a;border:1px solid rgba(255,255,255,.12)}.show .res{background:#0d2748;border-radius:12px;padding:14px;color:#ffb98a;font:13.5px/1.7 ui-monospace,Consolas,monospace;direction:rtl;text-align:right;white-space:pre-wrap}.show .res i{display:block;font-style:normal;font-weight:700;color:var(--primary);margin-bottom:6px;font-family:inherit}"
+نمط = نمط + "#showcase{background:linear-gradient(160deg,#0d2748,#091d37);color:#fff;border-radius:26px;padding:36px 22px!important;box-shadow:0 20px 50px rgba(9,29,55,.25)}#showcase h2{color:#fff}"
 نمط = نمط + "@media(max-width:480px){section.block{margin-top:36px}.ex{padding:12px}pre{font-size:12.5px}}"
 نمط = نمط + ".links{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}"
 نمط = نمط + ".links a{display:block;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;color:var(--text);text-decoration:none;font-weight:700}"
@@ -123,6 +127,19 @@
 رئيسي = رئيسي + "<div class=\"code\">دع الاسم = \"العالم\"؛<br>اطبع(\"مرحبا يا \" + الاسم + \"!\")؛</div>"
 رئيسي = رئيسي + "<div class=\"cta\"><a class=\"btn2\" href=\"#install\">" + ث("ابدأ التثبيت"، "Get started") + "</a><a class=\"btn2 ghost\" href=\"playground/\">" + ث("جرّب في المتصفح"، "Try in the browser") + "</a><a class=\"btn2 ghost\" href=\"" + الرابط + "\">GitHub</a></div></section>"
 موقعي.أضف_عنصر(رئيسي)
+
+# شريط الأرقام (فكرة من python.org)
+دع أرقام = "<div class=\"stats\"><div><b>83</b><small>" + ث("وحدة عتاد"، "hardware modules") + "</small></div><div><b>3</b><small>" + ث("طرق تنفيذ"، "execution paths") + "</small></div><div><b>3</b><small>" + ث("أنظمة أرقام"، "numeral systems") + "</small></div><div><b>MIT</b><small>" + ث("رخصة مفتوحة"، "open license") + "</small></div></div>"
+موقعي.أضف_عنصر(أرقام)
+
+# عرض الكود بالتبويبات (فكرة من python.org: أمثلة تفاعلية)
+دع عرض = "<section id=\"showcase\" class=\"block\"><h2>" + ث("جرّب لسان بنظرة"، "Lisan at a glance") + "</h2><div class=\"tabs\" role=\"tablist\">"
+عرض = عرض + "<button class=\"tab\" role=\"tab\" aria-selected=\"true\" data-t=\"0\">" + ث("أول برنامج"، "First program") + "</button><button class=\"tab\" role=\"tab\" aria-selected=\"false\" data-t=\"1\">" + ث("الدوال"، "Functions") + "</button><button class=\"tab\" role=\"tab\" aria-selected=\"false\" data-t=\"2\">" + ث("القوائم"، "Lists") + "</button></div>"
+عرض = عرض + "<div class=\"show on\" data-t=\"0\"><pre class=\"ar-code\">دع الاسم = \"العالم\"؛\nاطبع(\"مرحبا يا \" + الاسم + \"!\")؛</pre><div class=\"res\"><i>" + ث("الناتج"، "Output") + "</i>مرحبا يا العالم!</div></div>"
+عرض = عرض + "<div class=\"show\" data-t=\"1\"><pre class=\"ar-code\">دالة مضروب(ن) {\n    إذا (ن &lt;= 1) {\n        أرجع 1؛\n    }\n    أرجع ن * مضروب(ن - 1)؛\n}\nاطبع(\"مضروب 5 = \" + مضروب(5))؛</pre><div class=\"res\"><i>" + ث("الناتج"، "Output") + "</i>مضروب 5 = 120</div></div>"
+عرض = عرض + "<div class=\"show\" data-t=\"2\"><pre class=\"ar-code\">دع قياسات = [18، 21، 24]؛\nدع المجموع = 0؛\nلكل (قيمة في قياسات) {\n    المجموع = المجموع + قيمة؛\n}\nاطبع(\"المجموع: \" + المجموع)؛\nاطبع(\"عدد القياسات: \" + طول(قياسات))؛</pre><div class=\"res\"><i>" + ث("الناتج"، "Output") + "</i>المجموع: 63\nعدد القياسات: 3</div></div>"
+عرض = عرض + "<p class=\"sm\" style=\"color:#c9d5e8\">" + ث("المخرجات حقيقية: شغّلناها بمفسّر لسان."، "Outputs are real: we ran them with the Lisan interpreter.") + "</p></section>"
+موقعي.أضف_عنصر(عرض)
 
 # المزايا (من الشبكة الجاهزة في مكتبة موقع)
 موقعي.أضف_شبكة([
@@ -195,7 +212,7 @@
 # تذييل وسكربت التبديل
 دع تذييل = "<footer class=\"web-footer\"><p>" + ث("لسان مفتوحة المصدر برخصة MIT."، "Lisan is open source under the MIT license.") + "</p><p class=\"sm\">" + ث("هذه الصفحة مولَّدة بلغة لسان:"، "This page is generated by Lisan itself:") + " <a href=\"" + الرابط + "/blob/main/examples/site/site.lsn\">examples/site/site.lsn</a></p></footer>"
 موقعي.أضف_عنصر(تذييل)
-دع سكربت = "<script>function toggleTheme(){var d=document.documentElement;d.classList.toggle('dark');try{localStorage.setItem('lsn_theme',d.classList.contains('dark')?'dark':'light')}catch(e){}}try{if(localStorage.getItem('lsn_theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}function toggleLang(){var h=document.documentElement;var n=h.lang==='ar'?'en':'ar';setLang(n);}"
+دع سكربت = "<script>document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.tab');if(!b)return;var n=b.getAttribute('data-t');document.querySelectorAll('.tab').forEach(function(x){x.setAttribute('aria-selected',x===b?'true':'false')});document.querySelectorAll('.show').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-t')===n)})});function toggleTheme(){var d=document.documentElement;d.classList.toggle('dark');try{localStorage.setItem('lsn_theme',d.classList.contains('dark')?'dark':'light')}catch(e){}}try{if(localStorage.getItem('lsn_theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}function toggleLang(){var h=document.documentElement;var n=h.lang==='ar'?'en':'ar';setLang(n);}"
 سكربت = سكربت + "function setLang(l){var h=document.documentElement;h.lang=l;h.dir=l==='ar'?'rtl':'ltr';try{localStorage.setItem('lsn_lang',l)}catch(e){}}"
 سكربت = سكربت + "try{var s=localStorage.getItem('lsn_lang');if(s)setLang(s)}catch(e){}</script>"
 موقعي.أضف_عنصر(سكربت)

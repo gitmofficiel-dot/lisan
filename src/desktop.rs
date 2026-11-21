@@ -1021,7 +1021,7 @@ fn api_read_example(query: &str) -> (u16, String) {
         || name.contains("..")
         || name.contains('/')
         || name.contains('\\')
-        || !crate::modules::is_source_name(name)
+        || !crate::modules::is_source_name(&name)
     {
         return (
             400,

@@ -67,6 +67,7 @@
 نمط = نمط + "section.block{margin-top:56px}.block h2{font-size:clamp(24px,4vw,34px);margin-bottom:10px}"
 نمط = نمط + ".hero2{position:relative;overflow:hidden}.hero2::before{content:'';position:absolute;inset:-40% -10% auto;height:70%;background:radial-gradient(closest-side,rgba(139,92,246,.35),transparent);pointer-events:none}.hero2>*{position:relative}"
 نمط = نمط + "pre{scrollbar-width:thin}.lbl{font-weight:700;margin-bottom:6px}"
+نمط = نمط + ".path{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:14px;margin-top:12px}.path>*{display:flex;flex-direction:column;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;color:var(--text);text-decoration:none;min-width:0;transition:transform .2s,border-color .2s}.path>a:hover{transform:translateY(-3px);border-color:var(--primary)}.path small{color:var(--muted)}.path .n{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}"
 نمط = نمط + "@media(max-width:480px){section.block{margin-top:36px}.ex{padding:12px}pre{font-size:12.5px}}"
 نمط = نمط + ".links{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}"
 نمط = نمط + ".links a{display:block;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;color:var(--text);text-decoration:none;font-weight:700}"
@@ -80,10 +81,11 @@
 # الشريط العلوي
 دع شريط = "<header class=\"site-nav\"><a class=\"brand\" href=\"#top\">لسان · Lisan</a><nav>"
 شريط = شريط + "<a href=\"#features\">" + ث("المزايا"، "Features") + "</a>"
+شريط = شريط + "<a href=\"#start\">" + ث("ابدأ"، "Start") + "</a>"
 شريط = شريط + "<a href=\"#install\">" + ث("التثبيت"، "Install") + "</a>"
 شريط = شريط + "<a href=\"#examples\">" + ث("أمثلة"، "Examples") + "</a>"
 شريط = شريط + "<a href=\"#playground\">" + ث("التجربة"، "Playground") + "</a>"
-شريط = شريط + "<a href=\"#docs\">" + ث("الوثائق"، "Docs") + "</a></nav>"
+شريط = شريط + "<a href=\"#docs\">" + ث("الوثائق"، "Docs") + "</a><a href=\"#community\">" + ث("المجتمع"، "Community") + "</a></nav>"
 شريط = شريط + "<div class=\"tools\"><button class=\"theme-toggle-btn\" onclick=\"toggleTheme()\">" + ث("النسق"، "Theme") + "</button><button class=\"theme-toggle-btn\" onclick=\"toggleLang()\" aria-label=\"Language\"><span class=\"ar\">EN</span><span class=\"en\">عربي</span></button></div></header>"
 موقعي.أضف_عنصر(شريط)
 
@@ -103,6 +105,22 @@
     [ث("ويب وهاتف"، "Web and mobile"), ث("مكتبة لبناء صفحات الويب وتطبيقات PWA، وهذا الموقع مبني بها."، "A library for web pages and PWA apps. This very site is built with it."), "هاتف"],
     [ث("أدوات كاملة"، "Full tooling"), ث("منسّق، إطار اختبارات، خادم لغة LSP، مدير حزم، وإضافة VS Code."، "Formatter, test runner, LSP server, package manager and a VS Code extension."), "درع"]
 ])
+
+# ابدأ من هنا (نمط دليل المبتدئ)
+دع بداية = "<section id=\"start\" class=\"block\"><h2>" + ث("ابدأ من هنا"، "Start here") + "</h2><div class=\"path\">"
+بداية = بداية + "<a href=\"#install\"><span class=\"n\">1</span><b>" + ث("ثبّت لسان"، "Install Lisan") + "</b><small>" + ث("أمر واحد لكل نظام"، "One command per platform") + "</small></a>"
+بداية = بداية + "<a href=\"#examples\"><span class=\"n\">2</span><b>" + ث("اقرأ مثالًا يعمل"، "Read a working example") + "</b><small>" + ث("أول برنامج في ثلاثة أسطر"، "Your first program in three lines") + "</small></a>"
+بداية = بداية + "<a href=\"playground/\"><span class=\"n\">3</span><b>" + ث("جرّبه في المتصفح"، "Try it in the browser") + "</b><small>" + ث("بلا تثبيت"، "No install") + "</small></a>"
+بداية = بداية + "<a href=\"#docs\"><span class=\"n\">4</span><b>" + ث("تعمّق في الوثائق"، "Go deeper in the docs") + "</b><small>" + ث("القواعد والمترجم"، "Syntax and compiler") + "</small></a></div></section>"
+موقعي.أضف_عنصر(بداية)
+
+# الاستخدامات (نمط تطبيقات بايثون)
+دع استخدامات = "<section id=\"uses\" class=\"block\"><h2>" + ث("ماذا تبني بلسان؟"، "What can you build with Lisan?") + "</h2><div class=\"path\">"
+استخدامات = استخدامات + "<div><b>" + ث("التعلّم والتعليم"، "Learning and teaching") + "</b><small>" + ث("برمجة بكلمات عربية، ومفسّر مباشر"، "Programming in Arabic words with a direct interpreter") + "</small></div>"
+استخدامات = استخدامات + "<div><b>" + ث("المتحكمات"، "Microcontrollers") + "</b><small>Arduino · ESP32 · STM32 · Raspberry Pi</small></div>"
+استخدامات = استخدامات + "<div><b>" + ث("الويب والتطبيقات"، "Web and apps") + "</b><small>" + ث("مكتبة موقع، وهذه الصفحة مبنية بها"، "A web library; this page is built with it") + "</small></div>"
+استخدامات = استخدامات + "<div><b>" + ث("أدوات المطوّر"، "Developer tools") + "</b><small>" + ث("منسّق، اختبارات، خادم LSP، VS Code"، "Formatter, tests, LSP server, VS Code") + "</small></div></div></section>"
+موقعي.أضف_عنصر(استخدامات)
 
 # التثبيت
 دع تثبيت = "<section id=\"install\" class=\"block\"><h2>" + ث("التثبيت"، "Install") + "</h2><div class=\"steps\">"
@@ -136,6 +154,15 @@
 وثائق = وثائق + "<a href=\"" + الرابط + "/blob/main/CONTRIBUTING.md\">" + ث("المساهمة"، "Contributing") + "<small>CONTRIBUTING.md</small></a>"
 وثائق = وثائق + "</div></section>"
 موقعي.أضف_عنصر(وثائق)
+
+# المجتمع والمساهمة (نمط مجتمع بايثون)
+دع مجتمع = "<section id=\"community\" class=\"block\"><h2>" + ث("المجتمع"، "Community") + "</h2><p>" + ث("لسان مشروع مفتوح ويكبر بمساهمات الناس. المبتدئ والخبير مرحّب بهما."، "Lisan is open and grows with contributions. Beginners and experts are welcome.") + "</p><div class=\"links\">"
+مجتمع = مجتمع + "<a href=\"" + الرابط + "/issues/new/choose\">" + ث("أبلغ عن مشكلة أو اقترح ميزة"، "Report a bug or suggest a feature") + "<small>GitHub Issues</small></a>"
+مجتمع = مجتمع + "<a href=\"" + الرابط + "/blob/main/CONTRIBUTING.md\">" + ث("ساهم بالكود"، "Contribute code") + "<small>CONTRIBUTING.md</small></a>"
+مجتمع = مجتمع + "<a href=\"" + الرابط + "\">" + ث("ضع نجمة على المستودع"، "Star the repository") + "<small>GitHub</small></a>"
+مجتمع = مجتمع + "<a href=\"" + الرابط + "/blob/main/LICENSE\">" + ث("الرخصة المفتوحة"، "Open license") + "<small>MIT</small></a>"
+مجتمع = مجتمع + "</div></section>"
+موقعي.أضف_عنصر(مجتمع)
 
 # تذييل وسكربت التبديل
 دع تذييل = "<footer class=\"web-footer\"><p>" + ث("لسان مفتوحة المصدر برخصة MIT."، "Lisan is open source under the MIT license.") + "</p><p class=\"sm\">" + ث("هذه الصفحة مولَّدة بلغة لسان:"، "This page is generated by Lisan itself:") + " <a href=\"" + الرابط + "/blob/main/examples/site/site.lsn\">examples/site/site.lsn</a></p></footer>"

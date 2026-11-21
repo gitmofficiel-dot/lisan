@@ -112,6 +112,10 @@ else
 SVG
 fi
 
+if [ -f "$ROOT_DIR/assets/lisan.icns" ]; then
+    cp "$ROOT_DIR/assets/lisan.icns" "$APP_BUNDLE/Contents/Resources/lisan.icns"
+fi
+
 cp -r "$ROOT_DIR/examples/"* "$APP_BUNDLE/Contents/Resources/examples/" 2>/dev/null || true
 cp -r "$ROOT_DIR/editors/vscode/"* "$APP_BUNDLE/Contents/Resources/vscode/" 2>/dev/null || true
 

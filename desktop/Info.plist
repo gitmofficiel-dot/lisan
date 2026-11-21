@@ -19,7 +19,7 @@
     <key>CFBundleExecutable</key>
     <string>lisan-studio</string>
     <key>CFBundleIconFile</key>
-    <string>logo.svg</string>
+    <string>lisan</string>
     <key>LSMinimumSystemVersion</key>
     <string>11.0</string>
     <key>NSHighResolutionCapable</key>

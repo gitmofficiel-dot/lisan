@@ -1,0 +1,141 @@
+# موقع لسان الرسمي، مكتوب ومولَّد بلغة لسان نفسها
+# التشغيل من جذر المستودع:  lisan --interpret examples/site/site.lsn
+# الناتج: docs/index.html (جاهز للنشر عبر GitHub Pages)
+
+استورد "موقع"
+
+# نص ثنائي اللغة: عربي وإنجليزي، والتبديل بينهما في المتصفح
+دالة ث(عربي، إنجليزي) {
+    أرجع "<span class=\"ar\">" + عربي + "</span><span class=\"en\">" + إنجليزي + "</span>"
+}
+
+# تهريب رموز HTML ليظهر الكود كما هو
+دالة هرّب(نص_خام) {
+    دع ن = استبدل(نص_خام، "&"، "&amp;")
+    ن = استبدل(ن، "<"، "&lt;")
+    ن = استبدل(ن، ">"، "&gt;")
+    أرجع ن
+}
+
+# كتلة كود من ملف مثال حقيقي في المستودع، مع الناتج المتوقع
+دالة مثال(عنوان_ع، عنوان_إ، مسار، الناتج) {
+    دع كود = هرّب(اقرأ_ملف(مسار))
+    دع خرج = هرّب(الناتج)
+    أرجع "<article class=\"ex\"><h3>" + ث(عنوان_ع، عنوان_إ) + "</h3><div class=\"file\">" + مسار + "</div><pre class=\"ar-code\"><code>" + كود + "</code></pre><div class=\"out-label\">" + ث("الناتج"، "Output") + "</div><pre class=\"ar-code out\"><code>" + خرج + "</code></pre></article>"
+}
+
+دع الرابط = "https://github.com/gitmofficiel-dot/lisan"
+دع موقعي = جديد موقع_ويب("لسان | لغة البرمجة العربية — Lisan"، "ملكي")
+
+# تنسيق إضافي: شريط علوي متجاوب، كتل الكود، وتبديل اللغة
+دع نمط = "<style>"
+نمط = نمط + "html[lang=en] .ar{display:none} html[lang=ar] .en{display:none}"
+نمط = نمط + "html[lang=en]{direction:ltr} html[lang=en] body{direction:ltr}"
+نمط = نمط + ".container{padding:16px} img,svg{max-width:100%}"
+نمط = نمط + ".site-nav{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:12px 18px;position:sticky;top:10px;z-index:100;backdrop-filter:blur(10px)}"
+نمط = نمط + ".site-nav .brand{font-weight:900;font-size:20px;color:var(--text);text-decoration:none}"
+نمط = نمط + ".site-nav nav{display:flex;flex-wrap:wrap;gap:6px 16px}"
+نمط = نمط + ".site-nav nav a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px}"
+نمط = نمط + ".site-nav nav a:hover{color:var(--primary)}"
+نمط = نمط + ".site-nav .tools{display:flex;gap:8px}"
+نمط = نمط + ".hero2{background:linear-gradient(135deg,var(--surface),var(--surface-2));border:1px solid var(--border);border-radius:24px;padding:48px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px}"
+نمط = نمط + ".hero2 h1{font-size:clamp(34px,8vw,54px);font-weight:900;line-height:1.15}"
+نمط = نمط + ".hero2 p{color:var(--muted);max-width:680px;font-size:clamp(15px,3.6vw,18px);line-height:1.8}"
+نمط = نمط + ".hero2 .cta{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}"
+نمط = نمط + ".hero2 .code{direction:rtl;unicode-bidi:plaintext;text-align:right;background:#0b1020;color:#e5e7eb;border-radius:14px;padding:14px 18px;font-family:ui-monospace,Consolas,monospace;font-size:15px;max-width:100%;overflow-x:auto}"
+نمط = نمط + ".btn2{display:inline-flex;align-items:center;justify-content:center;padding:12px 24px;border-radius:14px;font-weight:700;text-decoration:none;color:#fff;background:linear-gradient(135deg,var(--primary),var(--accent))}"
+نمط = نمط + ".btn2.ghost{background:transparent;color:var(--text);border:1px solid var(--border)}"
+نمط = نمط + "section.block{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px 18px;display:flex;flex-direction:column;gap:14px;scroll-margin-top:90px}"
+نمط = نمط + "section.block h2{font-size:clamp(22px,5vw,28px);font-weight:800}"
+نمط = نمط + "section.block p{color:var(--muted)}"
+نمط = نمط + ".steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:14px}"
+نمط = نمط + ".lbl{font-weight:700;font-size:14px;margin-bottom:6px;color:var(--text)}"
+نمط = نمط + "pre{direction:ltr;text-align:left;background:#0b1020;color:#e5e7eb;border-radius:12px;padding:14px;overflow-x:auto;font-size:13.5px;line-height:1.6;max-width:100%}"
+نمط = نمط + "pre.ar-code{direction:rtl;unicode-bidi:plaintext;text-align:right}pre.ar-code code{white-space:pre-wrap;word-break:break-word}"
+نمط = نمط + ".sm a,.links a small{color:var(--primary)}.sm a{font-weight:700}"
+نمط = نمط + "pre code{font-family:ui-monospace,Consolas,monospace;white-space:pre}"
+نمط = نمط + "pre.out{background:#111827;color:#a7f3d0}"
+نمط = نمط + ".exs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px}"
+نمط = نمط + ".ex{background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:16px;min-width:0;display:flex;flex-direction:column;gap:8px}"
+نمط = نمط + ".ex h3{font-size:17px}.ex pre{max-height:360px}"
+نمط = نمط + ".file{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted);direction:ltr;text-align:left}"
+نمط = نمط + ".out-label{font-size:12px;font-weight:700;color:var(--muted)}"
+نمط = نمط + ".links{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}"
+نمط = نمط + ".links a{display:block;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;color:var(--text);text-decoration:none;font-weight:700}"
+نمط = نمط + ".links a small{display:block;color:var(--muted);font-weight:500;margin-top:4px}"
+نمط = نمط + ".links a:hover{border-color:var(--primary)}"
+نمط = نمط + ".lsn-card-body{min-width:0}.web-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}"
+نمط = نمط + ".sm{font-size:13px;color:var(--muted)}"
+نمط = نمط + "</style>"
+موقعي.أضف_عنصر(نمط)
+
+# الشريط العلوي
+دع شريط = "<header class=\"site-nav\"><a class=\"brand\" href=\"#top\">لسان · Lisan</a><nav>"
+شريط = شريط + "<a href=\"#features\">" + ث("المزايا"، "Features") + "</a>"
+شريط = شريط + "<a href=\"#install\">" + ث("التثبيت"، "Install") + "</a>"
+شريط = شريط + "<a href=\"#examples\">" + ث("أمثلة"، "Examples") + "</a>"
+شريط = شريط + "<a href=\"#playground\">" + ث("التجربة"، "Playground") + "</a>"
+شريط = شريط + "<a href=\"#docs\">" + ث("الوثائق"، "Docs") + "</a></nav>"
+شريط = شريط + "<div class=\"tools\"><button class=\"theme-toggle-btn\" onclick=\"toggleTheme()\">" + ث("النسق"، "Theme") + "</button><button class=\"theme-toggle-btn\" onclick=\"toggleLang()\" aria-label=\"Language\"><span class=\"ar\">EN</span><span class=\"en\">عربي</span></button></div></header>"
+موقعي.أضف_عنصر(شريط)
+
+# القسم الرئيسي
+دع رئيسي = "<section id=\"top\" class=\"hero2\"><h1>" + ث("لسان"، "Lisan") + "</h1>"
+رئيسي = رئيسي + "<p>" + ث("لغة برمجة عربية فصيحة مكتوبة بلغة Rust. اكتب بكلمات عربية وأرقام عربية وغربية وفارسية، وشغّلها بمفسّر أو آلة افتراضية، أو ترجمها إلى كود آلة أصلي عبر LLVM."، "An Arabic programming language written in Rust. Write with Arabic keywords and identifiers, use Western, Arabic-Indic or Persian digits, run it on an interpreter or VM, or compile natively through LLVM.") + "</p>"
+رئيسي = رئيسي + "<div class=\"code\">دع الاسم = \"العالم\"؛<br>اطبع(\"مرحبا يا \" + الاسم + \"!\")؛</div>"
+رئيسي = رئيسي + "<div class=\"cta\"><a class=\"btn2\" href=\"#install\">" + ث("ابدأ التثبيت"، "Get started") + "</a><a class=\"btn2 ghost\" href=\"playground/\">" + ث("جرّب في المتصفح"، "Try in the browser") + "</a><a class=\"btn2 ghost\" href=\"" + الرابط + "\">GitHub</a></div></section>"
+موقعي.أضف_عنصر(رئيسي)
+
+# المزايا (من الشبكة الجاهزة في مكتبة موقع)
+موقعي.أضف_شبكة([
+    [ث("كلمات عربية وكتابة من اليمين"، "Arabic keywords, right to left"), ث("المعرّفات والكلمات المفتاحية عربية، مع دعم النصوص ثنائية الاتجاه."، "Identifiers and keywords are Arabic, with bidirectional text support."), "كود"],
+    [ث("ثلاثة أنظمة للأرقام"، "Three digit systems"), ث("الأرقام الغربية 0-9 والعربية ٠-٩ والفارسية ۰-۹ بالتساوي: 42 = ٤٢ = ۴۲."، "Western 0-9, Arabic-Indic ٠-٩ and Persian ۰-۹ are equal: 42 = ٤٢ = ۴۲."), "شريحة"],
+    [ث("ثلاث طرق للتنفيذ"، "Three ways to run"), ث("مفسّر مباشر، آلة بايت كود افتراضية، أو ترجمة أصلية عبر LLVM وClang."، "A direct interpreter, a bytecode VM, or native compilation via LLVM and Clang."), "روبوت"],
+    [ث("المتحكمات والعتاد"، "Embedded targets"), ث("تصدير إلى Arduino وESP32 وSTM32 وRaspberry Pi."، "Export to Arduino, ESP32, STM32 and Raspberry Pi."), "أردوينو"],
+    [ث("ويب وهاتف"، "Web and mobile"), ث("مكتبة لبناء صفحات الويب وتطبيقات PWA، وهذا الموقع مبني بها."، "A library for web pages and PWA apps. This very site is built with it."), "هاتف"],
+    [ث("أدوات كاملة"، "Full tooling"), ث("منسّق، إطار اختبارات، خادم لغة LSP، مدير حزم، وإضافة VS Code."، "Formatter, test runner, LSP server, package manager and a VS Code extension."), "درع"]
+])
+
+# التثبيت
+دع تثبيت = "<section id=\"install\" class=\"block\"><h2>" + ث("التثبيت"، "Install") + "</h2><div class=\"steps\">"
+تثبيت = تثبيت + "<div><div class=\"lbl\">Linux · macOS · Raspberry Pi</div><pre><code>curl -sSf https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.sh | sh</code></pre></div>"
+تثبيت = تثبيت + "<div><div class=\"lbl\">Windows (PowerShell)</div><pre><code>irm https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.ps1 | iex</code></pre></div>"
+تثبيت = تثبيت + "<div><div class=\"lbl\">" + ث("من المصدر"، "From source") + " (Rust)</div><pre><code>git clone " + الرابط + ".git\ncd lisan\ncargo run -- examples/hello.lsn</code></pre></div>"
+تثبيت = تثبيت + "<div><div class=\"lbl\">" + ث("تشغيل ملف"، "Run a file") + "</div><pre><code>lisan --interpret examples/hello.lsn</code></pre></div></div>"
+تثبيت = تثبيت + "<p class=\"sm\">" + ث("حزم جاهزة لكل الأنظمة في صفحة"، "Prebuilt packages for every platform are on the") + " <a href=\"" + الرابط + "/releases/latest\">Releases</a>.</p></section>"
+موقعي.أضف_عنصر(تثبيت)
+
+# أمثلة حقيقية من المستودع
+دع أمثلة = "<section id=\"examples\" class=\"block\"><h2>" + ث("أمثلة حقيقية"، "Real examples") + "</h2><p>" + ث("هذه الملفات من مجلد examples في المستودع، وقد شغّلناها بالإصدار 1.0.0."، "These files come from the examples folder in the repository and were run with version 1.0.0.") + "</p><div class=\"exs\">"
+أمثلة = أمثلة + مثال("أول برنامج"، "Hello"، "examples/hello.lsn"، "مرحبا يا العالم!\nعددنا: 12")
+أمثلة = أمثلة + مثال("دالة تعيد نفسها"، "A recursive function"، "examples/functions.lsn"، "مضروب 5 = 120")
+أمثلة = أمثلة + مثال("قوائم وحلقات"، "Lists and loops"، "examples/lists.lsn"، "المجموع: 90\nعدد القياسات: 4\nالقياس الثاني: 22\nهل يوجد 26؟ صحيح")
+أمثلة = أمثلة + مثال("أصناف وكائنات"، "Classes and objects"، "examples/oop_car.lsn"، "تم إنشاء الكائن من صنف: سيارة\nسيارة تسلا تسير بسرعة: 0 كم/س\n--- تسارع بمقدار 80 ---\nسيارة تسلا تسير بسرعة: 80 كم/س\n...")
+أمثلة = أمثلة + "</div></section>"
+موقعي.أضف_عنصر(أمثلة)
+
+# التجربة في المتصفح
+دع تجربة = "<section id=\"playground\" class=\"block\"><h2>" + ث("التجربة في المتصفح"، "Playground") + "</h2><p>" + ث("استوديو لسان يعمل داخل المتصفح بمفسّر WebAssembly، بلا تثبيت."، "Lisan Studio runs in your browser on a WebAssembly interpreter, with no install.") + "</p><div class=\"cta\"><a class=\"btn2\" href=\"playground/\">" + ث("افتح الاستوديو"، "Open the Studio") + "</a></div></section>"
+موقعي.أضف_عنصر(تجربة)
+
+# الوثائق
+دع وثائق = "<section id=\"docs\" class=\"block\"><h2>" + ث("الوثائق"، "Documentation") + "</h2><div class=\"links\">"
+وثائق = وثائق + "<a href=\"" + الرابط + "/blob/main/docs/SYNTAX.md\">" + ث("قواعد اللغة"، "Syntax") + "<small>docs/SYNTAX.md</small></a>"
+وثائق = وثائق + "<a href=\"" + الرابط + "/blob/main/docs/NUMBERS-AND-STYLE.md\">" + ث("الأرقام والأسلوب"، "Numbers and style") + "<small>docs/NUMBERS-AND-STYLE.md</small></a>"
+وثائق = وثائق + "<a href=\"" + الرابط + "/blob/main/docs/EXECUTION-PATHS.md\">" + ث("مسارات التنفيذ"، "Execution paths") + "<small>docs/EXECUTION-PATHS.md</small></a>"
+وثائق = وثائق + "<a href=\"" + الرابط + "/blob/main/docs/NATIVE-COMPILER.md\">" + ث("المترجم الأصلي"، "Native compiler") + "<small>docs/NATIVE-COMPILER.md</small></a>"
+وثائق = وثائق + "<a href=\"" + الرابط + "/blob/main/docs/ROADMAP.md\">" + ث("خارطة الطريق"، "Roadmap") + "<small>docs/ROADMAP.md</small></a>"
+وثائق = وثائق + "<a href=\"" + الرابط + "/blob/main/CONTRIBUTING.md\">" + ث("المساهمة"، "Contributing") + "<small>CONTRIBUTING.md</small></a>"
+وثائق = وثائق + "</div></section>"
+موقعي.أضف_عنصر(وثائق)
+
+# تذييل وسكربت التبديل
+دع تذييل = "<footer class=\"web-footer\"><p>" + ث("لسان مفتوحة المصدر برخصة MIT."، "Lisan is open source under the MIT license.") + "</p><p class=\"sm\">" + ث("هذه الصفحة مولَّدة بلغة لسان:"، "This page is generated by Lisan itself:") + " <a href=\"" + الرابط + "/blob/main/examples/site/site.lsn\">examples/site/site.lsn</a></p></footer>"
+موقعي.أضف_عنصر(تذييل)
+دع سكربت = "<script>function toggleLang(){var h=document.documentElement;var n=h.lang==='ar'?'en':'ar';setLang(n);}"
+سكربت = سكربت + "function setLang(l){var h=document.documentElement;h.lang=l;h.dir=l==='ar'?'rtl':'ltr';try{localStorage.setItem('lsn_lang',l)}catch(e){}}"
+سكربت = سكربت + "try{var s=localStorage.getItem('lsn_lang');if(s)setLang(s)}catch(e){}</script>"
+موقعي.أضف_عنصر(سكربت)
+
+موقعي.حفظ("docs/index.html")
+اطبع("تم توليد docs/index.html")

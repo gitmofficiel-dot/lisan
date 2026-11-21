@@ -53,7 +53,7 @@ fn real_main() {
             if let Ok(entries) = std::fs::read_dir(".") {
                 for entry in entries.flatten() {
                     let p = entry.path();
-                    if p.extension().and_then(|s| s.to_str()) == Some("lsn") {
+                    if p.extension().and_then(|s| s.to_str()).map(lisan::modules::is_source_ext).unwrap_or(false) {
                         list.push(p);
                     }
                 }
@@ -308,7 +308,7 @@ fn real_main() {
         }
         return;
     }
-    if args.len() == 1 && args[0].ends_with(".lsn") {
+    if args.len() == 1 && lisan::modules::is_source_name(&args[0]) {
         let source = std::path::Path::new(&args[0]);
         let stem = source.file_stem().unwrap().to_string_lossy();
         let name = if cfg!(windows) { format!("{}.exe", stem) } else { stem.to_string() };

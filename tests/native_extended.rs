@@ -71,3 +71,67 @@ fn native_collections_binary_executes_without_interpreter(){
     assert!(process.status.success(),"{}",String::from_utf8_lossy(&process.stderr));
     assert_eq!(String::from_utf8_lossy(&process.stdout),"مجموع القيم = 65\nعدد الحروف = 4\n5\n3\n1\nنجحت الاختبارات الأصلية\n");
 }
+#[test]
+fn native_functions_accept_and_return_strings() {
+    let source = r#"
+دالة تحية(اسم) {
+    أرجع "مرحبا " + اسم؛
+}
+دالة طول_نص(ن) {
+    أرجع طول(ن)؛
+}
+دع رسالة = تحية("لسان")؛
+اطبع(رسالة)؛
+اطبع(طول_نص(رسالة))؛
+"#;
+    let ir = compile_ir(source).expect("string function args/return should compile");
+    assert!(ir.contains("define ptr @lisan_fn_0_txt(ptr %arg0)"));
+    assert!(ir.contains("define double @lisan_fn_1_txt(ptr %arg0)"));
+    assert!(ir.contains("call ptr @lisan_fn_0_txt(ptr "));
+    assert!(ir.contains("call double @lisan_fn_1_txt(ptr "));
+}
+
+#[test]
+fn native_functions_accept_and_return_number_lists() {
+    let source = r#"
+دالة اجمع_قائمة(ق) {
+    دع ناتج = 0؛
+    لكل عنصر في ق {
+        ناتج = ناتج + عنصر؛
+    }
+    أرجع ناتج؛
+}
+دالة مرر_قائمة(ق) {
+    أرجع ق؛
+}
+دع أرقام = [10, 20, 30]؛
+دع نسخة = مرر_قائمة(أرقام)؛
+اطبع(اجمع_قائمة(نسخة))؛
+"#;
+    let ir = compile_ir(source).expect("list function args/return should compile");
+    assert!(ir.contains("define double @lisan_fn_0_list({ i64, ptr } %arg0)"));
+    assert!(ir.contains("define { i64, ptr } @lisan_fn_1_list({ i64, ptr } %arg0)"));
+    assert!(ir.contains("call { i64, ptr } @lisan_fn_1_list({ i64, ptr } "));
+    assert!(ir.contains("call double @lisan_fn_0_list({ i64, ptr } "));
+}
+
+#[test]
+fn native_functions_support_mixed_params_and_recursion() {
+    let source = r#"
+دالة وصف(عنوان, قيم, معامل) {
+    أرجع طول(عنوان) + مجموع(قيم) * معامل؛
+}
+دالة مجموع_تنازلي(ن) {
+    إذا (ن <= 1) {
+        أرجع 1؛
+    }
+    أرجع ن + مجموع_تنازلي(ن - 1)؛
+}
+اطبع(وصف("لسان", [1, 2, 3], 2))؛
+اطبع(مجموع_تنازلي(4))؛
+"#;
+    let ir = compile_ir(source).expect("mixed params and recursion should compile");
+    assert!(ir.contains("define double @lisan_fn_0_txt_list_num(ptr %arg0, { i64, ptr } %arg1, double %arg2)"));
+    assert!(ir.contains("define double @lisan_fn_1(double %arg0)"));
+    assert!(ir.contains("call double @lisan_fn_1(double "));
+}

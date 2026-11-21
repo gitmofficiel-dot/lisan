@@ -6,11 +6,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Type { Number, Boolean, Text, NumberList }
 impl Type {
     fn llvm(self) -> &'static str { match self { Self::Number => "double", Self::Boolean => "i1", Self::Text => "ptr", Self::NumberList => "{ i64, ptr }" } }
     fn arabic(self) -> &'static str { match self { Self::Number => "عدد", Self::Boolean => "منطقي", Self::Text => "نص", Self::NumberList => "قائمة أرقام" } }
+    fn suffix(self) -> &'static str { match self { Self::Number => "num", Self::Boolean => "bool", Self::Text => "txt", Self::NumberList => "list" } }
+    fn default_operand(self) -> &'static str { match self { Self::Number => "0.0", Self::Boolean => "false", Self::Text => "null", Self::NumberList => "zeroinitializer" } }
 }
 #[derive(Clone)]
 struct Value { ty: Type, operand: String }
@@ -26,11 +28,12 @@ struct FunctionWriter<'a> {
     next: usize,
     terminated: bool,
     in_function: bool,
-}
+    return_type: Option<Type>,
+    }
 
 impl<'a> FunctionWriter<'a> {
     fn new(module: &'a mut Module, in_function: bool) -> Self {
-        Self { module, lines: vec!["entry:".into()], scopes: vec![HashMap::new()], loops: Vec::new(), next: 0, terminated: false, in_function }
+        Self { module, lines: vec!["entry:".into()], scopes: vec![HashMap::new()], loops: Vec::new(), next: 0, terminated: false, in_function , return_type: None}
     }
     fn new_reg(&mut self) -> String { let i=self.next; self.next+=1; format!("%t{}", i) }
     fn new_label(&mut self, prefix: &str) -> String { let i=self.next; self.next+=1; format!("{}.{}",prefix,i) }
@@ -430,13 +433,7 @@ impl<'a> FunctionWriter<'a> {
                     }
                     _=>{}
                 }
-                let (symbol,count)=self.module.functions.get(name).cloned().ok_or_else(||format!("الدالة '{}' غير مدعومة في المترجم الأصلي",name))?;
-                if count!=args.len(){return Err(format!("الدالة '{}' تتطلب {} معاملات",name,count));}
-                let mut operands=Vec::new();
-                for arg in args {let v=self.generate_expr(arg)?;self.requires(&v,Type::Number,"معامل الدالة")?;operands.push(format!("double {}",v.operand));}
-                let reg=self.new_reg();
-                self.instruction(format!("{} = call double @{}({})",reg,symbol,operands.join(", ")));
-                Ok(Value{ty:Type::Number,operand:reg})
+                let fun_arity = self.module.functions.get(name).map(|(_, f)| f.params.len()).ok_or_else(|| format!("الدالة '{}' غير معرّفة", name))?; if fun_arity != args.len() { return Err(format!("الدالة '{}' تتوقع {} معاملات", name, fun_arity)); } let mut values = Vec::with_capacity(args.len()); for arg in args { values.push(self.generate_expr(arg)?); } let arg_types: Vec<Type> = values.iter().map(|v| v.ty).collect(); let (symbol, ret_ty) = self.module.specialize(name, &arg_types)?; let operands: Vec<String> = values.iter().map(|v| format!("{} {}", v.ty.llvm(), v.operand)).collect(); let reg = self.new_reg(); self.instruction(format!("{} = call {} @{}({})", reg, ret_ty.llvm(), symbol, operands.join(", "))); Ok(Value { ty: ret_ty, operand: reg })
             }
             _=>Err("هذه البنية لم تُنفّذ بعد في المترجم الأصلي (القواميس أو القيم الفارغة)".into())
         }
@@ -486,12 +483,7 @@ impl<'a> FunctionWriter<'a> {
             }
             Stmt::Break=>{let label=self.loops.last().ok_or("توقف خارج حلقة")?.break_label.clone();self.branch(&label);Ok(())},
             Stmt::Continue=>{let label=self.loops.last().ok_or("تابع خارج حلقة")?.continue_label.clone();self.branch(&label);Ok(())},
-            Stmt::Return(result)=>{
-                if !self.in_function{return Err("أرجع خارج دالة".into());}
-                let result=match result {Some(expr)=>self.generate_expr(expr)?,None=>Value{ty:Type::Number,operand:"0.0".into()}};
-                self.requires(&result,Type::Number,"القيمة المعادة من الدالة")?;
-                self.instruction(format!("ret double {}",result.operand));self.terminated=true;Ok(())
-            }
+           Stmt::Return(result) => { if !self.in_function { return Err("لا يمكن استخدام أرجع خارج دالة".into()); } let result = match result { Some(expr) => self.generate_expr(expr)?, None => Value { ty: Type::Number, operand: "0.0".into() }, }; if let Some(expected) = self.return_type { self.requires(&result, expected, "قيمة الإرجاع يجب أن تطابق نوع إرجاع الدالة")?; } else { self.return_type = Some(result.ty); } self.instruction(format!("ret {} {}", result.ty.llvm(), result.operand)); self.terminated = true; Ok(()) }
             Stmt::Function(_)=>Err("تعريف دالة داخل كتلة غير مدعوم في المترجم الأصلي".into()),
             Stmt::Import(_)=>Err("الاستيراد المتداخل غير مسموح".into()),
             Stmt::ForEach(name,iterable,body)=>self.for_each(name,iterable,body),
@@ -546,46 +538,31 @@ impl<'a> FunctionWriter<'a> {
     }
 }
 
-struct Module { strings: Vec<(String,Vec<u8>)>, functions:HashMap<String,(String,usize)>, needs_pow:bool, intrinsics:std::collections::HashSet<String> }
+struct Module { strings: Vec<(String,Vec<u8>)>, functions: HashMap<String, (usize, Function)>, specializations: HashMap<(String, Vec<Type>), (String, Type)>, emitted_functions: Vec<String>>, needs_pow:bool, intrinsics:std::collections::HashSet<String> }
 impl Module {
-    fn new()->Self { Self { strings:Vec::new(),functions:HashMap::new(),needs_pow:false,intrinsics:std::collections::HashSet::new() } }
+    fn new() -> Self { Self { strings: Vec::new(), functions: HashMap::new(), specializations: HashMap::new(), emitted_functions: Vec::new(), needs_pow: false, intrinsics: std::collections::HashSet::new() } }
     fn intern_text(&mut self, value:&str)->String {
         let sym=format!(".text_{}",self.strings.len());
         let mut bytes=value.as_bytes().to_vec(); bytes.push(0);
         self.strings.push((sym.clone(),bytes));sym
     }
+    fn specialize(&mut self, name: &str, arg_types: &[Type]) -> Result<(String, Type), String> { let key = (name.to_string(), arg_types.to_vec()); if let Some(existing) = self.specializations.get(&key) { return Ok(existing.clone()); } let (fn_index, fun) = self.functions.get(name).cloned().ok_or_else(|| format!("الدالة '{}' غير معرّفة", name))?; let symbol = if arg_types.iter().all(|t| *t == Type::Number) { format!("lisan_fn_{}", fn_index) } else { let sig = arg_types.iter().map(|t| t.suffix()).collect::<Vec<_>>().join("_"); format!("lisan_fn_{}_{}", fn_index, sig) }; self.specializations.insert(key.clone(), (symbol.clone(), Type::Number)); let (ret_ty, body) = { let mut writer = FunctionWriter::new(self, true); for (i, param) in fun.params.iter().enumerate() { writer.register(param, Value { ty: arg_types[i], operand: format!("%arg{}", i) })?; } writer.statements(&fun.body)?; let ret_ty = writer.return_type.unwrap_or(Type::Number); if !writer.terminated { writer.instruction(format!("ret {} {}", ret_ty.llvm(), ret_ty.default_operand())); } (ret_ty, writer.lines.join("\n")) }; let params = arg_types.iter().enumerate().map(|(i, ty)| format!("{} %arg{}", ty.llvm(), i)).collect::<Vec<_>>().join(", "); let def = format!("define {} @{}({}) {{\n{}\n}}", ret_ty.llvm(), symbol, params, body); self.specializations.insert(key, (symbol.clone(), ret_ty)); self.emitted_functions.push(def); Ok((symbol, ret_ty)) }
 }
 
 /// Emit LLVM IR directly from the Lisan AST. This does not call or embed the interpreter.
 pub fn generate_llvm(stmts:&[Stmt])->Result<String,String>{
     let mut module=Module::new();
-    let mut functions=Vec::<Function>::new();let mut main_stmts=Vec::new();
+    let mut fn_names: Vec<String> = Vec::new();let mut main_stmts=Vec::new();
     for stmt in stmts {
         match stmt.unwrap_spanned() {
             Stmt::Function(f)=>{
                 if module.functions.contains_key(&f.name){return Err(format!("تعريف مكرر للدالة '{}'",f.name));}
-                let symbol=format!("lisan_fn_{}",functions.len());
-                module.functions.insert(f.name.clone(),(symbol,f.params.len()));functions.push(f.clone());
+                module.functions.insert(f.name.clone(), (fn_names.len(), f.clone())); fn_names.push(f.name.clone());
             }
             _ => main_stmts.push(stmt.clone()),
         }
     }
-    let mut function_ir=Vec::new();
-    for fun in &functions {
-        let (symbol,_)=module.functions.get(&fun.name).unwrap().clone();
-        let mut writer=FunctionWriter::new(&mut module,true);
-        for (i,param) in fun.params.iter().enumerate() {
-            writer.register(param,Value{ty:Type::Number,operand:format!("%arg{}",i)})?;
-        }
-        writer.statements(&fun.body)?;
-        if !writer.terminated {writer.instruction("ret double 0.0");}
-        let params=(0..fun.params.len()).map(|i|format!("double %arg{}",i)).collect::<Vec<_>>().join(", ");
-        function_ir.push(format!("define double @{}({}) {{\n{}\n}}",symbol,params,writer.lines.join("\n")));
-    }
-    let mut writer=FunctionWriter::new(&mut module,false);
-    writer.statements(&main_stmts)?;
-    if !writer.terminated {writer.instruction("ret i32 0");}
-    let main_ir=format!("define i32 @main() {{\n{}\n}}",writer.lines.join("\n"));
+    let main_fn = { let mut writer = FunctionWriter::new(&mut module, false); writer.statements(&main_stmts)?; if !writer.terminated { writer.instruction("ret i32 0"); } format!("define i32 @main() {{\n{}\n}}", writer.lines.join("\n")) }; for fn_name in &fn_names { if !module.specializations.keys().any(|(n, _)| n == fn_name) { let arity = module.functions[fn_name].1.params.len(); module.specialize(fn_name, &vec![Type::Number; arity])?; } }
     let mut ir=String::from("; Native Lisan: source language compiled to LLVM IR, not interpreted\nsource_filename = \"lisan_native\"\n\n");
     ir.push_str("declare i32 @puts(ptr)\ndeclare i32 @printf(ptr, ...)\ndeclare i32 @snprintf(ptr, i64, ptr, ...)\ndeclare ptr @malloc(i64)\ndeclare ptr @strcpy(ptr, ptr)\ndeclare ptr @strcat(ptr, ptr)\ndeclare i64 @strlen(ptr)\ndeclare i32 @strcmp(ptr, ptr)\ndeclare void @exit(i32)\ndeclare double @llvm.floor.f64(double)\n");
     for intrinsic in ["fabs","sqrt","round","floor","ceil"] {if module.intrinsics.contains(intrinsic){ir.push_str(&format!("declare double @llvm.{}.f64(double)\n",intrinsic));}}
@@ -603,7 +580,7 @@ pub fn generate_llvm(stmts:&[Stmt])->Result<String,String>{
     for (sym,bytes) in &module.strings {
         ir.push_str(&format!("@{} = private unnamed_addr constant [{} x i8] c\"{}\"\n",sym,bytes.len(),escape_llvm(bytes)));
     }
-    ir.push('\n');for function in function_ir {ir.push_str(&function);ir.push_str("\n\n");}ir.push_str(&main_ir);ir.push('\n');Ok(ir)
+    ir.push('\n'); for function in &module.emitted_functions { ir.push_str(function); ir.push_str("\n\n"); } ir.push_str(&main_fn); ir.push('\n'); Ok(ir)
 }
 fn escape_llvm(bytes:&[u8])->String {
     bytes.iter().map(|b|if (32..=126).contains(b)&&*b!=b'"'&&*b!=b'\\'{(*b as char).to_string()} else {format!("\\{:02X}",b)}).collect()

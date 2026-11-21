@@ -48,7 +48,7 @@ fn walk_dir(dir: &Path, acc: &mut Vec<PathBuf>) {
                 walk_dir(&path, acc);
             } else if path.is_file() {
                 if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if ext == "lsn" {
+                    if crate::modules::is_source_ext(ext) {
                         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                             if stem.starts_with("test_")
                                 || stem.ends_with("_test")

@@ -590,17 +590,42 @@ pub fn emit_file(path:&Path)->Result<String,String>{
     let ast=crate::modules::load_file(path)?;
     generate_llvm(&ast)
 }
+pub fn normalize_executable_path(output: &Path) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if output.extension().is_none() {
+            let mut with_ext = output.as_os_str().to_os_string();
+            with_ext.push(".exe");
+            return PathBuf::from(with_ext);
+        }
+    }
+    output.to_path_buf()
+}
+
+pub fn resolve_c_compiler() -> String {
+    std::env::var("CC")
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "clang".to_string())
+}
 
 /// Compiles a Lisan file to a genuine native executable, without a VM or bundled interpreter.
 /// Clang is used as the LLVM assembler/code generator and system linker.
 pub fn build_native(source:&Path,output:&Path)->Result<PathBuf,String>{
     let ir=emit_file(source)?;
-    let destination=if output.is_absolute(){output.to_path_buf()} else {std::env::current_dir().map_err(|e|e.to_string())?.join(output)};
+    let normalized = normalize_executable_path(output);
+    let destination = if normalized.is_absolute() { normalized } else { std::env::current_dir().map_err(|e| e.to_string())?.join(normalized) };
     let parent=destination.parent().ok_or("مسار الناتج غير صالح")?;
     fs::create_dir_all(parent).map_err(|e|format!("تعذر إعداد مجلد الناتج: {}",e))?;
     let temporary=parent.join(format!(".lisan-ir-{}-{}.ll",std::process::id(),destination.file_name().unwrap().to_string_lossy()));
-    fs::write(&temporary,ir).map_err(|e|format!("تعذر كتابة LLVM IR: {}",e))?;
-    let command=Command::new("clang").arg("-x").arg("ir").arg(&temporary).arg("-O2").arg("-o").arg(&destination).arg("-lm").output();
+     fs::write(&temporary,ir).map_err(|e|format!("تعذر كتابة LLVM IR: {}",e))?;
+       let compiler = resolve_c_compiler();
+    let mut cmd = Command::new(&compiler);
+    cmd.arg("-x").arg("ir").arg(&temporary).arg("-O2").arg("-o").arg(&destination);
+    #[cfg(not(target_os = "windows"))]
+    cmd.arg("-lm");
+    let command = cmd.output();
     let _=fs::remove_file(&temporary);
     let result=command.map_err(|e|format!("تعذر تشغيل Clang؛ ثبّت clang وأضفه إلى PATH: {}",e))?;
     if !result.status.success(){return Err(format!("فشلت الترجمة الأصلية: {}",String::from_utf8_lossy(&result.stderr)));}

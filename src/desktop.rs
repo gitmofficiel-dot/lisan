@@ -1128,6 +1128,56 @@ fn escape_json_str(s: &str) -> String {
     out
 }
 
+fn probe_tool(candidates: &[&str], version_arg: &str) -> Option<String> {
+    for bin in candidates {
+        if let Ok(out) = std::process::Command::new(bin).arg(version_arg).output() {
+            if out.status.success() {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                let first_line = stdout.lines().next()
+                    .or_else(|| stderr.lines().next())
+                    .unwrap_or("ok")
+                    .trim();
+                return Some(format!("{} ({})", bin, first_line));
+            }
+        }
+    }
+    None
+}
+
+pub fn collect_environment_report() -> String {
+    let mut report = String::new();
+    report.push_str("=== Lisan Developer Environment (فحص بيئة التطوير) ===\n");
+    report.push_str(&format!("OS: {}\n", std::env::consts::OS));
+    report.push_str(&format!("Arch: {}\n", std::env::consts::ARCH));
+    if let Ok(exe) = std::env::current_exe() {
+        report.push_str(&format!("Lisan Binary: {}\n", exe.display()));
+    }
+    let cc_env = std::env::var("CC").ok().filter(|s| !s.trim().is_empty());
+    let clang_status = if let Some(ref cc) = cc_env {
+        probe_tool(&[cc.as_str(), "clang"], "--version")
+    } else {
+        probe_tool(&["clang"], "--version")
+    };
+    match clang_status {
+        Some(v) => report.push_str(&format!("Native Compiler (LLVM/Clang): OK - {}\n", v)),
+        None => report.push_str("Native Compiler (LLVM/Clang): MISSING (install clang or set CC for --native)\n"),
+    }
+    match probe_tool(&["rustc"], "--version") {
+        Some(v) => report.push_str(&format!("Rust Compiler: OK - {}\n", v)),
+        None => report.push_str("Rust Compiler: MISSING (optional unless building from source)\n"),
+    }
+    match probe_tool(&["python3", "python"], "--version") {
+        Some(v) => report.push_str(&format!("Python (Raspberry Pi target): OK - {}\n", v)),
+        None => report.push_str("Python (Raspberry Pi target): MISSING (optional)\n"),
+    }
+    report
+}
+
+pub fn run_doctor() {
+    print!("{}", collect_environment_report());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

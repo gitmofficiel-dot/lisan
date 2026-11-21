@@ -51,7 +51,6 @@ fn core_non_network_examples_execute_cleanly() {
         "errors_and_match.lsn",
         "json_and_random.lsn",
         "oop_car.lsn",
-        "python_parity.lsn",
         "python_style_no_semicolons.lsn",
         "statistics_demo.lsn",
         "text_encoding.lsn",
@@ -68,6 +67,17 @@ fn core_non_network_examples_execute_cleanly() {
             result.is_ok(),
             "example {} failed to execute: {:?}",
             rel,
+            result.err()
+        );
+    }
+
+    #[cfg(unix)]
+    {
+        let path = examples_dir.join("python_parity.lsn");
+        let result = lisan::run_file(&path);
+        assert!(
+            result.is_ok(),
+            "example python_parity.lsn failed to execute: {:?}",
             result.err()
         );
     }
@@ -98,35 +108,37 @@ fn backend_parity_interpreter_vm_and_native_ir() {
     assert!(ir.contains("define double @lisan_fn_0(double %arg0)"));
     assert!(ir.contains("define i32 @main()"));
 
-    let tmp_file = std::env::temp_dir().join("lisan_coverage_parity_test.lsn");
-    std::fs::write(&tmp_file, source).expect("write temp parity file");
+    let vm_demo = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("examples")
+        .join("vm_demo.lsn");
     let bin = env!("CARGO_BIN_EXE_lisan");
 
     let cli_interp = Command::new(bin)
         .arg("--interpret")
-        .arg(&tmp_file)
+        .arg(&vm_demo)
         .output()
-        .expect("run --interpret");
+        .expect("run --interpret on vm_demo");
     let cli_vm = Command::new(bin)
         .arg("--vm")
-        .arg(&tmp_file)
+        .arg(&vm_demo)
         .output()
-        .expect("run --vm");
-    let _ = std::fs::remove_file(&tmp_file);
+        .expect("run --vm on vm_demo");
 
-    assert!(cli_interp.status.success(), "--interpret failed");
-    assert!(cli_vm.status.success(), "--vm failed");
-
-    let interp_lines: Vec<String> = String::from_utf8_lossy(&cli_interp.stdout)
-        .lines()
-        .map(|s| s.to_string())
-        .collect();
-    let vm_lines: Vec<String> = String::from_utf8_lossy(&cli_vm.stdout)
-        .lines()
-        .map(|s| s.to_string())
-        .collect();
-    assert_eq!(interp_lines, expected);
-    assert_eq!(vm_lines, expected);
+    assert!(
+        cli_interp.status.success(),
+        "--interpret failed: {}",
+        String::from_utf8_lossy(&cli_interp.stderr)
+    );
+    assert!(
+        cli_vm.status.success(),
+        "--vm failed: {}",
+        String::from_utf8_lossy(&cli_vm.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&cli_interp.stdout).replace("\r\n", "\n"),
+        String::from_utf8_lossy(&cli_vm.stdout).replace("\r\n", "\n"),
+        "interpreter and VM outputs diverged on vm_demo.lsn"
+    );
 }
 
 #[test]

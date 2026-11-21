@@ -988,7 +988,7 @@ impl Compiler {
             }
             Stmt::ImportModule { module, alias } => {
                 let target_name = alias.clone().unwrap_or_else(|| {
-                    if module.ends_with(".lsn") {
+                    if crate::modules::is_source_name(module) {
                         std::path::Path::new(module)
                             .file_stem()
                             .and_then(|s| s.to_str())

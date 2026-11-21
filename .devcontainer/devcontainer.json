@@ -28,7 +28,8 @@
       "settings": {
         "rust-analyzer.check.command": "clippy",
         "files.associations": {
-          "*.lsn": "lisan"
+          "*.lsn": "lisan",
+          "*.lisan": "lisan"
         },
         "editor.formatOnSave": true,
         "[lisan]": {

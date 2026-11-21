@@ -78,7 +78,7 @@ fn load_recursive(path: &Path, visited: &mut HashSet<PathBuf>, active: &mut Vec<
                 merged.extend(load_recursive(&imported, visited, active)?);
             }
             Stmt::ImportModule { module, alias } => {
-                if module.ends_with(".lsn") || Path::new(module).exists() {
+                if is_source_name(module) || Path::new(module).exists() {
                     let imported = path.parent().expect("canonical file has parent").join(module);
                     let can = fs::canonicalize(&imported).map_err(|e| format!("لا يمكن العثور على وحدة '{}': {}", imported.display(), e))?;
                     merged.push(Stmt::ImportModule { module: can.to_string_lossy().to_string(), alias: alias.clone() });
@@ -87,7 +87,7 @@ fn load_recursive(path: &Path, visited: &mut HashSet<PathBuf>, active: &mut Vec<
                 }
             }
             Stmt::FromImport { module, items } => {
-                if module.ends_with(".lsn") || Path::new(module).exists() {
+                if is_source_name(module) || Path::new(module).exists() {
                     let imported = path.parent().expect("canonical file has parent").join(module);
                     let can = fs::canonicalize(&imported).map_err(|e| format!("لا يمكن العثور على وحدة '{}': {}", imported.display(), e))?;
                     merged.push(Stmt::FromImport { module: can.to_string_lossy().to_string(), items: items.clone() });
@@ -123,4 +123,22 @@ fn validate_no_nested_imports(stmt: &Stmt) -> Result<(), String> {
     };
     for entry in nested { validate_no_nested_imports(entry)?; }
     Ok(())
+}
+
+/// صيغ ملفات المصدر المعتمدة: `.lsn` (الأصلية) و`.lisan` (الصيغة الرسمية الإضافية).
+/// لإضافة صيغة جديدة مستقبلًا يكفي توسيع هذه القائمة.
+pub const SOURCE_EXTENSIONS: &[&str] = &["lsn", "lisan"];
+
+/// هل الامتداد (دون نقطة) صيغة مصدر للسان؟
+pub fn is_source_ext(ext: &str) -> bool {
+    SOURCE_EXTENSIONS.iter().any(|e| ext.eq_ignore_ascii_case(e))
+}
+
+/// هل اسم الملف أو مساره ينتهي بصيغة مصدر للسان؟
+pub fn is_source_name(name: &str) -> bool {
+    Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(is_source_ext)
+        .unwrap_or(false)
 }

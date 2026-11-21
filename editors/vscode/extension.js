@@ -27,7 +27,7 @@ function activate(context) {
         const clientOptions = {
             documentSelector: [{ scheme: 'file', language: 'lisan' }],
             synchronize: {
-                fileEvents: vscode.workspace.createFileSystemWatcher('**/*.lsn')
+                fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{lsn,lisan}')
             }
         };
         const client = new LanguageClient(

@@ -106,7 +106,7 @@
 نمط = نمط + ".file,.out-label{font-size:13px}.sm{font-size:14px}"
 نمط = نمط + ".tab{border:1px solid #3d5b85}.tab[aria-selected=true]{border-color:var(--primary);box-shadow:0 2px 0 #fff inset}"
 نمط = نمط + "a:focus-visible,button:focus-visible,.tab:focus-visible{outline:3px solid #ffb98a;outline-offset:2px;border-radius:8px}"
-نمط = نمط + "@media(max-width:720px){.site-nav{flex-wrap:nowrap;gap:10px;padding:10px 14px}.site-nav nav{flex:1;min-width:0;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;scrollbar-width:none}.site-nav nav::-webkit-scrollbar{display:none}.site-nav .brand span{display:none}.site-nav .tools{flex:none}.hero2 .logo{width:min(140px,38%)}.hero2{padding-block:28px}}"
+نمط = نمط + "@media(max-width:720px){.site-nav{flex-wrap:wrap;gap:8px 10px;padding:10px 14px}.site-nav .tools{margin-inline-start:auto}.site-nav nav{order:3;flex:1 1 100%;flex-wrap:wrap;justify-content:center;gap:6px}.site-nav nav a{background:var(--surface-2);border-radius:999px;padding:6px 12px;font-size:13px}.site-nav nav a::after{display:none}.site-nav .brand span{display:none}.site-nav .tools{flex:none}.hero2 .logo{width:min(140px,38%)}.hero2{padding-block:28px}}"
 نمط = نمط + "@media(max-width:480px){section.block{margin-top:36px}.ex{padding:12px}pre{font-size:12.5px}}"
 نمط = نمط + ".links{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}"
 نمط = نمط + ".links a{display:block;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;color:var(--text);text-decoration:none;font-weight:700}"
@@ -125,7 +125,7 @@
 شريط = شريط + "<a href=\"#examples\">" + ث("أمثلة"، "Examples") + "</a>"
 شريط = شريط + "<a href=\"#playground\">" + ث("التجربة"، "Playground") + "</a>"
 شريط = شريط + "<a href=\"#docs\">" + ث("الوثائق"، "Docs") + "</a><a href=\"#community\">" + ث("المجتمع"، "Community") + "</a></nav>"
-شريط = شريط + "<div class=\"tools\"><button class=\"theme-toggle-btn\" onclick=\"toggleTheme()\">" + ث("النسق"، "Theme") + "</button><button class=\"theme-toggle-btn\" onclick=\"toggleLang()\" aria-label=\"Language\"><span class=\"ar\">EN</span><span class=\"en\">عربي</span></button></div></header>"
+شريط = شريط + "<div class=\"tools\"><button class=\"theme-toggle-btn\" onclick=\"toggleTheme()\">" + ث("الوضع"، "Theme") + "</button><button class=\"theme-toggle-btn\" onclick=\"toggleLang()\" aria-label=\"Language\"><span class=\"ar\">EN</span><span class=\"en\">عربي</span></button></div></header>"
 موقعي.أضف_عنصر(شريط)
 
 # القسم الرئيسي

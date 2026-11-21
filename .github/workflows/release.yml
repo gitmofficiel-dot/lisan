@@ -31,8 +31,8 @@ jobs:
           path: |
             dist/lisan-linux-x86_64.tar.gz
             dist/lisan-linux-x86_64.tar.gz.sha256
-            dist/lisan_1.0.0_amd64.deb
-            dist/lisan_1.0.0_amd64.deb.sha256
+            dist/*.deb
+            dist/*.deb.sha256
 
   build-linux-arm64-raspberrypi:
     name: Build Linux ARM64 / Raspberry Pi 4 & 5 (.tar.gz + .deb)
@@ -62,8 +62,8 @@ jobs:
           path: |
             dist/lisan-linux-arm64-raspberrypi.tar.gz
             dist/lisan-linux-arm64-raspberrypi.tar.gz.sha256
-            dist/lisan_1.0.0_arm64.deb
-            dist/lisan_1.0.0_arm64.deb.sha256
+            dist/*.deb
+            dist/*.deb.sha256
 
   build-windows-x86_64:
     name: Build Windows x86_64 (.zip + Lisan Studio)
@@ -150,4 +150,6 @@ jobs:
           files: release-assets/*
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: See CHANGELOG.md and docs/RELEASES-AND-UPGRADING.md for release notes and upgrade details.
+          

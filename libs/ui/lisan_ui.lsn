@@ -1,0 +1,71 @@
+# مكتبة واجهة لسان (lisan-ui): مكونات جاهزة بألوان هوية لسان، مكتوبة بلغة لسان نفسها
+# كل دالة تعيد نص HTML. اجمعها ثم احفظها بـ اكتب_ملف.
+# الألوان: كحلي #091d37، برتقالي #e65c1a (للأزرار النصية استعمل #c2410c لتباين أعلى)
+
+دع لون_كحلي = "#091d37"
+دع لون_برتقالي = "#e65c1a"
+دع لون_زر = "#c2410c"
+
+# تهريب رموز HTML
+دالة واجهة_هرّب(س) {
+    دع ن = استبدل(س، "&"، "&amp;")
+    ن = استبدل(ن، "<"، "&lt;")
+    أرجع استبدل(ن، ">"، "&gt;")
+}
+
+# أنماط الهوية: ضعها مرة واحدة داخل <head>
+دالة واجهة_نمط() {
+    دع ن = "<style>:root{--ui-navy:#091d37;--ui-orange:#e65c1a;--ui-btn:#c2410c;--ui-bg:#fff;--ui-soft:#f3f5f9;--ui-text:#091d37;--ui-muted:#44546e;--ui-line:#dbe1ea}"
+    ن = ن + "body{font-family:system-ui,'Noto Naskh Arabic',Tahoma,sans-serif;line-height:1.8;color:var(--ui-text);background:var(--ui-bg);margin:0}"
+    ن = ن + ".ui-wrap{max-width:1040px;margin:0 auto;padding:0 20px}"
+    ن = ن + ".ui-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 24px;border-radius:14px;font-weight:700;text-decoration:none;color:#fff;background:var(--ui-btn);border:1px solid var(--ui-btn);transition:transform .15s,box-shadow .15s}"
+    ن = ن + ".ui-btn:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(194,65,12,.3)}.ui-btn.ghost{background:transparent;color:var(--ui-navy);border-color:var(--ui-line)}"
+    ن = ن + ".ui-card{background:#fff;border:1px solid var(--ui-line);border-top:4px solid var(--ui-orange);border-radius:18px;padding:20px;box-shadow:0 6px 20px rgba(9,29,55,.06)}.ui-card h3{margin:0 0 6px}.ui-card p{margin:0;color:var(--ui-muted)}"
+    ن = ن + ".ui-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px}"
+    ن = ن + ".ui-badge{display:inline-block;padding:2px 12px;border-radius:999px;background:var(--ui-navy);color:#fff;font-size:13px;font-weight:700}"
+    ن = ن + ".ui-stat{text-align:center;padding:18px}.ui-stat b{display:block;font-size:44px;font-weight:900;color:var(--ui-orange);line-height:1.1}.ui-stat small{color:var(--ui-muted);font-weight:600}"
+    ن = ن + ".ui-hero{background:linear-gradient(160deg,#0d2748,#091d37);color:#fff;border-radius:26px;padding:48px 24px;text-align:center}.ui-hero h1{margin:0 0 10px;font-size:clamp(30px,6vw,48px)}.ui-hero p{color:#c9d5e8;max-width:620px;margin:0 auto 22px}"
+    ن = ن + ".ui-code{direction:rtl;unicode-bidi:plaintext;text-align:right;background:#06142a;color:#ffb98a;border-radius:14px;padding:16px;font:14px/1.8 ui-monospace,Consolas,monospace;overflow-x:auto;white-space:pre-wrap}"
+    ن = ن + ".ui-hero .ui-btn.ghost{color:#fff;border-color:rgba(255,255,255,.55)}.ui-hero .ui-btn.ghost:hover{background:rgba(255,255,255,.1)}"
+    ن = ن + "a:focus-visible,button:focus-visible{outline:3px solid #ffb98a;outline-offset:2px}</style>"
+    أرجع ن
+}
+
+دالة واجهة_زر(نص_الزر، رابط) {
+    أرجع "<a class=\"ui-btn\" href=\"" + رابط + "\">" + واجهة_هرّب(نص_الزر) + "</a>"
+}
+
+دالة واجهة_زر_شفاف(نص_الزر، رابط) {
+    أرجع "<a class=\"ui-btn ghost\" href=\"" + رابط + "\">" + واجهة_هرّب(نص_الزر) + "</a>"
+}
+
+دالة واجهة_بطاقة(عنوان، وصف) {
+    أرجع "<article class=\"ui-card\"><h3>" + واجهة_هرّب(عنوان) + "</h3><p>" + واجهة_هرّب(وصف) + "</p></article>"
+}
+
+دالة واجهة_شارة(نص_الشارة) {
+    أرجع "<span class=\"ui-badge\">" + واجهة_هرّب(نص_الشارة) + "</span>"
+}
+
+دالة واجهة_إحصائية(رقم، وصف) {
+    أرجع "<div class=\"ui-stat\"><b>" + نص(رقم) + "</b><small>" + واجهة_هرّب(وصف) + "</small></div>"
+}
+
+دالة واجهة_شبكة(عناصر) {
+    أرجع "<div class=\"ui-grid\">" + ادمج(عناصر، "") + "</div>"
+}
+
+دالة واجهة_بطل(عنوان، وصف، أزرار) {
+    أرجع "<section class=\"ui-hero\"><h1>" + واجهة_هرّب(عنوان) + "</h1><p>" + واجهة_هرّب(وصف) + "</p>" + ادمج(أزرار، " ") + "</section>"
+}
+
+دالة واجهة_كود(كود_لسان) {
+    أرجع "<pre class=\"ui-code\"><code>" + واجهة_هرّب(كود_لسان) + "</code></pre>"
+}
+
+# صفحة كاملة: عنوان + محتوى (قائمة نصوص HTML)
+دالة واجهة_صفحة(عنوان، محتوى) {
+    دع ص = "<!DOCTYPE html><html lang=\"ar\" dir=\"rtl\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + واجهة_هرّب(عنوان) + "</title>" + واجهة_نمط() + "</head><body><main class=\"ui-wrap\" style=\"padding-block:28px\">"
+    ص = ص + ادمج(محتوى، "<div style=\"height:20px\"></div>") + "</main></body></html>"
+    أرجع ص
+}

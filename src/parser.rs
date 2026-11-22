@@ -561,7 +561,7 @@ impl Parser {
             self.expect(&TokenKind::RightParen, "متوقع ')' بعد وسائط الاستدعاء")?;
             expr = match expr.unwrap_spanned() {
                 Expr::Variable(name) => Expr::Call(name.clone(), args),
-                _ => return Err(self.error("الاستدعاء يحتاج إلى اسم دالة")),
+                other => Expr::MethodCall(Box::new(other.clone()), "\u{0}استدعاء".to_string(), args),
             };
         }
         Ok(expr)

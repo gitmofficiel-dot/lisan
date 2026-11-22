@@ -679,10 +679,13 @@ impl Interpreter {
                 return body_result;
             }
             Stmt::Function(f) => {
-                if self.call_depth > 0 {
-                    let mut captured = Vec::new();
+                self.functions.insert(f.name.clone(), f.clone());
+                // A function defined inside another function captures the enclosing variables.
+                if self.scopes.len() > 1 && f.vararg.is_none() && f.defaults.iter().all(|d| d.is_none()) {
+                    let mut captured: Vec<(String, Value)> = Vec::new();
                     for scope in self.scopes.iter().skip(1) {
                         for (k, v) in scope {
+                            if k == &f.name { continue; }
                             if let Some((_, existing)) = captured.iter_mut().find(|(ek, _): &&mut (String, Value)| ek == k) {
                                 *existing = v.clone();
                             } else {
@@ -690,16 +693,8 @@ impl Interpreter {
                             }
                         }
                     }
-                    let lambda = Value::Lambda {
-                        params: f.params.clone(),
-                        body: f.body.clone(),
-                        captured,
-                    };
-                    if let Some(current_scope) = self.scopes.last_mut() {
-                        current_scope.insert(f.name.clone(), lambda);
-                    }
-                } else {
-                    self.functions.insert(f.name.clone(), f.clone());
+                    let lam = Value::Lambda { params: f.params.clone(), body: f.body.clone(), captured };
+                    self.scopes.last_mut().expect("scope exists").insert(f.name.clone(), lam);
                 }
             }
             Stmt::Class(c) => {
@@ -896,16 +891,16 @@ impl Interpreter {
                 let key = self.eval(index)?;
                 match value {
                     Value::List(items) => {
-                        let idx = checked_index(key)?;
+                        let idx = checked_index_len(key, items.borrow().len())?;
                         let borrowed = items.borrow();
                         borrowed.get(idx).cloned().ok_or_else(|| format!("الفهرس {} خارج حدود القائمة", idx))
                     }
                     Value::Tuple(items) => {
-                        let idx = checked_index(key)?;
+                        let idx = checked_index_len(key, items.len())?;
                         items.get(idx).cloned().ok_or_else(|| format!("الفهرس {} خارج حدود الصف", idx))
                     }
                     Value::Text(text) => {
-                        let idx = checked_index(key)?;
+                        let idx = checked_index_len(key, text.chars().count())?;
                         text.chars().nth(idx).map(|c| Value::Text(c.to_string()))
                             .ok_or_else(|| format!("الفهرس {} خارج حدود النص", idx))
                     }
@@ -1465,6 +1460,12 @@ impl Interpreter {
                         (Value::Text(from), Value::Text(to)) => Ok(Value::Text(text.replace(from, to))),
                         _ => Err("طريقة استبدل تتطلب نصين (القديم والجديد)".into()),
                     },
+                    "قسّم" | "قسم" | "نظّف" | "نظف" | "اقتطع" => {
+                        let mut call_args = Vec::with_capacity(evaluated_args.len() + 1);
+                        call_args.push(Value::Text(text.clone()));
+                        call_args.extend(evaluated_args.iter().cloned());
+                        call_builtin(method_name, call_args)
+                    }
                     _ => Err(format!("الطريقة '{}' غير مدعومة للنصوص", method_name)),
                 }
             }
@@ -1901,6 +1902,17 @@ impl Interpreter {
 fn finite_number(value: f64) -> Result<Value, String> {
     if value.is_finite() { Ok(Value::Number(value)) }
     else { Err("الناتج الحسابي خارج النطاق المسموح للأعداد".into()) }
+}
+
+fn checked_index_len(index: Value, len: usize) -> Result<usize, String> {
+    if let Value::Number(n) = &index {
+        if n.is_finite() && n.fract() == 0.0 && *n < 0.0 {
+            let back = (-*n) as usize;
+            if back <= len { return Ok(len - back); }
+            return Err(format!("الفهرس {} خارج الحدود", *n as i64));
+        }
+    }
+    checked_index(index)
 }
 
 fn checked_index(index: Value) -> Result<usize, String> {

@@ -811,7 +811,12 @@
                     <option value="raspberry_pi5">5. راسبيري باي 5: GPIO وكاميرا و SenseHAT والذكاء الاصطناعي</option>
                     <option value="crypto_regex_db">6. التشفير، الأنماط (Regex)، وقاعدة البيانات المحلية</option>
                     <option value="arabic_website">7. بناء موقع ويب عربي متكامل (مع معاينة حية مباشرة!)</option>
-                    <option value="mobile_pwa">8. تطبيق هاتف ذكي تفاعلي بالأيقونات (PWA)</option>
+                    <option value="mobile_pwa">8. تطبيق هاتف ذكي متعدد الشاشات (PWA 2.0)</option>
+                    <option value="pico_w">9. راسبيري باي بيكو (RP2040 / Pico W MicroPython)</option>
+                    <option value="robotics_pid">10. الروبوتات والتحكم (PID، كالمان، ذراع آلي، مودباس)</option>
+                    <option value="ai_ml_svg">11. الذكاء الاصطناعي، المصفوفات، الشبكة العصبية ومخططات SVG</option>
+                    <option value="web_framework">12. إطار الويب الكامل (قوالب آمنة + توجيه مسارات + API)</option>
+                    <option value="game_2d_arcade">13. محرك الألعاب ثنائي الأبعاد 2D (لعبة أركيد عربية حية!)</option>
                 </select>
             </div>
 
@@ -849,6 +854,9 @@
             </button>
             <button type="button" class="tool-btn" id="raspberryBtn" title="توليد سكربت Raspberry Pi Python 3 (.py)">
                 <span>🍓 راسبيري باي Python</span>
+            </button>
+            <button type="button" class="tool-btn" id="picoBtn" title="توليد سكربت Raspberry Pi Pico / RP2040 MicroPython (.py)">
+                <span>🔌 بيكو MicroPython</span>
             </button>
         </div>
 
@@ -1346,6 +1354,86 @@
 تطبيقي.أضف_زر("تفعيل درع الحماية الشامل"، "درع"، "تم تفعيل الحماية وتشفير السجلات بنجاح!")
 
 اطبع(تطبيقي.بناء_واجهة())
+`,
+
+            pico_w: String.raw`# 9. راسبيري باي بيكو (RP2040 / Pico W): GPIO، PWM، PIO، وWi-Fi
+استورد "بيكو"
+
+دع لوحة = جديد لوحة_بيكو("Raspberry Pi Pico W")
+اطبع("اللوحة: " + لوحة.اسم_الطراز() + " | التردد: " + نص(لوحة.تردد_المعالج_ميجا()) + " MHz")
+
+دع مصباح = جديد منفذ_بيكو(25، "مخرج")
+مصباح.شغّل()
+دع نبضة = جديد نبضة_بيكو(15، 2000)
+نبضة.اضبط_نسبة(75)
+دع حرارة = جديد مستشعر_حرارة_داخلي_بيكو()
+اطبع("حرارة شريحة RP2040: " + نص(حرارة.اقرأ_مئوية()) + "°C")
+
+دع شبكة = جديد واي_فاي_بيكو_w()
+شبكة.اتصل("شبكة_المختبر"، "12345678")
+اطبع("عنوان Pico W: " + شبكة.عنوان_ip())
+`,
+
+            robotics_pid: String.raw`# 10. الروبوتات والتحكم (PID، مرشح كالمان، ذراع آلي، مودباس)
+استورد "روبوتات"
+
+دع متحكم = جديد متحكم_pid(2.0، 0.1، 0.05، 100)
+اطبع("مخرج PID عند قراءة 60: " + نص(متحكم.احسب(60، 0.1)))
+
+دع مرشح = جديد مرشح_كالمان(20.0، 1.0، 0.5، 0.05)
+اطبع("قراءة منقاة بكالمان: " + نص(مرشح.حدّث(22.4)))
+
+دع ذراع = جديد ذراع_آلي(12، 10)
+دع موضع = ذراع.الموضع_الأمامي(45، 30)
+اطبع("موضع الذراع الآلي (س، ص): " + نص(موضع))
+
+دع بطارية = جديد مراقب_بطارية_bms(3، 3.3، 4.2)
+بطارية.حدّث_الجهد(11.8)
+اطبع("نسبة شحن البطارية: " + نص(بطارية.نسبة_الشحن()) + "%")
+`,
+
+            ai_ml_svg: String.raw`# 11. الذكاء الاصطناعي وعلوم البيانات ومعالجة العربية ومخططات SVG
+استورد "ذكاء"
+
+# الانحدار الخطي
+دع نموذج = جديد انحدار_خطي()
+نموذج.درّب([1، 2، 3، 4، 5]، [5، 7، 9، 11، 13])
+اطبع("التوقع عند س=10 (القيمة الحقيقية 23): " + نص(نموذج.توقّع(10)))
+
+# معالجة اللغة العربية وتحليل المشاعر
+دع لغوي = جديد محلل_نص_عربي()
+اطبع("بعد إزالة التشكيل: " + لغوي.أزل_التشكيل("لُغَةُ لِسَانٍ رَائِعَةٌ وَمُمْتَازَةٌ"))
+اطبع("تحليل المشاعر: " + نص(لغوي.تحليل_المشاعر("المشروع رائع وسريع وممتاز جداً")))
+
+# مخطط أعمدة SVG عربي جاهز للتضمين
+دع مخطط = جديد مخطط_أعمدة("نمو لغة لسان 2026")
+مخطط.أضف_بيان("المتحكمات"، 105، "#091d37")
+مخطط.أضف_بيان("الاختبارات"، 285، "#e65c1a")
+اطبع("طول كود SVG المولّد: " + نص(طول(مخطط.بناء_svg())) + " حرف")
+`,
+
+            web_framework: String.raw`# 12. إطار الويب الكامل: محرك القوالب الآمن + موجّه المسارات
+استورد "إطار_ويب"
+
+دع قالب = جديد قالب_صفحة("<h1>مرحباً {{مستخدم.اسم}}</h1><p>الدور: {{مستخدم.دور}}</p>")
+دع ناتج = قالب.عرض({"مستخدم": {"اسم": "سارة"، "دور": "مهندسة برمجيات"}})
+اطبع("القالب الآمن: " + ناتج)
+
+دع تطبيق = جديد تطبيق_ويب("بوابة لسان"، 8080)
+تطبيق.رد_json("/api/status"، {"الحالة": "يعمل"، "الإصدار": "1.1.0"})
+اطبع("محاكاة طلب API: " + نص(تطبيق.محاكاة_طلب("GET"، "/api/status")))
+`,
+
+            game_2d_arcade: String.raw`# 13. محرك الألعاب ثنائي الأبعاد 2D (اضغط "معاينة موقع / تطبيق" للعب فوراً!)
+استورد "ألعاب"
+
+دع لعبة = جديد لعبة_ثنائية_الأبعاد("حامي الفضاء العربي"، 760، 460، "#091d37")
+لعبة.أضف_لاعب("المركبة"، 350، 390، 56، 28، "#e65c1a"، 7)
+لعبة.أضف_هدف("نجمة الطاقة"، "#10b981"، 15)
+لعبة.أضف_عقبة("نيزك"، "#ef4444"، 4)
+لعبة.اضبط_تحكم("أسهم_ولمس")
+
+اطبع(لعبة.بناء_لعبة_html())
 `
         };
 
@@ -1378,6 +1466,7 @@
         const esp32Btn = document.getElementById('esp32Btn');
         const stm32Btn = document.getElementById('stm32Btn');
         const raspberryBtn = document.getElementById('raspberryBtn');
+        const picoBtn = document.getElementById('picoBtn');
         const livePreviewBtn = document.getElementById('livePreviewBtn');
         const fmtBtn = document.getElementById('fmtBtn');
         const saveDownloadBtn = document.getElementById('saveDownloadBtn');
@@ -1400,7 +1489,7 @@
         const closeDownloadsBtn = document.getElementById('closeDownloadsBtn');
         const toastBanner = document.getElementById('toastBanner');
 
-        const modeButtons = [runDirectBtn, runVmBtn, arduinoBtn, esp32Btn, stm32Btn, raspberryBtn, livePreviewBtn];
+        const modeButtons = [runDirectBtn, runVmBtn, arduinoBtn, esp32Btn, stm32Btn, raspberryBtn, picoBtn, livePreviewBtn];
 
         /* ==================== إشعارات سريعة ومظهر الصفحة ==================== */
         let toastTimer = null;
@@ -1677,6 +1766,10 @@
 
         raspberryBtn.addEventListener('click', () => {
             runTranspiler('raspberry', raspberryBtn, '🍓 سكربت راسبيري باي المولّد Python 3 (.py)', '.py', 'مترجم Raspberry Pi Python 3');
+        });
+
+        picoBtn.addEventListener('click', () => {
+            runTranspiler('pico', picoBtn, '🔌 سكربت راسبيري بيكو المولّد MicroPython (.py)', '.py', 'مترجم Raspberry Pi Pico MicroPython');
         });
 
         livePreviewBtn.addEventListener('click', async () => {

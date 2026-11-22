@@ -136,7 +136,7 @@
 موقعي.أضف_عنصر(رئيسي)
 
 # شريط الأرقام (فكرة من python.org)
-دع أرقام = "<div class=\"stats\"><div><b>83</b><small>" + ث("وحدة عتاد"، "hardware modules") + "</small></div><div><b>3</b><small>" + ث("طرق تنفيذ"، "execution paths") + "</small></div><div><b>3</b><small>" + ث("أنظمة أرقام"، "numeral systems") + "</small></div><div><b>MIT</b><small>" + ث("رخصة مفتوحة"، "open license") + "</small></div></div>"
+دع أرقام = "<div class=\"stats\"><div><b>105</b><small>" + ث("وحدة عتاد وروبوت"، "hardware & robotics modules") + "</small></div><div><b>3</b><small>" + ث("طرق تنفيذ"، "execution paths") + "</small></div><div><b>3</b><small>" + ث("أنظمة أرقام"، "numeral systems") + "</small></div><div><b>MIT</b><small>" + ث("رخصة مفتوحة"، "open license") + "</small></div></div>"
 موقعي.أضف_عنصر(أرقام)
 
 # عرض الكود بالتبويبات (فكرة من python.org: أمثلة تفاعلية)

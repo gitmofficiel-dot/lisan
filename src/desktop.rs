@@ -236,6 +236,7 @@ pub const STUDIO_DESKTOP_HTML: &str = r##"<!DOCTYPE html>
         <button class="btn-target" data-target="esp32">ESP32 IoT</button>
         <button class="btn-target" data-target="stm32">STM32</button>
         <button class="btn-target" data-target="raspberry">Raspberry Pi 🐍</button>
+        <button class="btn-target" data-target="pico">Pico RP2040 🔌</button>
         <select id="exampleSelect">
             <option value="">📂 اختر مثالاً جاهزاً...</option>
             <optgroup label="قوالب استوديو لسان المدمجة">
@@ -475,7 +476,7 @@ pub const STUDIO_DESKTOP_HTML: &str = r##"<!DOCTYPE html>
                     updateStats();
                     renderOutput('✓ تم تنسيق الشيفرة العربية وضبط المحاذاة بنجاح.', false, false, '✨ منسق لسان');
                 } else {
-                    lastExtension = target === 'raspberry' ? 'py' : 'ino';
+                    lastExtension = (target === 'raspberry' || target === 'pico') ? 'py' : 'ino';
                     renderOutput(resultCode, false, true, `🔧 الشيفرة المولّدة للهدف (${target.toUpperCase()})`);
                 }
             } catch (err) {
@@ -896,7 +897,7 @@ pub fn platform_info_json() -> String {
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|_| ".".to_string());
     format!(
-        "{{\"ok\":true,\"name\":\"استوديو لسان لسطح المكتب\",\"version\":\"{}\",\"os\":\"{}\",\"arch\":\"{}\",\"workspace\":\"{}\",\"targets\":[\"native\",\"arduino\",\"esp32\",\"stm32\",\"raspberry\",\"fmt\",\"wasm\",\"mobile\"]}}",
+        "{{\"ok\":true,\"name\":\"استوديو لسان لسطح المكتب\",\"version\":\"{}\",\"os\":\"{}\",\"arch\":\"{}\",\"workspace\":\"{}\",\"targets\":[\"native\",\"arduino\",\"esp32\",\"stm32\",\"raspberry\",\"pico\",\"fmt\",\"wasm\",\"mobile\"]}}",
         escape_json_str(LISAN_STUDIO_VERSION),
         escape_json_str(env::consts::OS),
         escape_json_str(env::consts::ARCH),

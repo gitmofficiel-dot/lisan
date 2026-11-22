@@ -1300,6 +1300,21 @@ impl Interpreter {
 
     #[inline(never)]
     fn eval_method_call(&mut self, target: &Expr, method_name: &str, args: &[Expr]) -> Result<Value, String> {
+        if method_name == "\u{0}استدعاء" {
+            let callee = self.eval(target)?;
+            let mut evaluated_args = Vec::with_capacity(args.len());
+            for a in args { evaluated_args.push(self.eval(a)?); }
+            return match callee {
+                Value::Lambda { params, body, captured } => {
+                    let span = self.current_span;
+                    self.call_stack.push(("<دالة>".to_string(), span));
+                    let res = self.invoke_lambda(&params, None, &body, &captured, evaluated_args);
+                    if res.is_ok() { self.call_stack.pop(); }
+                    res
+                }
+                _ => Err("الاستدعاء يحتاج إلى دالة".into()),
+            };
+        }
         if let Expr::Variable(v) = target.unwrap_spanned() {
             if v == "أصل" || v == "الأصل" {
                 let self_val = self.get_variable("هذا").map_err(|_| "لا يمكن استخدام 'أصل' خارج طريقة صنف".to_string())?;

@@ -873,16 +873,16 @@ impl Interpreter {
                 let key = self.eval(index)?;
                 match value {
                     Value::List(items) => {
-                        let idx = checked_index(key)?;
+                        let idx = checked_index_len(key, items.borrow().len())?;
                         let borrowed = items.borrow();
                         borrowed.get(idx).cloned().ok_or_else(|| format!("الفهرس {} خارج حدود القائمة", idx))
                     }
                     Value::Tuple(items) => {
-                        let idx = checked_index(key)?;
+                        let idx = checked_index_len(key, items.len())?;
                         items.get(idx).cloned().ok_or_else(|| format!("الفهرس {} خارج حدود الصف", idx))
                     }
                     Value::Text(text) => {
-                        let idx = checked_index(key)?;
+                        let idx = checked_index_len(key, text.chars().count())?;
                         text.chars().nth(idx).map(|c| Value::Text(c.to_string()))
                             .ok_or_else(|| format!("الفهرس {} خارج حدود النص", idx))
                     }
@@ -1878,6 +1878,17 @@ impl Interpreter {
 fn finite_number(value: f64) -> Result<Value, String> {
     if value.is_finite() { Ok(Value::Number(value)) }
     else { Err("الناتج الحسابي خارج النطاق المسموح للأعداد".into()) }
+}
+
+fn checked_index_len(index: Value, len: usize) -> Result<usize, String> {
+    if let Value::Number(n) = &index {
+        if n.is_finite() && n.fract() == 0.0 && *n < 0.0 {
+            let back = (-*n) as usize;
+            if back <= len { return Ok(len - back); }
+            return Err(format!("الفهرس {} خارج الحدود", *n as i64));
+        }
+    }
+    checked_index(index)
 }
 
 fn checked_index(index: Value) -> Result<usize, String> {

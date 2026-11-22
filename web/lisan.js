@@ -186,6 +186,32 @@ class LisanRuntime {
     }
 
     /**
+     * تحويل شيفرة لسان إلى كود بايثون (Python 3)
+     */
+    python(sourceCode) {
+        return this._callWasmStringFn('lisan_python_wasm', sourceCode);
+    }
+
+    /**
+     * تحويل شيفرة لسان إلى كود جافاسكربت (ES2022)
+     */
+    js(sourceCode) {
+        return this._callWasmStringFn('lisan_js_wasm', sourceCode);
+    }
+
+    /**
+     * فحص شيفرة لسان (قواعد + عربية فقط + أنواع اختيارية) وإرجاع قائمة تشخيصات JSON
+     */
+    checkJson(sourceCode) {
+        const raw = this._callWasmStringFn('lisan_check_json_wasm', sourceCode);
+        try {
+            return JSON.parse(raw);
+        } catch (_) {
+            return [];
+        }
+    }
+
+    /**
      * تنسيق شيفرة لسان العربية وضبط المحاذاة والمسافات
      */
     fmt(sourceCode) {
@@ -259,6 +285,12 @@ class LisanRuntime {
             case 'pico':
             case 'rp2040':
                 return this.pico(sourceCode);
+            case 'python':
+            case 'py':
+                return this.python(sourceCode);
+            case 'js':
+            case 'javascript':
+                return this.js(sourceCode);
             case 'fmt':
                 return this.fmt(sourceCode);
             case 'arduino':

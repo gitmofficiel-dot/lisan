@@ -1,0 +1,115 @@
+# Lisan (لسان) — Arabic-Only Programming Language
+
+> Lisan (لسان, v1.1.0) is a modern, full-stack, 100% Arabic-keyword programming language implemented in Rust with zero external runtime dependencies. It offers a native LLVM/Clang compiler, bytecode VM, tree-walking interpreter, WebAssembly playground, LSP server, MCP server for AI agents, and hardware transpilation for Arduino, ESP32, STM32, Raspberry Pi, and Raspberry Pi Pico (RP2040).
+
+## Golden Rules for LLMs & Agents
+
+- **100% Arabic-Only Keywords**: Never write English keywords (`if`, `else`, `def`, `return`, `import`, `class`, `while`, `for`, `print`, `true`, `false`, `null`, `let`, `var`, `try`, `except`, `and`, `or`, `not`, `in`).
+- **Foreign Libraries**: External Python/JS library names appear **only inside string literals**, e.g. `دع مصفوفات = استورد_بايثون("numpy")`.
+- **Strings**: Always use double quotes `"..."`. Formatted strings use `ن"مرحبا {الاسم}"`. Single quotes `'...'` are not valid strings.
+- **Single-Arg Print**: `اطبع(تعبير)` takes exactly one expression. Join values via `ن"..."` or `"الناتج: " + نص(القيمة)`.
+- **Braced Else**: `وإلا` must be followed by `{ ... }`. Express `elif` as `إذا (أ) { ... } وإلا { إذا (ب) { ... } }`.
+- **No Compound Assignment**: Write `س = س + 1` instead of `س += 1`.
+- **Optional Semicolons**: Newlines terminate statements; `؛` or `;` is only needed for multiple statements on one line. Both `،` and `,` separate items (prefer Arabic `،`).
+- **Reserved Words (Never use as variable names)**: `حالة`, `افتراضي`, `و`, `أو`, `خطأ`, `صحيح`, `لاشيء`, `فارغ`, `في`, `من`, `مع`, `باسم`, `كـ`, `فئة`, `هيكل`, `صنف`, `يرث`, `جديد`, `دع`, `ليكن`, `متغير`, `دالة`, `أرجع`, `إذا`, `وإلا`, `طالما`, `بينما`, `لكل`, `توقف`, `تابع`, `استمر`, `حاول`, `التقط`, `أخيرًا`, `نهائيا`, `ارمِ`, `أطلق`, `اختر`, `استورد`, `اطبع`, `ليس`.
+  - Classic trap: write `التقط (رسالة)` — **never** `التقط (خطأ)` (`خطأ` means `false`).
+
+## Quick Syntax Cheat Sheet
+
+```lisan
+// المتغيرات والتفكيك والنصوص المنسقة
+دع الاسم = "ليلى"
+دع أ، ب = [10، 20]
+اطبع(ن"مرحبا {الاسم}، المجموع = {أ + ب}")
+
+// الشروط والحلقات والتوليد المختصر
+إذا (أ < ب) {
+    اطبع("أصغر")
+} وإلا {
+    إذا (أ == ب) {
+        اطبع("متساويان")
+    } وإلا {
+        اطبع("أكبر")
+    }
+}
+
+دع مربعات = [س * س لكل س في مدى(1، 6) إذا س % 2 == 1]
+لكل (عنصر في مربعات) {
+    اطبع(عنصر)
+}
+
+// الدوال والإغلاقات والدوال المجهولة
+دالة مصنع_ضرب(عامل) {
+    أرجع دالة(قيمة) => قيمة * عامل
+}
+اطبع(مصنع_ضرب(3)(7))   // 21
+
+// الأصناف والوراثة
+صنف مركبة {
+    دالة بناء(الاسم) { هذا.الاسم = الاسم }
+}
+صنف سيارة يرث مركبة {
+    دالة بناء(الاسم، سرعة) {
+        هذا.الاسم = الاسم
+        هذا.سرعة = سرعة
+    }
+    دالة وصف() => ن"{هذا.الاسم} ({هذا.سرعة} كم/س)"
+}
+دع مركبتي = جديد سيارة("نسر"، 180)
+اطبع(مركبتي.وصف())
+
+// المطابقة والاستثناءات ومدير السياق
+اختر (أ) {
+    حالة 10: { اطبع("عشرة") }
+    افتراضي: { اطبع("قيمة أخرى") }
+}
+حاول {
+    إذا (أ > 5) { ارمِ "تجاوز الحد" }
+} التقط (رسالة) {
+    اطبع("تنبيه: " + رسالة)
+} أخيرًا {
+    اطبع("انتهى")
+}
+```
+
+## Standard Library & Ecosystem (Pure Arabic Imports)
+
+- **Core Runtime Modules** (`استورد <وحدة> كـ <اختصار>` / `من <وحدة> استورد ...`):
+  `رياضيات`, `إحصاء`, `نصوص`, `ملفات`, `نظام`, `وقت`, `تاريخ`, `عشوائي`, `جيسون`, `شبكة`.
+- **Core Builtins**:
+  `طول`, `نوع`, `نص`, `عدد`, `عدد_صحيح`, `مدى`, `أضف`, `احذف`, `عكس`, `فرز`, `مجموع`, `متوسط`, `ابحث`, `مفاتيح`, `قيم`, `يحتوي`, `صف`, `مجموعة`, `سحاب`, `مرقم`, `أي`, `كل`, `مطلق`, `جذر`, `قرّب`, `أدنى`, `أعلى`, `أرضية`, `سقف`, `قوة`, `نظّف`, `اقتطع`, `قسّم`, `ادمج`, `استبدل`, `يبدأ_ب`, `ينتهي_ب`, `افتح`, `اقرأ_ملف`, `اكتب_ملف`, `تحقق`, `تحقق_يساوي`.
+- **Web & Mobile**:
+  - `استورد "إطار_ويب"` → `تطبيق_ويب`, `قالب_صفحة`, `عميل_api`
+  - `استورد "موقع"` → `موقع_ويب` (responsive Arabic site generator)
+  - `استورد "هاتف"` → `تطبيق_هاتف` (multi-screen Mobile PWA 2.0)
+- **AI, Data Science & SVG Charts**:
+  - `استورد "ذكاء"` → `مصفوفة`, `جدول_بيانات`, `انحدار_خطي`, `مصنف_جيران_knn`, `شبكة_عصبية`, `محلل_نص_عربي`, `مخطط_أعمدة`, `مخطط_خطي`, `مخطط_دائري`, `لوحة_رسم_svg`
+- **Database, Cryptography & Regex**:
+  - `استورد "قاعدة_بيانات"` → `قاعدة_بيانات`, `تشفير_أمان` (SHA-256, HMAC, Cipher, UUID), `محلل_أنماط`
+- **Systems, CLI & 2D Games**:
+  - `استورد "ألعاب"` / `استورد "أنظمة"` → `لعبة_ثنائية_الأبعاد` (HTML5 Canvas), `أداة_سطر_أوامر`, `سجل_أحداث`, `مجدول_مهام`, `بصمة_crc32`, `ضغط_rle`, `نفّذ_أمر`
+- **Hardware & Robotics (105+ Classes)**:
+  - `استورد "اردوينو"` (38 classes) — `--arduino` (C++)
+  - `استورد "اي_اس_بي32"` (18 classes) — `--esp32` (C++)
+  - `استورد "اس_تي_ام32"` (15 classes) — `--stm32` (C++)
+  - `استورد "راسبيري"` (12 classes) — `--raspberry` (Python 3)
+  - `استورد "بيكو"` (12 classes) — `--pico` (MicroPython RP2040)
+  - `استورد "روبوتات"` (10 classes: PID, Kalman, Mobile Robot, Arm, FSM, Modbus, LoRa, GSM, A4988, BMS)
+
+## CLI & MCP Server
+
+- `lisan --mcp` — JSON-RPC 2.0 MCP server (`lisan_run`, `lisan_check`, `lisan_format`, `lisan_transpile`, `lisan_docs`, `lisan_from_python` + resource `lisan://llms.txt`).
+- `lisan --check ملف.lsn` — Syntax and import check.
+- `lisan --test ملف.lsn` — Run `تحقق` and `تحقق_يساوي` assertions.
+- `lisan --fmt ملف.lsn` — Format source file.
+- `lisan --sandbox ملف.lsn` — Safe bounded execution.
+- `lisan --interpret ملف.lsn` / `lisan --vm ملف.lsn` / `lisan --native ملف.lsn --output برنامج`.
+- `lisan --arduino` / `--esp32` / `--stm32` / `--raspberry` / `--pico` / `--mobile`.
+
+## Documentation Links
+
+- [AGENTS.md](../AGENTS.md): Authoritative AI coding agent rules, Python→Lisan table, reserved words, and pitfalls.
+- [Full Reference (llms-full.txt)](./llms-full.txt): Complete self-contained Lisan specification covering all keywords, stdlib, web, mobile, AI/ML, games, and all 105 hardware/robotics classes with runnable examples.
+- [SYNTAX.md](./SYNTAX.md): Core syntax notes and diagnostics.
+- [NUMBERS-AND-STYLE.md](./NUMBERS-AND-STYLE.md): Numerals and formatting conventions.
+- [EXECUTION-PATHS.md](./EXECUTION-PATHS.md): Native LLVM, Bytecode VM, Interpreter, and WebAssembly paths.

@@ -1,19 +1,41 @@
 {
   "name": "lisan-arabic-lang",
-  "displayName": "Lisan (لسان) - لغة البرمجة العربية",
-  "description": "دعم التلوين النحوي وإعدادات المحرر للغة البرمجة العربية لسان (.lsn)",
-  "version": "1.0.0",
+  "displayName": "Lisan (لسان) - بيئة تطوير لغة البرمجة العربية",
+  "description": "بيئة تطوير متكاملة للغة البرمجة العربية لسان (.lsn): خادم لغة LSP مدمج، مصحح أخطاء DAP، معاينة حية للويب وتطبيقات الهاتف، ترجمة لبايثون وجافاسكربت والمتحكمات الدقيقة (Arduino / ESP32 / STM32 / Raspberry Pi / Pico).",
+  "version": "1.2.0",
   "publisher": "lisan-lang",
   "icon": "icon.png",
   "main": "./extension.js",
   "activationEvents": [
-    "onLanguage:lisan"
+    "onLanguage:lisan",
+    "onDebugInitialConfigurations",
+    "onDebugResolve:lisan",
+    "onCommand:lisan.newProject",
+    "onCommand:lisan.openStudio"
   ],
   "engines": {
     "vscode": "^1.75.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Debuggers",
+    "Snippets",
+    "Formatters",
+    "Linters"
+  ],
+  "keywords": [
+    "lisan",
+    "لسان",
+    "arabic",
+    "عربي",
+    "programming",
+    "dap",
+    "lsp",
+    "arduino",
+    "esp32",
+    "stm32",
+    "raspberry-pi",
+    "pico"
   ],
   "contributes": {
     "languages": [
@@ -38,9 +60,252 @@
         "path": "./syntaxes/lisan.tmLanguage.json"
       }
     ],
+    "snippets": [
+      {
+        "language": "lisan",
+        "path": "./snippets/lisan.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "lisan.runFile",
+        "title": "تشغيل ملف لسان الحالي",
+        "category": "لسان",
+        "icon": "$(play)"
+      },
+      {
+        "command": "lisan.checkFile",
+        "title": "فحص ملف لسان (قواعد + عربية خالصة)",
+        "category": "لسان",
+        "icon": "$(check)"
+      },
+      {
+        "command": "lisan.formatFile",
+        "title": "تنسيق ملف لسان",
+        "category": "لسان",
+        "icon": "$(symbol-ruler)"
+      },
+      {
+        "command": "lisan.runTests",
+        "title": "تشغيل اختبارات لسان",
+        "category": "لسان",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "lisan.transpilePython",
+        "title": "ترجمة إلى بايثون (Python 3)",
+        "category": "لسان",
+        "icon": "$(code)"
+      },
+      {
+        "command": "lisan.transpileJs",
+        "title": "ترجمة إلى جافاسكربت (ES2022)",
+        "category": "لسان",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "lisan.transpileMcu",
+        "title": "ترجمة للمتحكمات (Arduino / ESP32 / STM32 / Raspberry Pi / Pico)",
+        "category": "لسان",
+        "icon": "$(circuit-board)"
+      },
+      {
+        "command": "lisan.uploadMcu",
+        "title": "رفع الشيفرة إلى المتحكم (Arduino CLI / mpremote)",
+        "category": "لسان",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "lisan.previewWeb",
+        "title": "معاينة موقع أو تطبيق هاتف لسان داخل VS Code",
+        "category": "لسان",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "lisan.newProject",
+        "title": "إنشاء مشروع لسان جديد (ويب / تطبيق هاتف / ذكاء اصطناعي / متحكم / نظام)",
+        "category": "لسان",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "lisan.openStudio",
+        "title": "فتح استوديو لسان",
+        "category": "لسان",
+        "icon": "$(window)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "lisan.runFile",
+          "when": "resourceLangId == lisan",
+          "group": "navigation@1"
+        },
+        {
+          "command": "lisan.previewWeb",
+          "when": "resourceLangId == lisan",
+          "group": "navigation@2"
+        },
+        {
+          "command": "lisan.checkFile",
+          "when": "resourceLangId == lisan",
+          "group": "navigation@3"
+        },
+        {
+          "command": "lisan.transpileMcu",
+          "when": "resourceLangId == lisan",
+          "group": "navigation@4"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "lisan.runFile",
+          "when": "editorLangId == lisan",
+          "group": "lisan@1"
+        },
+        {
+          "command": "lisan.checkFile",
+          "when": "editorLangId == lisan",
+          "group": "lisan@2"
+        },
+        {
+          "command": "lisan.formatFile",
+          "when": "editorLangId == lisan",
+          "group": "lisan@3"
+        },
+        {
+          "command": "lisan.runTests",
+          "when": "editorLangId == lisan",
+          "group": "lisan@4"
+        },
+        {
+          "command": "lisan.previewWeb",
+          "when": "editorLangId == lisan",
+          "group": "lisan@5"
+        },
+        {
+          "command": "lisan.transpilePython",
+          "when": "editorLangId == lisan",
+          "group": "lisan@6"
+        },
+        {
+          "command": "lisan.transpileJs",
+          "when": "editorLangId == lisan",
+          "group": "lisan@7"
+        },
+        {
+          "command": "lisan.transpileMcu",
+          "when": "editorLangId == lisan",
+          "group": "lisan@8"
+        },
+        {
+          "command": "lisan.uploadMcu",
+          "when": "editorLangId == lisan",
+          "group": "lisan@9"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "lisan.runFile",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "editorLangId == lisan"
+      },
+      {
+        "command": "lisan.checkFile",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
+        "when": "editorLangId == lisan"
+      },
+      {
+        "command": "lisan.runTests",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t",
+        "when": "editorLangId == lisan"
+      },
+      {
+        "command": "lisan.previewWeb",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p",
+        "when": "editorLangId == lisan"
+      },
+      {
+        "command": "lisan.formatFile",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f",
+        "when": "editorLangId == lisan"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "lisan",
+        "label": "مصحح أخطاء لسان (Lisan Debugger)",
+        "languages": [
+          "lisan"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "default": "${file}",
+                "description": "المسار الكامل لملف لسان (.lsn) المراد تصحيحه"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "default": false,
+                "description": "التوقف تلقائياً عند أول تعليمة في البرنامج"
+              },
+              "cwd": {
+                "type": "string",
+                "default": "${workspaceFolder}",
+                "description": "مجلد العمل أثناء جلسة التصحيح"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "lisan",
+            "request": "launch",
+            "name": "تصحيح ملف لسان الحالي",
+            "program": "${file}",
+            "stopOnEntry": false
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "لسان: تصحيح الملف الحالي",
+            "description": "تشغيل وتصحيح ملف لسان (.lsn) المفتوح حالياً",
+            "body": {
+              "type": "lisan",
+              "request": "launch",
+              "name": "تصحيح ملف لسان الحالي",
+              "program": "^\"\\${file}\"",
+              "stopOnEntry": false
+            }
+          },
+          {
+            "label": "لسان: تصحيح مع التوقف عند البداية",
+            "description": "تشغيل مصحح أخطاء لسان مع التوقف التلقائي عند السطر الأول",
+            "body": {
+              "type": "lisan",
+              "request": "launch",
+              "name": "تصحيح لسان (توقف عند البداية)",
+              "program": "^\"\\${file}\"",
+              "stopOnEntry": true
+            }
+          }
+        ]
+      }
+    ],
     "configuration": {
       "type": "object",
-      "title": "Lisan Language Server",
+      "title": "إعدادات لغة لسان (Lisan)",
       "properties": {
         "lisan.executablePath": {
           "type": "string",
@@ -50,7 +315,29 @@
         "lisan.lsp.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "تفعيل خادم لغة لسان الذكي LSP"
+          "description": "تفعيل خادم لغة لسان الذكي المدمج (LSP)"
+        },
+        "lisan.arabicOnlyStrict": {
+          "type": "boolean",
+          "default": true,
+          "description": "تفعيل الفحص الصارم للعربية الخالصة وتنبيه المطور عند استخدام كلمات مفتاحية غير عربية"
+        },
+        "lisan.mcuDefaultTarget": {
+          "type": "string",
+          "enum": [
+            "arduino",
+            "esp32",
+            "stm32",
+            "raspberry",
+            "pico"
+          ],
+          "default": "esp32",
+          "description": "لوحة المتحكم الافتراضية عند الترجمة والرفع (Arduino / ESP32 / STM32 / Raspberry Pi / Pico)"
+        },
+        "lisan.serialPort": {
+          "type": "string",
+          "default": "",
+          "description": "المنفذ التسلسلي الافتراضي للرفع إلى المتحكمات (مثل /dev/ttyUSB0 أو /dev/ttyACM0 أو COM3)"
         }
       }
     }

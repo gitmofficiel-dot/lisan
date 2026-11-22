@@ -73,6 +73,40 @@ impl Parser {
 
     fn raw_statement(&mut self) -> Result<Stmt, String> {
         if self.take(&TokenKind::Import) {
+            // دعم الاستيراد العربي الخالص للمكتبات الخارجية:
+            // استورد بايثون "numpy" كـ مصفوفات
+            // استورد جافاسكربت "path" كـ مسار
+            if let TokenKind::Identifier(ref lang) = self.current().kind {
+                if (lang == "بايثون" || lang == "جافاسكربت")
+                    && matches!(self.peek_next().map(|t| &t.kind), Some(TokenKind::String(_)))
+                {
+                    let lang_name = lang.clone();
+                    self.cursor += 1;
+                    let pkg = match self.current().kind.clone() {
+                        TokenKind::String(p) => { self.cursor += 1; p }
+                        _ => unreachable!(),
+                    };
+                    let alias = if self.take_as() {
+                        self.identifier()?
+                    } else {
+                        pkg.split(|c: char| !c.is_alphanumeric() && c != '_')
+                            .next()
+                            .filter(|s| !s.is_empty())
+                            .unwrap_or("مكتبة")
+                            .to_string()
+                    };
+                    self.semicolon()?;
+                    let loader = if lang_name == "بايثون" {
+                        "استورد_بايثون"
+                    } else {
+                        "استورد_جافاسكربت"
+                    };
+                    return Ok(Stmt::Let(
+                        alias,
+                        Expr::Call(loader.to_string(), vec![Expr::Text(pkg)]),
+                    ));
+                }
+            }
             let (module, is_string) = match self.current().kind.clone() {
                 TokenKind::String(path) => { self.cursor += 1; (path, true) }
                 TokenKind::Identifier(name) => { self.cursor += 1; (name, false) }
@@ -131,8 +165,12 @@ impl Parser {
         if self.take(&TokenKind::Let) {
             let name = self.identifier()?;
             let mut names = vec![name];
-            while self.take(&TokenKind::Comma) {
-                names.push(self.identifier()?);
+            if self.take(&TokenKind::Colon) {
+                let _type_ann = self.parse_type_annotation()?;
+            } else {
+                while self.take(&TokenKind::Comma) {
+                    names.push(self.identifier()?);
+                }
             }
             self.expect(&TokenKind::Equal, "متوقع '=' لتعريف المتغير")?;
             let value = self.expression()?;
@@ -236,9 +274,11 @@ impl Parser {
             });
         }
         if self.take(&TokenKind::Match) {
-            self.expect(&TokenKind::LeftParen, "متوقع '(' بعد اختر")?;
+            let has_paren = self.take(&TokenKind::LeftParen);
             let target = self.expression()?;
-            self.expect(&TokenKind::RightParen, "متوقع ')' بعد تعبير اختر")?;
+            if has_paren {
+                self.expect(&TokenKind::RightParen, "متوقع ')' بعد تعبير اختر")?;
+            }
             self.expect(&TokenKind::LeftBrace, "متوقع '{' لكتلة اختر")?;
             let mut cases = Vec::new();
             let mut default_case = None;
@@ -278,6 +318,31 @@ impl Parser {
         Ok(Stmt::Expr(expr))
     }
 
+    fn parse_type_annotation(&mut self) -> Result<String, String> {
+        let base = match self.current().kind.clone() {
+            TokenKind::Identifier(name) => { self.cursor += 1; name }
+            TokenKind::Null => { self.cursor += 1; "فارغ".to_string() }
+            TokenKind::Function => { self.cursor += 1; "دالة".to_string() }
+            _ => return Err(self.error("متوقع اسم نوع عربي بعد ':' أو '->' (مثل: عدد، نص، منطقي، قائمة، قاموس، فارغ، أي)")),
+        };
+        let mut full = base;
+        if self.take(&TokenKind::LeftBracket) {
+            full.push('[');
+            let mut first = true;
+            while !self.is(&TokenKind::RightBracket) && !self.is(&TokenKind::Eof) {
+                if !first {
+                    self.expect(&TokenKind::Comma, "متوقع '،' بين أنواع المعاملات")?;
+                    full.push('،');
+                }
+                first = false;
+                full.push_str(&self.parse_type_annotation()?);
+            }
+            self.expect(&TokenKind::RightBracket, "متوقع ']' لإغلاق تحديد النوع")?;
+            full.push(']');
+        }
+        Ok(full)
+    }
+
     fn function_declaration(&mut self) -> Result<Function, String> {
         let name = self.identifier()?;
         self.expect(&TokenKind::LeftParen, "متوقع '(' بعد اسم الدالة")?;
@@ -289,6 +354,9 @@ impl Parser {
             loop {
                 if self.take(&TokenKind::Star) {
                     let vname = self.identifier()?;
+                    if self.take(&TokenKind::Colon) {
+                        let _ = self.parse_type_annotation()?;
+                    }
                     vararg = Some(vname);
                     if self.take(&TokenKind::Comma) {
                         if !self.is(&TokenKind::RightParen) {
@@ -298,6 +366,9 @@ impl Parser {
                     break;
                 }
                 let param_name = self.identifier()?;
+                if self.take(&TokenKind::Colon) {
+                    let _ = self.parse_type_annotation()?;
+                }
                 if params.contains(&param_name) { return Err(self.error("معامل مكرر في الدالة")); }
                 params.push(param_name);
                 if self.take(&TokenKind::Equal) {
@@ -314,6 +385,9 @@ impl Parser {
             }
         }
         self.expect(&TokenKind::RightParen, "متوقع ')' بعد معاملات الدالة")?;
+        if self.take(&TokenKind::Arrow) {
+            let _return_type = self.parse_type_annotation()?;
+        }
         let enclosing_loop_depth = self.loop_depth;
         self.loop_depth = 0;
         self.function_depth += 1;

@@ -3,13 +3,16 @@ pub mod arduino;
 pub mod ast;
 pub mod bundle;
 pub mod bytecode;
+pub mod dap;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
 pub mod diagnostics;
 pub mod fmt;
+pub mod interop;
 pub mod json;
 pub mod lexer;
 pub mod lsp;
+pub mod mcp;
 pub mod modules;
 pub mod native;
 pub mod parser;

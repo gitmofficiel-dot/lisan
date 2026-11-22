@@ -1793,6 +1793,28 @@ impl Interpreter {
     }
 
     fn call(&mut self, name: &str, args: &[Expr]) -> Result<Value, String> {
+        // تحميل تلقائي لوحدة التوافق (بايثون / جافاسكربت / نماذج الذكاء) عند استخدامها مباشرة
+        if matches!(
+            name,
+            "استورد_بايثون" | "استورد_جافاسكربت" | "مكتبة_بايثون" | "مكتبة_جافاسكربت" | "نموذج_ذكاء" | "عميل_ذكي"
+        ) && !self.functions.contains_key(name)
+            && !self.classes.contains_key(name)
+        {
+            let b_tokens = crate::lexer::tokenize(crate::interop::STDLIB_INTEROP)?;
+            let b_stmts = crate::parser::parse(b_tokens)?;
+            self.execute_statements(&b_stmts, false)?;
+        }
+        let name: &str = if self.classes.contains_key(name)
+            || self.functions.contains_key(name)
+            || self.scopes.iter().rev().any(|s| s.contains_key(name))
+            || is_builtin(name)
+        {
+            name
+        } else if let Some(canonical) = crate::diagnostics::pure_arabic_to_canonical(name) {
+            canonical
+        } else {
+            name
+        };
         if self.classes.contains_key(name) {
             let instance = Value::Instance {
                 class_name: name.to_string(),
@@ -2012,6 +2034,7 @@ fn is_builtin(name: &str) -> bool {
         || crate::stdlib_ext::is_ext_builtin(name)
         || crate::web_framework::is_web_builtin(name)
         || crate::sys_games::is_sys_builtin(name)
+        || crate::interop::is_interop_builtin(name)
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -2069,6 +2092,7 @@ fn checked_int(value: &Value, fn_name: &str) -> Result<i64, String> {
 }
 
 fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
+    let name = crate::diagnostics::pure_arabic_to_canonical(name).unwrap_or(name);
     match name {
         "تحقق" => {
             require_args(name, &args, 1)?;
@@ -2936,6 +2960,9 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             }
             if crate::sys_games::is_sys_builtin(name) {
                 return crate::sys_games::eval_sys_builtin(name, args);
+            }
+            if let Some(res) = crate::interop::try_call_interop_builtin(name, &args) {
+                return res;
             }
             let empty: Vec<&str> = Vec::new();
             Err(crate::diagnostics::suggest_function_error(name, &empty))

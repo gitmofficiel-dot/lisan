@@ -1,7 +1,13 @@
 //! Language Server Protocol (LSP) Server for Lisan.
 //! Provides IDE diagnostics, hover documentation, autocompletion, and formatting over JSON-RPC 2.0.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io::{self, BufRead, Read, Write};
+
+thread_local! {
+    static OPEN_DOCS: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LspDiagnostic {
@@ -49,35 +55,17 @@ pub fn parse_diagnostic_location(err_msg: &str) -> (u32, u32, String) {
     (line, col, err_msg.to_string())
 }
 
-/// Analyze Lisan source code and produce LSP diagnostics.
+/// Analyze Lisan source code and produce LSP diagnostics (syntax, Arabic-only lint, gradual types).
 pub fn check_source_for_diagnostics(source: &str) -> Vec<LspDiagnostic> {
-    let mut diagnostics = Vec::new();
-
-    let tokens = match crate::lexer::tokenize(source) {
-        Ok(toks) => toks,
-        Err(err) => {
-            let (line, col, msg) = parse_diagnostic_location(&err);
-            diagnostics.push(LspDiagnostic {
-                line,
-                column: col,
-                message: msg,
-                severity: 1,
-            });
-            return diagnostics;
-        }
-    };
-
-    if let Err(err) = crate::parser::parse(tokens) {
-        let (line, col, msg) = parse_diagnostic_location(&err);
-        diagnostics.push(LspDiagnostic {
-            line,
-            column: col,
-            message: msg,
-            severity: 1,
-        });
-    }
-
-    diagnostics
+    crate::diagnostics::diagnose_source(source)
+        .into_iter()
+        .map(|d| LspDiagnostic {
+            line: d.line.saturating_sub(1) as u32,
+            column: d.column.saturating_sub(1) as u32,
+            message: format!("[{}] {}", d.code, d.message),
+            severity: if d.severity == "warning" { 2 } else { 1 },
+        })
+        .collect()
 }
 
 /// Return hover markdown documentation for a given Arabic symbol/keyword.
@@ -160,10 +148,20 @@ pub fn get_hover_documentation(word: &str) -> Option<&'static str> {
         "اتصال_مباشر_espnow" => Some("**فئة الاتصال المباشر ESP-NOW (`اتصال_مباشر_espnow`):**\n\nتراسل لاسلكي فوري ومباشر بين شرائح ESP32 دون راوتر."),
         "ناقل_مباشر_dma" => Some("**فئة النقل المباشر للذاكرة (`ناقل_مباشر_dma`):**\n\nنقل البيانات فائق السرعة في متحكمات STM32 دون إشغال المعالج."),
         "قاعدة_بيانات" => Some("**فئة قاعدة البيانات المدمجة (`قاعدة_بيانات`):**\n\nإنشاء الجداول وإدراج والبحث وحذف وحفظ السجلات محلياً.\n```lisan\nاستورد \"قاعدة_بيانات\"\nدع قاعدة = جديد قاعدة_بيانات(\"بياناتي.json\")\nقاعدة.أنشئ_جدول(\"المستخدمون\")\n```"),
-        "تجزئة_sha256" => Some("**دالة التجزئة التشفيرية (`تجزئة_sha256`):**\n\nحساب بصمة SHA-256 القياسية (FIPS 180-4) لأي نص."),
+        "تجزئة_sha256" | "تجزئة_آمنة" => Some("**دالة التجزئة التشفيرية (`تجزئة_آمنة`):**\n\nحساب بصمة SHA-256 القياسية (FIPS 180-4) لأي نص."),
         "شفر_نص" => Some("**دالة التشفير الآمن (`شفر_نص`):**\n\nتشفير النصوص العربية والعالمية بكلمة مرور وتوثيق HMAC-SHA256."),
         "يطابق_نمط" => Some("**دالة مطابقة الأنماط القياسية (`يطابق_نمط`):**\n\nفحص مطابقة النصوص للتعابير النمطية (Regex)."),
         "معلومات_النظام" => Some("**دالة معلومات النظام والمنصة (`معلومات_النظام`):**\n\nإرجاع قاموس بنظام التشغيل والمعمارية وعدد الأنوية والمسارات."),
+        "طابق" => Some("**مطابقة الأنماط (`طابق` / `اختر`):**\n\nمطابقة القيم مع حالات متعددة بشكل عصري.\n```lisan\nطابق اليوم {\n    حالة \"الجمعة\": اطبع(\"عطلة\")\n    افتراضي: اطبع(\"عمل\")\n}\n```"),
+        "مكتبة_بايثون" | "استورد_بايثون" => Some("**الربط بمكتبات بايثون (`استورد بايثون` / `مكتبة_بايثون`):**\n\nاستدعاء أي مكتبة بايثون (PyTorch، NumPy، Pandas، FastAPI) من شيفرة لسان العربية.\n```lisan\nاستورد بايثون \"math\" كـ رياضيات_ب\nاطبع(رياضيات_ب.استدعِ(\"sqrt\"، [16]))\n```"),
+        "مكتبة_جافاسكربت" | "استورد_جافاسكربت" => Some("**الربط بمكتبات جافاسكربت (`استورد جافاسكربت` / `مكتبة_جافاسكربت`):**\n\nاستدعاء وحدات Node.js وnpm من شيفرة لسان العربية."),
+        "نموذج_ذكاء" => Some("**عميل نماذج الذكاء الاصطناعي الموحّد (`نموذج_ذكاء`):**\n\nالتواصل عبر HTTPS مع Gemini وOpenAI وClaude والنماذج المحلية (Ollama)."),
+        "طلب_شبكي_آمن" => Some("**طلب شبكي آمن (`طلب_شبكي_آمن`):**\n\nإرسال طلبات HTTPS/TLS وHTTP كاملة (GET/POST/PUT/DELETE) مع ترويسات وجسم JSON."),
+        "بصمة_تحقق" => Some("**بصمة التحقق الدوري (`بصمة_تحقق`):**\n\nحساب بصمة CRC-32 القياسية (IEEE 802.3) للتحقق من سلامة البيانات."),
+        "مصنف_الجيران_الأقرب" => Some("**مصنّف الجيران الأقرب (`مصنف_الجيران_الأقرب`):**\n\nخوارزمية تصنيف للتعلم الآلي الموجه باللغة العربية الخالصة."),
+        "متحكم_تناسبي_تكاملي" => Some("**المتحكم التناسبي التكاملي التفاضلي (`متحكم_تناسبي_تكاملي`):**\n\nمتحكم PID احترافي للروبوتات والطائرات المسيّرة والأنظمة الصناعية."),
+        "عميل_واجهة_برمجية" => Some("**عميل الواجهة البرمجية (`عميل_واجهة_برمجية`):**\n\nعميل HTTP/HTTPS للاتصال بواجهات REST واسترجاع JSON."),
+        "عدد" | "نص" | "منطقي" | "قائمة" | "قاموس" => Some("**تحديد النوع الاختياري (Gradual Typing):**\n\nيمكن إضافة أنواع اختيارية للمتغيرات ومعاملات الدوال وقيم الإرجاع:\n```lisan\nدالة جمع(أ: عدد، ب: عدد) -> عدد {\n    أرجع أ + ب\n}\n```"),
         _ => None,
     }
 }
@@ -378,6 +376,75 @@ pub fn get_completion_items() -> &'static [(&'static str, &'static str, u32)] {
     ]
 }
 
+fn json_escape_lsp(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 8);
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+fn extract_word_at(text: &str, line_idx: usize, char_idx: usize) -> Option<String> {
+    let line = text.lines().nth(line_idx)?;
+    let chars: Vec<char> = line.chars().collect();
+    if chars.is_empty() {
+        return None;
+    }
+    let pos = char_idx.min(chars.len().saturating_sub(1));
+    let is_word = |c: char| c.is_alphanumeric() || c == '_' || matches!(c, '\u{064B}'..='\u{065F}' | '\u{0670}' | '\u{0640}');
+    if !is_word(chars[pos]) {
+        return None;
+    }
+    let mut start = pos;
+    while start > 0 && is_word(chars[start - 1]) {
+        start -= 1;
+    }
+    let mut end = pos + 1;
+    while end < chars.len() && is_word(chars[end]) {
+        end += 1;
+    }
+    Some(chars[start..end].iter().collect())
+}
+
+fn extract_uri_and_pos(parsed: &crate::runtime::Value) -> (String, usize, usize) {
+    let mut uri = String::new();
+    let mut line = 0usize;
+    let mut character = 0usize;
+    if let crate::runtime::Value::Map(root) = parsed {
+        if let Some((_, crate::runtime::Value::Map(params))) = root.borrow().iter().find(|(k, _)| k == "params") {
+            for (k, v) in params.borrow().iter() {
+                if k == "textDocument" {
+                    if let crate::runtime::Value::Map(td) = v {
+                        if let Some((_, crate::runtime::Value::Text(u))) = td.borrow().iter().find(|(dk, _)| dk == "uri") {
+                            uri = u.clone();
+                        }
+                    }
+                }
+                if k == "position" {
+                    if let crate::runtime::Value::Map(pos) = v {
+                        for (pk, pv) in pos.borrow().iter() {
+                            if pk == "line" {
+                                if let crate::runtime::Value::Number(n) = pv { line = *n as usize; }
+                            }
+                            if pk == "character" {
+                                if let crate::runtime::Value::Number(n) = pv { character = *n as usize; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    (uri, line, character)
+}
+
 /// Handle a single JSON-RPC request and produce a JSON-RPC response if required.
 pub fn handle_json_rpc(payload: &str) -> Option<String> {
     let parsed = crate::json::parse_json(payload).ok()?;
@@ -408,13 +475,12 @@ pub fn handle_json_rpc(payload: &str) -> Option<String> {
         "initialize" => {
             let res_id = id.unwrap_or_else(|| "1".into());
             Some(format!(
-                r#"{{"jsonrpc":"2.0","id":{},"result":{{"capabilities":{{"textDocumentSync":1,"hoverProvider":true,"completionProvider":{{"triggerCharacters":["."," "]}},"documentFormattingProvider":true}}}}}}"#,
+                r#"{{"jsonrpc":"2.0","id":{},"result":{{"capabilities":{{"textDocumentSync":1,"hoverProvider":true,"completionProvider":{{"triggerCharacters":["."," ","\""]}},"documentFormattingProvider":true,"definitionProvider":true,"documentSymbolProvider":true,"codeActionProvider":true}}}}}}"#,
                 res_id
             ))
         }
         "initialized" => None,
         "textDocument/didOpen" | "textDocument/didChange" => {
-            // Extract uri and text
             if let crate::runtime::Value::Map(root) = &parsed {
                 let params = root.borrow().iter().find(|(k, _)| k == "params").map(|(_, v)| v.clone());
                 if let Some(crate::runtime::Value::Map(param_map)) = params {
@@ -446,10 +512,13 @@ pub fn handle_json_rpc(payload: &str) -> Option<String> {
                     }
 
                     if !uri.is_empty() {
+                        OPEN_DOCS.with(|docs| {
+                            docs.borrow_mut().insert(uri.clone(), text.clone());
+                        });
                         let diags = check_source_for_diagnostics(&text);
                         let mut diag_json_items = Vec::new();
                         for d in diags {
-                            let clean_msg = d.message.replace('"', "\\\"").replace('\n', " ");
+                            let clean_msg = json_escape_lsp(&d.message);
                             diag_json_items.push(format!(
                                 r#"{{"range":{{"start":{{"line":{},"character":{}}},"end":{{"line":{},"character":{}}}}},"severity":{},"source":"لسان","message":"{}"}}"#,
                                 d.line, d.column, d.line, d.column + 1, d.severity, clean_msg
@@ -458,17 +527,159 @@ pub fn handle_json_rpc(payload: &str) -> Option<String> {
                         let joined_diags = diag_json_items.join(",");
                         return Some(format!(
                             r#"{{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{{"uri":"{}","diagnostics":[{}]}}}}"#,
-                            uri, joined_diags
+                            json_escape_lsp(&uri), joined_diags
                         ));
                     }
                 }
             }
             None
         }
+        "textDocument/didClose" => {
+            let (uri, _, _) = extract_uri_and_pos(&parsed);
+            if !uri.is_empty() {
+                OPEN_DOCS.with(|docs| { docs.borrow_mut().remove(&uri); });
+            }
+            None
+        }
         "textDocument/hover" => {
             let res_id = id.unwrap_or_else(|| "1".into());
-            // Default response is null hover unless symbol matched
+            let (uri, line, character) = extract_uri_and_pos(&parsed);
+            let doc_opt = OPEN_DOCS.with(|docs| docs.borrow().get(&uri).cloned());
+            if let Some(source) = doc_opt {
+                if let Some(word) = extract_word_at(&source, line, character) {
+                    if let Some(md) = get_hover_documentation(&word) {
+                        return Some(format!(
+                            r#"{{"jsonrpc":"2.0","id":{},"result":{{"contents":{{"kind":"markdown","value":"{}"}}}}}}"#,
+                            res_id, json_escape_lsp(md)
+                        ));
+                    }
+                    if let Some(arabic_kw) = crate::diagnostics::english_keyword_to_arabic(&word) {
+                        let md = format!("**لسان عربية فقط (`ل0001`):** الكلمة الإنجليزية `{}` غير مسموحة — استخدم **`{}`** بدلاً منها.", word, arabic_kw);
+                        return Some(format!(
+                            r#"{{"jsonrpc":"2.0","id":{},"result":{{"contents":{{"kind":"markdown","value":"{}"}}}}}}"#,
+                            res_id, json_escape_lsp(&md)
+                        ));
+                    }
+                    if let Some(pure_ar) = crate::diagnostics::legacy_to_pure_arabic(&word) {
+                        let md = format!("**بديل عربي خالص (`ل0004`):** يُفضّل استخدام **`{}`** بدلاً من `{}`.", pure_ar, word);
+                        return Some(format!(
+                            r#"{{"jsonrpc":"2.0","id":{},"result":{{"contents":{{"kind":"markdown","value":"{}"}}}}}}"#,
+                            res_id, json_escape_lsp(&md)
+                        ));
+                    }
+                }
+            }
             Some(format!(r#"{{"jsonrpc":"2.0","id":{},"result":null}}"#, res_id))
+        }
+        "textDocument/definition" => {
+            let res_id = id.unwrap_or_else(|| "1".into());
+            let (uri, line, character) = extract_uri_and_pos(&parsed);
+            let doc_opt = OPEN_DOCS.with(|docs| docs.borrow().get(&uri).cloned());
+            if let Some(source) = doc_opt {
+                if let Some(word) = extract_word_at(&source, line, character) {
+                    if let Ok(tokens) = crate::lexer::tokenize(&source) {
+                        for pair in tokens.windows(2) {
+                            let is_decl = matches!(
+                                pair[0].kind,
+                                crate::lexer::TokenKind::Function
+                                    | crate::lexer::TokenKind::Class
+                                    | crate::lexer::TokenKind::Let
+                            );
+                            if is_decl {
+                                if let crate::lexer::TokenKind::Identifier(ref name) = pair[1].kind {
+                                    if name == &word {
+                                        let target_line = pair[1].line.saturating_sub(1);
+                                        let target_col = pair[1].column.saturating_sub(1);
+                                        return Some(format!(
+                                            r#"{{"jsonrpc":"2.0","id":{},"result":{{"uri":"{}","range":{{"start":{{"line":{},"character":{}}},"end":{{"line":{},"character":{}}}}}}}}}"#,
+                                            res_id,
+                                            json_escape_lsp(&uri),
+                                            target_line,
+                                            target_col,
+                                            target_line,
+                                            target_col + word.chars().count()
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Some(format!(r#"{{"jsonrpc":"2.0","id":{},"result":null}}"#, res_id))
+        }
+        "textDocument/documentSymbol" => {
+            let res_id = id.unwrap_or_else(|| "1".into());
+            let (uri, _, _) = extract_uri_and_pos(&parsed);
+            let doc_opt = OPEN_DOCS.with(|docs| docs.borrow().get(&uri).cloned());
+            let mut syms = Vec::new();
+            if let Some(source) = doc_opt {
+                if let Ok(tokens) = crate::lexer::tokenize(&source) {
+                    for pair in tokens.windows(2) {
+                        let sym_kind = match pair[0].kind {
+                            crate::lexer::TokenKind::Function => Some(12),
+                            crate::lexer::TokenKind::Class => Some(5),
+                            _ => None,
+                        };
+                        if let (Some(kind), crate::lexer::TokenKind::Identifier(ref name)) = (sym_kind, &pair[1].kind) {
+                            let l = pair[1].line.saturating_sub(1);
+                            let c = pair[1].column.saturating_sub(1);
+                            syms.push(format!(
+                                r#"{{"name":"{}","kind":{},"range":{{"start":{{"line":{},"character":{}}},"end":{{"line":{},"character":{}}}}},"selectionRange":{{"start":{{"line":{},"character":{}}},"end":{{"line":{},"character":{}}}}}}}"#,
+                                json_escape_lsp(name), kind, l, c, l, c + name.chars().count(), l, c, l, c + name.chars().count()
+                            ));
+                        }
+                    }
+                }
+            }
+            Some(format!(r#"{{"jsonrpc":"2.0","id":{},"result":[{}]}}"#, res_id, syms.join(",")))
+        }
+        "textDocument/codeAction" => {
+            let res_id = id.unwrap_or_else(|| "1".into());
+            let (uri, _, _) = extract_uri_and_pos(&parsed);
+            let doc_opt = OPEN_DOCS.with(|docs| docs.borrow().get(&uri).cloned());
+            let mut actions = Vec::new();
+            if let Some(source) = doc_opt {
+                if let Ok(tokens) = crate::lexer::tokenize(&source) {
+                    for diag in crate::diagnostics::lint_arabic_only(&source) {
+                        if let Some(ref replacement) = diag.replacement {
+                            let l = diag.line.saturating_sub(1);
+                            let c = diag.column.saturating_sub(1);
+                            let orig_len = tokens
+                                .iter()
+                                .find(|t| t.line == diag.line && t.column == diag.column)
+                                .and_then(|t| match &t.kind {
+                                    crate::lexer::TokenKind::Identifier(w) => Some(w.chars().count()),
+                                    _ => None,
+                                })
+                                .unwrap_or(1);
+                            let title = diag.suggestion.clone().unwrap_or_else(|| format!("استبدل بـ '{}'", replacement));
+                            actions.push(format!(
+                                r#"{{"title":"{}","kind":"quickfix","edit":{{"changes":{{"{}":[{{"range":{{"start":{{"line":{},"character":{}}},"end":{{"line":{},"character":{}}}}},"newText":"{}"}}]}}}}}}"#,
+                                json_escape_lsp(&title),
+                                json_escape_lsp(&uri),
+                                l, c, l, c + orig_len,
+                                json_escape_lsp(replacement)
+                            ));
+                        }
+                    }
+                }
+            }
+            Some(format!(r#"{{"jsonrpc":"2.0","id":{},"result":[{}]}}"#, res_id, actions.join(",")))
+        }
+        "textDocument/formatting" => {
+            let res_id = id.unwrap_or_else(|| "1".into());
+            let (uri, _, _) = extract_uri_and_pos(&parsed);
+            let doc_opt = OPEN_DOCS.with(|docs| docs.borrow().get(&uri).cloned());
+            if let Some(source) = doc_opt {
+                let formatted = crate::fmt::format_source(&source);
+                let line_count = source.lines().count() + 1;
+                return Some(format!(
+                    r#"{{"jsonrpc":"2.0","id":{},"result":[{{"range":{{"start":{{"line":0,"character":0}},"end":{{"line":{},"character":0}}}},"newText":"{}"}}]}}"#,
+                    res_id, line_count, json_escape_lsp(&formatted)
+                ));
+            }
+            Some(format!(r#"{{"jsonrpc":"2.0","id":{},"result":[]}}"#, res_id))
         }
         "textDocument/completion" => {
             let res_id = id.unwrap_or_else(|| "1".into());

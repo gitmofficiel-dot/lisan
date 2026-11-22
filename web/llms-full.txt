@@ -1,0 +1,549 @@
+# Lisan (لسان) — Complete Self-Contained Language & Ecosystem Reference (`llms-full.txt`)
+
+> Version: 1.1.0 | License: MIT | Runtime: Rust (zero external crate dependencies)
+> Execution targets: Native (LLVM/Clang), Bytecode VM, Tree-Walking Interpreter, WebAssembly (WASM), Arduino C++, ESP32 C++, STM32 C++, Raspberry Pi Python 3, Raspberry Pi Pico MicroPython (RP2040), Responsive HTML5 Web, Mobile PWA 2.0, 2D HTML5 Canvas Games, LSP Server, and MCP Server.
+
+---
+
+## 1. The Golden Rule & Reserved Words
+
+### Golden Rule (100% Arabic-Only Keywords)
+- **Zero English keywords** are permitted in Lisan source files (`.lsn` / `.lisan`). Never write `if`, `else`, `elif`, `def`, `function`, `return`, `import`, `from`, `as`, `class`, `while`, `for`, `in`, `print`, `true`, `false`, `null`, `None`, `let`, `var`, `try`, `except`, `catch`, `finally`, `raise`, `throw`, `and`, `or`, `not`, `break`, `continue`, `with`, `match`, `case`, `default`, `new`, `self`, `this`, `extends`.
+- **Foreign library names appear ONLY inside string literals** when using Python or JavaScript interop:
+  ```lisan
+  دع مصفوفات = استورد_بايثون("numpy")
+  دع جداول = استورد_بايثون("pandas")
+  ```
+- **Pure Arabic module names** are preferred for all built-in and embedded modules (`رياضيات`, `إحصاء`, `اردوينو`, `اي_اس_بي32`, `اس_تي_ام32`, `راسبيري`, `بيكو`, `روبوتات`, `ذكاء`, `إطار_ويب`, `موقع`, `هاتف`, `قاعدة_بيانات`, `ألعاب`, `أنظمة`).
+
+### Complete List of Reserved Words (Never Use as Variable Names)
+Because Lisan normalizes Arabic hamza (`أ إ آ ٱ` → `ا`), tāʾ marbūṭa (`ة` → `ه`), and alif maqṣūra (`ى` → `ي`) on keywords, avoid ALL of these as identifiers:
+- Declarations & functions: `دع`, `ليكن`, `متغير`, `دالة`, `أرجع`, `ارجع`
+- Output & imports: `اطبع`, `استورد`, `استيراد`, `من`, `كـ`, `باسم`, `كاسم`
+- Control flow: `إذا`, `اذا`, `وإلا`, `والا`, `إلا`, `طالما`, `بينما`, `لكل`, `في`, `توقف`, `تابع`, `استمر`
+- Pattern matching: `اختر`, `حالة`, `افتراضي`
+- Errors & context: `حاول`, `التقط`, `أمسك`, `امسك`, `أخيرًا`, `أخيرا`, `اخيرا`, `نهائيا`, `ارمِ`, `ارم`, `ألقِ`, `الق`, `أطلق`, `مع`
+- Classes & objects: `صنف`, `فئة`, `هيكل`, `يرث`, `يمتد`, `جديد` (`هذا` is the implicit instance receiver inside class methods)
+- Literals & logic: `صحيح`, `خطأ`, `خطا`, `لاشيء`, `فارغ`, `و`, `أو`, `او`, `ليس`
+
+> **Critical Trap**: `خطأ` means boolean `false`, and `حالة` means `case`. Never write `التقط (خطأ)` or `دع حالة = 1`. Always write `التقط (رسالة)` and `دع الوضع = 1`.
+
+---
+
+## 2. Lexical Rules & Literals
+
+- **Encoding**: UTF-8 plain text with `.lsn` or `.lisan` extension.
+- **Comments**: Single-line comments start with `//` or `#`.
+- **Statement termination**: Newlines terminate statements automatically. Semicolons (`؛` or `;`) are optional and only needed to place multiple statements on one line: `دع أ = 1؛ دع ب = 2`.
+- **Commas**: Both Arabic comma `،` and Latin `,` separate arguments/elements; Arabic `،` is canonical.
+- **Numbers**: 64-bit IEEE-754 floating point (`42`, `3.14`, `1e3`, `2.5E-2`). Both Latin (`0-9`) and Arabic-Indic (`٠-٩`, `٫`) digits are accepted in source; printed output uses standard digits.
+- **Strings**: Always enclosed in double quotes `"..."` (single quotes `'...'` are NOT string literals). Supported escapes: `\n`, `\t`, `\r`, `\"`, `\\`.
+- **Formatted Strings (Interpolation)**: Prefix with Arabic `ن"..."`:
+  ```lisan
+  دع الاسم = "طارق"
+  دع الدرجة = 95
+  اطبع(ن"الطالب {الاسم} حصل على {الدرجة} من 100")
+  ```
+  Use `{{` and `}}` for literal braces inside `ن"..."`.
+- **Booleans & Null**: `صحيح`, `خطأ`, `لاشيء`.
+
+---
+
+## 3. Operators & Precedence
+
+From highest to lowest precedence:
+1. Grouping `(...)`, indexing `ق[0]`, slicing `ق[1:4:1]`, property access `ك.حقل`, call `د(أ، ب)`, instantiation `جديد صنف(...)`
+2. Exponentiation `**` (right-associative: `2 ** 3 ** 2 == 512`, `-2 ** 2 == -4`)
+3. Unary: `-س`, `ليس ش`, `!ش`
+4. Multiplicative: `*`, `/`, `%`
+5. Additive: `+`, `-` (string `+` concatenates two strings; convert numbers explicitly with `نص(س)`)
+6. Membership & Comparison: `<`, `<=`, `>`, `>=`, `في`, `ليس في`
+7. Equality: `==`, `!=`
+8. Logical AND: `و` (or `&&`)
+9. Logical OR: `أو` (or `||`)
+10. Assignment: `=` (note: **no `+=`, `-=`, `*=`, `/=`** — write `س = س + 1`)
+
+---
+
+## 4. Variables, Unpacking, Collections & Slicing
+
+```lisan
+// تعريف المتغيرات والتفكيك
+دع الاسم = "لسان"
+دع س، ص = [10، 20]
+س = س + 5
+
+// القوائم والتقطيع (Slicing)
+دع أرقام = [10، 20، 30، 40، 50]
+اطبع(أرقام[0])        // 10
+اطبع(أرقام[-1])       // 50
+اطبع(أرقام[1:4])      // [20، 30، 40]
+اطبع(أرقام[::-1])     // [50، 40، 30، 20، 10]
+
+// القواميس (Dictionaries)
+دع طالب = {"الاسم": "سلمى"، "العمر": 22}
+طالب["التخصص"] = "هندسة"
+اطبع(طالب["الاسم"])
+
+// الصفوف الثابتة (Tuples) والمجموعات الفريدة (Sets)
+دع إحداثي = صف([30، 40])
+دع فريدة = مجموعة([1، 2، 2، 3، 3])
+اطبع(طول(فريدة))      // 3
+```
+
+---
+
+## 5. Control Flow, Pattern Matching, Exceptions & Context Managers
+
+### Conditionals (`إذا` / `وإلا`)
+Parentheses around conditions and `{ ... }` around branches are required. `وإلا` must be followed by `{ ... }`:
+```lisan
+دع الدرجة = 85
+إذا (الدرجة >= 90) {
+    اطبع("ممتاز")
+} وإلا {
+    إذا (الدرجة >= 75) {
+        اطبع("جيد جداً")
+    } وإلا {
+        اطبع("مقبول")
+    }
+}
+```
+
+### Loops (`طالما`, `بينما`, `لكل`)
+```lisan
+دع عداد = 0
+طالما (عداد < 3) {
+    اطبع(عداد)
+    عداد = عداد + 1
+}
+
+لكل (ن في مدى(0، 10، 2)) {
+    إذا (ن == 2) { تابع }
+    إذا (ن == 8) { توقف }
+    اطبع(ن)
+}
+
+// تفكيك العناصر أثناء التكرار
+لكل (فهرس، قيمة في مرقم(["ألف"، "باء"])) {
+    اطبع(ن"{فهرس}: {قيمة}")
+}
+```
+
+### Pattern Matching (`اختر` / `حالة` / `افتراضي`)
+```lisan
+دع الرمز = 200
+اختر (الرمز) {
+    حالة 200: { اطبع("نجاح") }
+    حالة 404: { اطبع("غير موجود") }
+    افتراضي: { اطبع("رمز آخر") }
+}
+```
+
+### Exception Handling (`حاول` / `التقط` / `أخيرًا` / `ارمِ`)
+```lisan
+حاول {
+    دع رصيد = -5
+    إذا (رصيد < 0) {
+        ارمِ "الرصيد لا يمكن أن يكون سالباً"
+    }
+} التقط (رسالة) {
+    اطبع("تم اعتراض الاستثناء: " + رسالة)
+} أخيرًا {
+    اطبع("اكتملت العملية")
+}
+```
+
+### Context Manager (`مع ... كـ`)
+```lisan
+مع افتح("ملاحظة.txt"، "ك") كـ ملف {
+    ملف.اكتب("سطر محفوظ بأمان")
+}
+```
+
+---
+
+## 6. Functions, Closures, Lambdas & Comprehensions
+
+```lisan
+// دالة بمعاملات افتراضية
+دالة تحية(الاسم، لقب = "صديقي") {
+    أرجع ن"مرحبا يا {لقب} {الاسم}"
+}
+
+// دالة مختصرة بسهم =>
+دالة مربع(س) => س * س
+
+// معاملات متغيرة الطول (*وسائط)
+دالة جمع_الكل(*أعداد) {
+    أرجع مجموع(أعداد)
+}
+
+// إغلاقات معجمية ودوال مجهولة واستدعاء متسلسل
+دالة اصنع_عداد(بداية) {
+    دع قيمة = بداية
+    أرجع دالة(خطوة) {
+        قيمة = قيمة + خطوة
+        أرجع قيمة
+    }
+}
+دع زِد = اصنع_عداد(10)
+اطبع(زِد(5))          // 15
+اطبع(زِد(3))          // 18
+
+// استدعاء متسلسل مباشر
+دالة أضف_ثابت(أ) => دالة(ب) => أ + ب
+اطبع(أضف_ثابت(4)(6))  // 10
+
+// التوليد المختصر للقوائم (List Comprehension)
+دع زوجية_مربعة = [س * س لكل س في مدى(1، 11) إذا س % 2 == 0]
+اطبع(زوجية_مربعة)     // [4، 16، 36، 64، 100]
+```
+
+---
+
+## 7. Classes & Object-Oriented Inheritance
+
+- Declare classes with `صنف الاسم { ... }` and inheritance with `صنف ابن يرث أب { ... }`.
+- Constructor is `دالة بناء(...)`.
+- `هذا` implicitly refers to the current instance (never pass `هذا` in method parameter lists).
+- Instantiate with `جديد الاسم(...)`.
+
+```lisan
+صنف كائن_حي {
+    دالة بناء(الاسم) {
+        هذا.الاسم = الاسم
+    }
+    دالة تعريف() => ن"الكائن: {هذا.الاسم}"
+}
+
+صنف طائر يرث كائن_حي {
+    دالة بناء(الاسم، ارتفاع) {
+        هذا.الاسم = الاسم
+        هذا.ارتفاع = ارتفاع
+    }
+    دالة حلّق() {
+        أرجع ن"{هذا.الاسم} يحلّق على ارتفاع {هذا.ارتفاع} متر"
+    }
+}
+
+دع صقر = جديد طائر("الصقر"، 500)
+اطبع(صقر.تعريف())
+اطبع(صقر.حلّق())
+```
+
+---
+
+## 8. Modules, Built-in Functions & Standard Library
+
+### Import Forms
+```lisan
+استورد "وحدة_محلية.lsn"          // مسار نسبي للملف الحالي
+استورد رياضيات كـ ر               // وحدة قياسية مع اسم مستعار
+من رياضيات استورد جذر، ط          // استيراد رموز محددة
+استورد "ذكاء"                     // وحدة مدمجة من منظومة لسان
+```
+
+### Core Built-in Functions
+- **General**: `اطبع(ق)`, `طول(س)`, `نوع(ق)`, `نص(ق)`, `عدد(ق)`, `عدد_صحيح(ق)`, `الآن()`, `ادخل()`, `تحقق(ش)`, `تحقق_يساوي(ف، م)`.
+- **Numbers**: `مطلق(س)`, `جذر(س)`, `قرّب(س)`, `أدنى(أ، ب)`, `أعلى(أ، ب)`, `أرضية(س)`, `سقف(س)`, `قوة(أ، ب)`, `جا`, `جتا`, `ظا`, `لوغاريتم`, `أسي`, `مضروب`, `توافيق`, `تباديل`, `قاسم_مشترك`, `مضاعف_مشترك`, `تقارب`, `ط`, `هـ`.
+- **Text**: `نظّف(ن)`, `اقتطع(ن، ب، هـ)`, `قسّم(ن، ف)`, `ادمج(ق، ف)`, `استبدل(ن، ق، ج)`, `يبدأ_ب(ن، ب)`, `ينتهي_ب(ن، ل)`, `كرر(ن، ع)`, `أحرف_كبيرة(ن)`, `أحرف_صغيرة(ن)`, `ترميز_قاعدة64`, `فك_قاعدة64`, `ترميز_url`, `فك_url`.
+- **Lists & Collections**: `مدى(...)`, `أضف(ق، ع)`, `ألحق(ق، ع)`, `احذف(ق، ف)`, `عكس(ق)`, `فرز(ق)`, `مجموع(ق)`, `متوسط(ق)`, `ابحث(ق، ع)`, `خلط(ق)`, `صف(ق)`, `مجموعة(ق)`, `سحاب(ق1، ق2)`, `مرقم(ق)`, `أي(ق)`, `كل(ق)`.
+- **Dicts**: `مفاتيح(ق)`, `قيم(ق)`, `يحتوي(ق، م)`, `عناصر(ق)`.
+- **Files & OS**: `افتح(م، و)`, `اقرأ_ملف(م)`, `اكتب_ملف(م، ن)`, `ألحق_ملف(م، ن)`, `ملف_موجود(م)`, `مجلد_موجود(م)`, `أنشئ_مجلد(م)`, `قائمة_ملفات(م)`, `احذف_ملف(م)`, `مسار_حالي()`, `نظام_تشغيل()`, `معلومات_النظام()`.
+- **Time, Date, Random, JSON, Network**: `طابع_زمني()`, `انتظر_ملي(م)`, `تاريخ_اليوم()`, `فرق_أيام(ت1، ت2)`, `أضف_أيام(ت، أ)`, `يوم_الأسبوع(ت)`, `عشوائي()`, `عدد_عشوائي(أ، ب)`, `عنصر_عشوائي(ق)`, `تحليل_جيسون(ن)`, `إلى_جيسون(ق)`, `تحليل_csv(ن)`, `ترميز_csv(ص)`, `طلب_وب(ر)`.
+
+### Built-in Runtime Modules (`استورد <اسم>`)
+`رياضيات` | `إحصاء` (`وسيط`, `منوال`, `تباين`, `انحراف_معياري`, `ارتباط`) | `نصوص` | `ملفات` | `نظام` | `وقت` | `تاريخ` | `عشوائي` | `جيسون` | `شبكة`.
+
+### Database, Cryptography & Regex (`استورد "قاعدة_بيانات"`)
+- `قاعدة_بيانات(مسار_الملف)`: `أنشئ_جدول`, `أدرج`, `الكل`, `ابحث_بحقل`, `احذف_بمعرف`, `عدد_السجلات`, `أسماء_الجداول`, `احفظ`.
+- `تشفير_أمان(مفتاح)`: `تجزئة` (`تجزئة_sha256`), `وقع` (`توقيع_hmac`), `تحقق_توقيع`, `شفر` (`شفر_نص`), `فك_تشفير` (`فك_تشفير_نص`), `معرف_جديد` (`معرف_فريد`), `إلى_ست_عشري`, `من_ست_عشري`.
+- `محلل_أنماط(نمط)`: `يطابق` (`يطابق_نمط`), `استخرج` (`استخرج_نمط`), `استبدل` (`استبدل_نمط`), `عدد_التطابقات`.
+
+```lisan
+استورد "قاعدة_بيانات"
+دع قاعدة = جديد قاعدة_بيانات("")
+قاعدة.أنشئ_جدول("مستخدمون")
+قاعدة.أدرج("مستخدمون"، {"الاسم": "خالد"، "الدور": "مطور"})
+اطبع(قاعدة.عدد_السجلات("مستخدمون"))  // 1
+
+دع أمن = جديد تشفير_أمان("مفتاح_سري")
+اطبع(طول(أمن.تجزئة("لسان")))         // 64 (SHA-256 hex)
+```
+
+---
+
+## 9. Web Framework & Static Website Builder
+
+### Multi-Route Web Framework (`استورد "إطار_ويب"`)
+- `تطبيق_ويب(اسم، منفذ = 8080)`: `مسار_get`, `مسار_post`, `رد_json`, `رد_html`, `عدد_المسارات`, `محاكاة_طلب(طريقة، مسار)`, `شغّل(حد_طلبات)`.
+- `قالب_صفحة(قالب_نص)`: `عرض(بيانات_قاموس)` (auto-escapes HTML safely).
+- `عميل_api(رابط_أساسي، ترويسات)`: `بناء_الرابط`, `جلب`, `إرسال`.
+
+```lisan
+استورد "إطار_ويب"
+دع خادم = جديد تطبيق_ويب("بوابة_لسان"، 8080)
+خادم.رد_json("/صحة"، {"الحالة_الخدمية": "يعمل"، "الإصدار": "1.1.0"})
+دع استجابة = خادم.محاكاة_طلب("GET"، "/صحة")
+اطبع(استجابة["رمز"])
+```
+
+### Responsive Arabic Site Generator (`استورد "موقع"`)
+- `موقع_ويب(عنوان، النسق = "ملكي")`: `أضف_تنبيه_أعلى`, `شريط_تنقل`, `قسم_رئيسي`, `أضف_بطاقة`, `أضف_إحصائية`, `أضف_إحصائيات`, `أضف_شبكة`, `أضف_أسعار`, `أضف_أسئلة_شائعة`, `أضف_جدول`, `أضف_شهادات`, `أضف_معرض`, `أضف_قسم`, `أضف_نموذج_تواصل`, `حفظ("index.html")`.
+
+---
+
+## 10. Mobile PWA 2.0 (`استورد "هاتف"`)
+
+- `تطبيق_هاتف(اسم_التطبيق، النسق)`:
+  - UI components: `اختر_نسق`, `أضف_بطاقة`, `أضف_إحصائية`, `أضف_مفتاح_تحكم`, `أضف_زر`, `أضف_عنصر`, `أضف_تبويب`.
+  - PWA 2.0 multi-screen & interactive components: `أضف_شاشة(معرف، عنوان، أيقونة، عناصر)`, `أضف_زر_عائم(أيقونة، رسالة، نافذة)`, `أضف_نافذة_سفلية(معرف، عنوان، محتوى)`, `أضف_نموذج_هاتف(معرف، عنوان، حقول، زر، نجاح)`.
+  - Build & export: `بناء_واجهة()`, `تصدير("dist_app")` (generates `index.html`, `manifest.json`, `sw.js`).
+
+```lisan
+استورد "هاتف"
+دع تطبيق = جديد تطبيق_هاتف("مدير المهام"، "زمردي")
+تطبيق.أضف_بطاقة("أهلاً بك"، "تطبيق هاتف عربي متكامل بلغة لسان"، "هاتف")
+تطبيق.أضف_إحصائية("المهام المنجزة"، "12"، "نجمة")
+تطبيق.أضف_مفتاح_تحكم("الوضع الليلي"، "قمر"، صحيح)
+دع واجهة = تطبيق.بناء_واجهة()
+اطبع(طول(واجهة) > 100)
+```
+
+---
+
+## 11. AI, Machine Learning, Data Science, Arabic NLP & SVG Charts (`استورد "ذكاء"`)
+
+All 10 classes in `ذكاء`:
+1. `مصفوفة(صفوف_2d)`: `أبعاد`, `قيمة`, `ضبط`, `جمع`, `طرح`, `ضرب_عددي`, `منقول`, `ضرب`, `مجموع_الكل`, `تفعيل_سيجمويد`, `تفعيل_ريلو`.
+2. `جدول_بيانات(سجلات)`: `أضف_صف`, `عدد_الصفوف`, `الأعمدة`, `رأس`, `ذيل`, `عمود`, `تصفية`, `مجموع_عمود`, `متوسط_عمود`, `أعلى_عمود`, `أدنى_عمود`, `تجميع_عدد`, `إلى_csv`, `من_csv`, `ملخص`.
+3. `انحدار_خطي()`: `درّب(س، ص)`, `توقّع(ق)`, `توقّع_قائمة(ق)`, `الميل()`, `التقاطع()`, `دقة_r2(س، ص)`.
+4. `مصنف_جيران_knn(ك = 3)`: `درّب(نقاط، تصنيفات)`, `توقّع(نقطة)`.
+5. `شبكة_عصبية(مدخلات، مخفية، معدل_التعلم)`: `توقّع(مدخل)`, `درّب_خطوة(مدخل، هدف)`, `درّب(س، ص، دورات)`.
+6. `محلل_نص_عربي()`: `أزل_التشكيل`, `وحّد_الحروف`, `كلمات`, `تكرار_الكلمات`, `تحليل_المشاعر`.
+7. `مخطط_أعمدة(عنوان، عرض، ارتفاع)`: `أضف_بيان`, `بناء_svg`, `حفظ`.
+8. `مخطط_خطي(عنوان، عرض، ارتفاع، لون)`: `أضف_نقطة`, `بناء_svg`, `حفظ`.
+9. `مخطط_دائري(عنوان، عرض، ارتفاع)`: `أضف_شريحة`, `بناء_svg`, `حفظ`.
+10. `لوحة_رسم_svg(عرض، ارتفاع، خلفية)`: `مستطيل`, `دائرة`, `خط`, `نص_svg`, `بناء_svg`, `حفظ`.
+
+```lisan
+استورد "ذكاء"
+دع نموذج = جديد انحدار_خطي()
+نموذج.درّب([1، 2، 3، 4]، [3، 5، 7، 9])
+اطبع(قرّب(نموذج.توقّع(5)))   // 11
+
+دع محلل = جديد محلل_نص_عربي()
+اطبع(محلل.أزل_التشكيل("لِسَانٌ عَرَبِيٌّ"))
+```
+
+---
+
+## 12. Python & JavaScript Interop (Foreign Names in Strings Only)
+
+When integrating external Python or JavaScript packages, keep Lisan syntax 100% Arabic and place external package names **strictly inside string literals**:
+```lisan
+// مثال نمط التكامل الخارجي (اسم المكتبة الأجنبية داخل نص فقط)
+دع مصفوفات = استورد_بايثون("numpy")
+دع رياضيات_خارجية = استورد_بايثون("math")
+دع أداة_ويب = استورد_جافاسكريبت("lodash")
+```
+Never write `import numpy as np` or `from pandas import DataFrame`.
+
+---
+
+## 13. Systems, CLI Toolkit & 2D HTML5 Canvas Game Engine (`استورد "ألعاب"` / `استورد "أنظمة"`)
+
+- `لعبة_ثنائية_الأبعاد(عنوان، عرض، ارتفاع، خلفية)`: `أضف_لاعب`, `أضف_هدف`, `أضف_عقبة`, `بناء_html`, `حفظ`.
+- `أداة_سطر_أوامر(اسم، إصدار)`: `إطار_عنوان`, `جدول_طرفية`, `شريط_تقدم_نصي`, `ملوّن`.
+- `سجل_أحداث(اسم_الخدمة)`: `أضف_حدث`, `معلومات`, `تحذير`, `عطل`, `عدد_السجلات`, `الكل`, `تصدير_json`.
+- `مجدول_مهام(اسم_المسار)`: `أضف_مهمة`, `نفّذ_الكل`, `تقرير`.
+- Systems builtins: `بصمة_crc32(نص)`, `ضغط_rle(نص)`, `فك_ضغط_rle(نص)`, `نفّذ_أمر(أمر)`.
+
+```lisan
+استورد "ألعاب"
+دع سجل = جديد سجل_أحداث("خادم_الرصد")
+سجل.معلومات("بدء التشغيل بنجاح")
+سجل.تحذير("ارتفاع طفيف في الحرارة")
+اطبع(سجل.عدد_السجلات())  // 2
+```
+
+---
+
+## 14. Complete Catalog of All 105 Hardware & Robotics Classes
+
+### A. Arduino (`استورد "اردوينو"` — 38 Classes, `--arduino` → C++ `.ino`)
+1. `محرك_سيرفو` (Servo motor)
+2. `محرك_خطوي` (Stepper motor)
+3. `حساس_مسافة` (HC-SR04 ultrasonic)
+4. `حساس_حرارة` (DHT11/DHT22 temp & humidity)
+5. `شاشة_كريستال` (I2C LCD 16x2/20x4)
+6. `شريط_إضاءة` (WS2812 NeoPixel LED strip)
+7. `ذاكرة_eeprom` (Non-volatile EEPROM)
+8. `ناقل_i2c` (I2C / Wire bus)
+9. `زر_ضاغط` (Debounced push button)
+10. `جرس_تنبيه` (Piezo buzzer / tones)
+11. `متحكم_محركات_l298n` (Dual H-bridge motor driver)
+12. `واي_فاي_متحكم` (WiFi shield/module)
+13. `بلوتوث_متحكم` (HC-05/HC-06 Bluetooth)
+14. `شاشة_oled` (SSD1306 128x64 OLED)
+15. `مرحل_كهربائي` (Relay switch)
+16. `حساس_حركة_pir` (PIR infrared motion)
+17. `حساس_غاز_mq` (MQ-2/MQ-135 gas & smoke)
+18. `محدد_مواقع_gps` (NEO-6M GPS)
+19. `قارئ_rfid` (MFRC522 RFID reader)
+20. `لوحة_مفاتيح_4x4` (4x4 matrix keypad)
+21. `عصا_تحكم` (2-axis analog joystick)
+22. `مشفر_دوار` (KY-040 rotary encoder)
+23. `حساس_رطوبة_تربة` (Soil moisture sensor)
+24. `حساس_مطر` (Raindrop detector)
+25. `حساس_لهب` (Flame fire sensor)
+26. `مستقبل_أشعة_ir` (IR remote receiver)
+27. `بطاقة_ذاكرة_sd` (SD card storage)
+28. `حساس_تسارع_جيروسكوب` (MPU6050 6-axis IMU)
+29. `حساس_ضغط_جوي` (BME280 barometric pressure & altitude)
+30. `خلية_وزن_hx711` (HX711 load cell scale)
+31. `شاشة_سبع_قطع` (TM1637 7-segment display)
+32. `مصفوفة_ليد_8x8` (MAX7219 8x8 LED matrix)
+33. `حساس_صوت` (Sound/microphone level)
+34. `حساس_مستوى_ماء` (Water level sensor)
+35. `حساس_تيار_acs712` (ACS712 current sensor)
+36. `حساس_ألوان_tcs3200` (TCS3200 RGB color sensor)
+37. `حساس_نبض_max30102` (MAX30102 heart rate & SpO2)
+38. `ناقل_spi` (SPI bus)
+
+### B. ESP32 (`استورد "اي_اس_بي32"` — 18 Classes, `--esp32` → C++ `.ino`)
+39. `واي_فاي_esp` (WiFi station & AP)
+40. `خادم_ويب_esp` (Embedded HTTP server)
+41. `عميل_mqtt` (IoT MQTT publish/subscribe)
+42. `بلوتوث_ble` (Bluetooth Low Energy)
+43. `حساس_لمس_esp` (Capacitive touch pins)
+44. `نوم_عميق_esp` (Deep sleep power management)
+45. `ذاكرة_فلاش_spiffs` (SPIFFS flash filesystem)
+46. `محول_تماثلي_esp` (12-bit ADC)
+47. `محول_رقمي_esp` (True 8-bit DAC)
+48. `تحديث_هوائي_ota` (Over-The-Air WiFi updates)
+49. `اتصال_مباشر_espnow` (Peer-to-peer ESP-NOW)
+50. `كاميرا_esp32` (ESP32-CAM capture & stream)
+51. `عميل_http_esp` (ESP32 HTTP client)
+52. `مقبس_ويب_esp` (WebSocket client/server)
+53. `ذاكرة_تفضيلات_nvs` (NVS persistent key-value flash)
+54. `توقيت_شبكي_ntp` (NTP network clock sync)
+55. `مهمة_متوازية_rtos` (FreeRTOS multi-core tasks)
+56. `بلوتوث_تسلسلي_esp` (Classic Bluetooth Serial)
+
+### C. STM32 (`استورد "اس_تي_ام32"` — 15 Classes, `--stm32` → C++ `.ino`)
+57. `مؤقت_عتادي_stm32` (Hardware timers & PWM)
+58. `محول_تماثلي_stm32` (12-bit ADC)
+59. `محول_رقمي_stm32` (12-bit DAC)
+60. `ناقل_can_stm32` (CAN Bus automotive/industrial)
+61. `ساعة_الوقت_الحقيقي_rtc` (Hardware RTC)
+62. `وضع_توفير_طاقة_stm32` (Sleep/Stop/Standby power)
+63. `منفذ_تسلسلي_stm32` (Hardware USART)
+64. `ناقل_مباشر_dma` (Direct Memory Access DMA)
+65. `مراقب_النظام_iwdg` (Independent Watchdog IWDG)
+66. `مقاطعة_خارجية_exti` (External GPIO interrupts EXTI)
+67. `مشفر_عتادي_stm32` (Hardware quadrature encoder)
+68. `ذاكرة_فلاش_stm32` (Internal flash storage)
+69. `منفذ_usb_cdc` (USB CDC virtual COM)
+70. `ناقل_spi_stm32` (Hardware SPI)
+71. `ناقل_i2c_stm32` (Hardware I2C)
+
+### D. Raspberry Pi (`استورد "راسبيري"` — 12 Classes, `--raspberry` → Python 3 `.py`)
+72. `لوحة_راسبيري` (Board telemetry: CPU temp, RAM, cores, IP)
+73. `منفذ_gpio_راسبيري` (BCM GPIO input/output)
+74. `نبضة_pwm_راسبيري` (PWM frequency & duty cycle)
+75. `ناقل_i2c_راسبيري` (SMBus / I2C)
+76. `ناقل_spi_راسبيري` (spidev SPI)
+77. `منفذ_تسلسلي_راسبيري` (UART serial)
+78. `كاميرا_راسبيري` (Picamera2 photo, video, streaming)
+79. `قبعة_الحساسات_sensehat` (Sense HAT 8x8 LED & sensors)
+80. `قبعة_محركات_pca9685` (16-channel servo/PWM HAT)
+81. `شاشة_لمس_dsi` (Official DSI touchscreen)
+82. `صوت_راسبيري` (Audio playback & Arabic TTS)
+83. `شاشة_حبر_إلكتروني_epaper` (Waveshare e-Paper display)
+
+### E. Raspberry Pi Pico / RP2040 (`استورد "بيكو"` — 12 Classes, `--pico` → MicroPython `.py`)
+84. `لوحة_بيكو` (Pico / Pico W / Pico 2 board & onboard LED)
+85. `منفذ_بيكو` (RP2040 GPIO pin)
+86. `نبضة_بيكو` (16-bit hardware PWM)
+87. `محول_تماثلي_بيكو` (12-bit/16-bit ADC)
+88. `ناقل_i2c_بيكو` (Hardware I2C)
+89. `ناقل_spi_بيكو` (Hardware SPI)
+90. `منفذ_uart_بيكو` (Hardware UART)
+91. `واي_فاي_بيكو_w` (Pico W CYW43439 WiFi)
+92. `شريط_نيوبكسل_بيكو` (WS2812 NeoPixel via PIO)
+93. `مؤقت_بيكو` (Hardware timers)
+94. `وحدة_pio_بيكو` (RP2040 Programmable I/O state machines)
+95. `مستشعر_حرارة_داخلي_بيكو` (Internal RP2040 temperature sensor)
+
+### F. Robotics & Industrial Protocols (`استورد "روبوتات"` — 10 Classes)
+96. `متحكم_pid` (PID controller: `احسب`, `أعد_الضبط`)
+97. `مرشح_كالمان` (1D Kalman filter: `حدّث`, `القيمة_المقدرة`)
+98. `روبوت_متحرك` (Differential-drive kinematics & odometry)
+99. `ذراع_آلي` (2-DOF robotic arm forward kinematics)
+100. `آلة_حالات` (Finite State Machine: `أضف_انتقال`, `نفّذ_حدث`, `الوضع_الحالي`)
+101. `مودباس_صناعي` (Modbus RTU/TCP coils & holding registers)
+102. `لورا_lora` (Long-range LoRa SX1278 packet radio)
+103. `شريحة_اتصال_gsm` (SIM800L/GSM SMS & cellular data)
+104. `سائق_خطوي_a4988` (A4988 microstepping CNC/3D printer driver)
+105. `مراقب_بطارية_bms` (Li-ion/LiPo BMS voltage, SoC & safety guard)
+
+### Runnable Hardware & Robotics Example
+```lisan
+استورد "اردوينو"
+استورد "روبوتات"
+
+دع حساس = جديد حساس_مسافة(9، 10)
+حساس.ضبط_محاكاة(18)
+
+دع متحكم = جديد متحكم_pid(1.2، 0.1، 0.05)
+دع مرشح = جديد مرشح_كالمان(20)
+دع مسافة_منقاة = مرشح.حدّث(حساس.اقرأ_سم())
+دع أمر_المحرك = متحكم.احسب(30، مسافة_منقاة، 0.1)
+اطبع(ن"المسافة المنقاة: {قرّب(مسافة_منقاة)} سم | الخرج: {قرّب(أمر_المحرك)}")
+```
+
+---
+
+## 15. Testing, Formatting, CLI, LSP & MCP Server
+
+### Built-in Testing (`lisan --test ملف.lsn`)
+```lisan
+دالة ضعف(س) => س * 2
+تحقق(ضعف(4) == 8)
+تحقق_يساوي(ضعف(5)، 10)
+```
+
+### MCP Server (`lisan --mcp`)
+Protocol version `"2024-11-05"` over stdio (supports both newline-delimited JSON-RPC 2.0 and `Content-Length:` framing):
+- Tools:
+  1. `lisan_run` — Sandboxed execution (`Limits::sandbox()` or custom `max_steps`) with structured Arabic error locations.
+  2. `lisan_check` — Lexer + parser validation + English keyword detector with exact Arabic Lisan suggestions.
+  3. `lisan_format` — Canonical code formatting (`format_source`).
+  4. `lisan_transpile` — Hardware transpilation (`arduino`, `esp32`, `stm32`, `raspberry`, `pico`).
+  5. `lisan_docs` — Embedded Arabic documentation search across all topics and symbols.
+  6. `lisan_from_python` — Deterministic Python → pure Arabic Lisan converter.
+- Resources:
+  - `lisan://llms.txt` — Compact Arabic-only language reference.
+
+### Complete CLI Reference
+```bash
+lisan ملف.lsn                        # Compile & run native binary (default)
+lisan --interpret ملف.lsn            # Tree-walking interpreter (full limits)
+lisan --sandbox ملف.lsn              # Bounded sandbox execution (250k steps)
+lisan --vm ملف.lsn                   # Bytecode virtual machine
+lisan --native ملف.lsn --output bin  # Compile native executable via Clang
+lisan --check ملف.lsn                # Syntax & import check
+lisan --test ملف.lsn                 # Run تحقق / تحقق_يساوي suite
+lisan --fmt ملف.lsn                  # Format code in place
+lisan --lsp                          # Start Language Server Protocol server
+lisan --mcp                          # Start Model Context Protocol server
+lisan --arduino ملف.lsn              # Transpile to Arduino C++ (.ino)
+lisan --esp32 ملف.lsn                # Transpile to ESP32 C++ (.ino)
+lisan --stm32 ملف.lsn                # Transpile to STM32 C++ (.ino)
+lisan --raspberry ملف.lsn            # Transpile to Raspberry Pi Python 3 (.py)
+lisan --pico ملف.lsn                 # Transpile to Raspberry Pi Pico MicroPython (.py)
+lisan --mobile ملف.lsn               # Export Mobile PWA 2.0 app
+lisan -e 'اطبع("مرحبا بالعالم")'      # Run inline one-liner
+```

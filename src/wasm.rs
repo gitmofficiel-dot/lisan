@@ -122,6 +122,58 @@ pub extern "C" fn lisan_pico_wasm(ptr: *const c_char) -> *mut c_char {
     CString::new(output).unwrap_or_else(|_| CString::new("خطأ غير متوقع").unwrap()).into_raw()
 }
 
+/// تحويل شيفرة لسان إلى كود بايثون (Python 3) داخل WebAssembly
+#[no_mangle]
+pub extern "C" fn lisan_python_wasm(ptr: *const c_char) -> *mut c_char {
+    if ptr.is_null() {
+        return CString::new("خطأ: مؤشر الإدخال فارغ").unwrap().into_raw();
+    }
+    let c_str = unsafe { CStr::from_ptr(ptr) };
+    let source = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return CString::new("خطأ: نص غير متوافق مع UTF-8").unwrap().into_raw(),
+    };
+    let output = match crate::interop::transpile_to_python(source) {
+        Ok(py) => py,
+        Err(err) => format!("خطأ: {}", err),
+    };
+    CString::new(output).unwrap_or_else(|_| CString::new("خطأ غير متوقع").unwrap()).into_raw()
+}
+
+/// تحويل شيفرة لسان إلى كود جافاسكربت (ES2022) داخل WebAssembly
+#[no_mangle]
+pub extern "C" fn lisan_js_wasm(ptr: *const c_char) -> *mut c_char {
+    if ptr.is_null() {
+        return CString::new("خطأ: مؤشر الإدخال فارغ").unwrap().into_raw();
+    }
+    let c_str = unsafe { CStr::from_ptr(ptr) };
+    let source = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return CString::new("خطأ: نص غير متوافق مع UTF-8").unwrap().into_raw(),
+    };
+    let output = match crate::interop::transpile_to_js(source) {
+        Ok(js) => js,
+        Err(err) => format!("خطأ: {}", err),
+    };
+    CString::new(output).unwrap_or_else(|_| CString::new("خطأ غير متوقع").unwrap()).into_raw()
+}
+
+/// فحص شيفرة لسان (قواعد + عربية فقط + أنواع اختيارية) وإرجاع التشخيص بصيغة JSON
+#[no_mangle]
+pub extern "C" fn lisan_check_json_wasm(ptr: *const c_char) -> *mut c_char {
+    if ptr.is_null() {
+        return CString::new("[]").unwrap().into_raw();
+    }
+    let c_str = unsafe { CStr::from_ptr(ptr) };
+    let source = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return CString::new("[]").unwrap().into_raw(),
+    };
+    let diags = crate::diagnostics::diagnose_source(source);
+    let json = crate::diagnostics::diagnostics_to_json(&diags);
+    CString::new(json).unwrap_or_else(|_| CString::new("[]").unwrap()).into_raw()
+}
+
 /// تنسيق كود لسان داخل WebAssembly
 #[no_mangle]
 pub extern "C" fn lisan_fmt_wasm(ptr: *const c_char) -> *mut c_char {

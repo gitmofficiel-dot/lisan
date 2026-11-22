@@ -13,6 +13,7 @@ const RUNTIME_SOURCES: &[(&str, &str)] = &[
     ("ast.rs", include_str!("ast.rs")),
     ("bytecode.rs", include_str!("bytecode.rs")),
     ("diagnostics.rs", include_str!("diagnostics.rs")),
+    ("interop.rs", include_str!("interop.rs")),
     ("json.rs", include_str!("json.rs")),
     ("lexer.rs", include_str!("lexer.rs")),
     ("modules.rs", include_str!("modules.rs")),
@@ -160,6 +161,7 @@ mod sys_games;
 mod ui;
 mod vm;
 mod web_framework;
+mod interop;
 use ast::{{ClassDef, Expr, Function, Op, Stmt}};
 fn main() {{
     let program: Vec<Stmt> = {ast};

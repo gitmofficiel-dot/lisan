@@ -43,6 +43,9 @@ pub fn resolve_builtin_module(name: &str) -> Option<&'static str> {
         "موقع" | "مواقع" | "موقع_ويب" | "ايقونات" | "تصميم" | "واجهه" | "هاتف" | "جوال" | "ويب" | "ui" | "mobile" | "web" | "icons" => {
             Some(crate::ui::STDLIB_UI_AND_MOBILE)
         }
+        "توافق" | "ترابط" | "بايثون" | "جافاسكربت" | "ذكاء_خارجي" | "interop" | "python" | "javascript" | "js" => {
+            Some(crate::interop::STDLIB_INTEROP)
+        }
         _ => None,
     }
 }

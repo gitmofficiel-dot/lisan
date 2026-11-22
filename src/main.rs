@@ -9,7 +9,7 @@ fn main() {
 fn real_main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 1.1.0 | لغة برمجة عربية عصرية وشاملة لجميع المنصات والعتاد\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan استوديو [منفذ] تشغيل تطبيق استوديو لسان لسطح المكتب (--studio / --app)\n  lisan منصات          عرض كافة أنظمة التشغيل واللوحات المدعومة (--platforms)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan اختبار [ملفات...] تشغيل حزمة اختبارات وتحققات لسان (--test)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات C++\n  lisan --esp32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود ESP32 C++ (WiFi/BLE/CAM/OTA)\n  lisan --stm32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود STM32 C++ (Timers/CAN/DMA/DAC)\n  lisan --raspberry ملف.lsn [--output app.py]    ترجمة إلى كود راسبيري باي Python 3 (GPIO/Camera/SenseHAT)\n  lisan --pico ملف.lsn [--output main_pico.py]   ترجمة إلى كود راسبيري بيكو MicroPython (RP2040/Pico W)\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL\n  lisan doctor / --doctor  لفحص بيئة التطوير");
+        println!("لسان 1.1.0 | لغة برمجة عربية عصرية وشاملة لجميع المنصات والعتاد\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan استوديو [منفذ] تشغيل تطبيق استوديو لسان لسطح المكتب (--studio / --app)\n  lisan منصات          عرض كافة أنظمة التشغيل واللوحات المدعومة (--platforms)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan --mcp          تشغيل خادم وكلاء الذكاء الاصطناعي (MCP — خادم_وكيل)\n  lisan --dap          تشغيل مصحح أخطاء لسان (DAP — مصحح) لمحرر VS Code\n  lisan --python ملف.lsn [--output app.py]     ترجمة إلى كود بايثون (Python 3)\n  lisan --js ملف.lsn [--output app.js]         ترجمة إلى كود جافاسكربت (ES2022)\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan اختبار [ملفات...] تشغيل حزمة اختبارات وتحققات لسان (--test)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات C++\n  lisan --esp32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود ESP32 C++ (WiFi/BLE/CAM/OTA)\n  lisan --stm32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود STM32 C++ (Timers/CAN/DMA/DAC)\n  lisan --raspberry ملف.lsn [--output app.py]    ترجمة إلى كود راسبيري باي Python 3 (GPIO/Camera/SenseHAT)\n  lisan --pico ملف.lsn [--output main_pico.py]   ترجمة إلى كود راسبيري بيكو MicroPython (RP2040/Pico W)\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL\n  lisan doctor / --doctor  لفحص بيئة التطوير");
         return;
     }
     if !args.is_empty() && (args[0] == "--platforms" || args[0] == "--targets" || args[0] == "منصات") {
@@ -42,6 +42,48 @@ fn real_main() {
         if let Err(e) = lisan::lsp::run_lsp_server() {
             eprintln!("خطأ خادم لغة لسان (LSP): {}", e);
             std::process::exit(1);
+        }
+        return;
+    }
+    if !args.is_empty() && (args[0] == "--mcp" || args[0] == "mcp" || args[0] == "خادم_وكيل") {
+        if let Err(e) = lisan::mcp::run_mcp_server() {
+            eprintln!("خطأ خادم وكلاء الذكاء الاصطناعي (MCP): {}", e);
+            std::process::exit(1);
+        }
+        return;
+    }
+    if !args.is_empty() && (args[0] == "--dap" || args[0] == "dap" || args[0] == "مصحح") {
+        if let Err(e) = lisan::dap::run_dap_server() {
+            eprintln!("خطأ مصحح أخطاء لسان (DAP): {}", e);
+            std::process::exit(1);
+        }
+        return;
+    }
+    if !args.is_empty() && (args[0] == "--python" || args[0] == "--بايثون") {
+        let flag = &args[0];
+        if args.len() != 2 && !(args.len() == 4 && args[2] == "--output") {
+            eprintln!("الاستخدام: lisan {} ملف.lsn [--output app.py]", flag);
+            std::process::exit(2);
+        }
+        let input = std::path::Path::new(&args[1]);
+        let target_path = if args.len() == 4 { Some(std::path::Path::new(&args[3])) } else { None };
+        match lisan::interop::build_python_file(input, target_path) {
+            Ok(path) => println!("تمت الترجمة إلى بايثون (Python 3) بنجاح: {}", path.display()),
+            Err(err) => { eprintln!("خطأ في الترجمة إلى بايثون: {}", err); std::process::exit(1); }
+        }
+        return;
+    }
+    if !args.is_empty() && (args[0] == "--js" || args[0] == "--javascript" || args[0] == "--جافاسكربت") {
+        let flag = &args[0];
+        if args.len() != 2 && !(args.len() == 4 && args[2] == "--output") {
+            eprintln!("الاستخدام: lisan {} ملف.lsn [--output app.js]", flag);
+            std::process::exit(2);
+        }
+        let input = std::path::Path::new(&args[1]);
+        let target_path = if args.len() == 4 { Some(std::path::Path::new(&args[3])) } else { None };
+        match lisan::interop::build_js_file(input, target_path) {
+            Ok(path) => println!("تمت الترجمة إلى جافاسكربت (ES2022) بنجاح: {}", path.display()),
+            Err(err) => { eprintln!("خطأ في الترجمة إلى جافاسكربت: {}", err); std::process::exit(1); }
         }
         return;
     }
@@ -284,10 +326,61 @@ fn real_main() {
         return;
     }
 
-    if args.len() == 2 && args[0] == "--check" {
-        match check_file(&args[1]) {
-            Ok(()) => println!("نجح فحص ملفات لسان"),
-            Err(err) => { eprintln!("خطأ: {}", err); std::process::exit(1); }
+    if !args.is_empty() && (args[0] == "--check" || args[0] == "فحص") {
+        let json_mode = args.iter().any(|a| a == "--json");
+        let file_arg = args[1..].iter().find(|a| !a.starts_with('-'));
+        let path = match file_arg {
+            Some(p) => p,
+            None => {
+                eprintln!("الاستخدام: lisan --check [--json] ملف.lsn");
+                std::process::exit(2);
+            }
+        };
+        let source = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(err) => {
+                if json_mode {
+                    println!(r#"[{{"code":"ل0000","severity":"error","line":1,"column":1,"message":"تعذر قراءة الملف"}}]"#);
+                } else {
+                    eprintln!("خطأ في قراءة '{}': {}", path, err);
+                }
+                std::process::exit(1);
+            }
+        };
+        let mut diags = lisan::diagnostics::diagnose_source(&source);
+        if diags.iter().all(|d| d.severity != "error") {
+            if let Err(err) = check_file(path) {
+                let (l, c, msg) = lisan::lsp::parse_diagnostic_location(&err);
+                diags.push(lisan::diagnostics::StructuredDiagnostic {
+                    code: "ل0002".to_string(),
+                    severity: "error".to_string(),
+                    line: (l + 1) as usize,
+                    column: (c + 1) as usize,
+                    message: msg,
+                    suggestion: None,
+                    replacement: None,
+                });
+            }
+        }
+        let has_errors = diags.iter().any(|d| d.severity == "error");
+        if json_mode {
+            println!("{}", lisan::diagnostics::diagnostics_to_json(&diags));
+        } else if diags.is_empty() {
+            println!("نجح فحص ملف لسان (قواعد سليمة وعربية خالصة 100%)");
+        } else {
+            for d in &diags {
+                let label = if d.severity == "warning" { "تحذير" } else { "خطأ" };
+                eprintln!("{} [{}] السطر {}:{} — {}", label, d.code, d.line, d.column, d.message);
+                if let Some(ref s) = d.suggestion {
+                    eprintln!("   اقتراح: {}", s);
+                }
+            }
+            if !has_errors {
+                println!("نجح فحص ملف لسان مع تحذيرات اختيارية.");
+            }
+        }
+        if has_errors {
+            std::process::exit(1);
         }
         return;
     }

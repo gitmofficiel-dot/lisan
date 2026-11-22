@@ -1,6 +1,6 @@
 # لسان — Lisan Programming Language
 
-**لسان 1.0.0 — لغة البرمجة العربية الشاملة والمنظومة العتادية والسحابية**
+**لسان 1.1.0 — لغة البرمجة العربية الشاملة والمنظومة العتادية والسحابية**
 
 [![CI](https://github.com/gitmofficiel-dot/lisan/actions/workflows/rust.yml/badge.svg)](https://github.com/gitmofficiel-dot/lisan/actions/workflows/rust.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -50,7 +50,7 @@ Prebuilt packages are on the [Releases page](https://github.com/gitmofficiel-dot
   ```powershell
   irm https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.ps1 | iex
   ```
-* **حزم الإصدار الجاهزة:** راجع صفحة [Releases (`v1.0.0`)](https://github.com/gitmofficiel-dot/lisan/releases/tag/v1.0.0) لتحميل حزم `.deb` و`.tar.gz` و`.zip` وتطبيق سطح المكتب `Lisan Studio`.
+* **حزم الإصدار الجاهزة:** راجع صفحة [Releases (`v1.1.0`)](https://github.com/gitmofficiel-dot/lisan/releases/tag/v1.1.0) لتحميل حزم `.deb` و`.tar.gz` و`.zip` وتطبيق سطح المكتب `Lisan Studio`.
 
 ### التشغيل والبناء من المصدر
 ```sh

@@ -12,7 +12,7 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 /// إصدار استوديو لسان لسطح المكتب
-pub const LISAN_STUDIO_VERSION: &str = "1.0.0";
+pub const LISAN_STUDIO_VERSION: &str = "1.1.0";
 
 /// نسخة مدمجة من واجهة الملعب التفاعلي للويب
 pub const EMBEDDED_WEB_HTML: &str = include_str!("../web/index.html");
@@ -1192,7 +1192,7 @@ mod tests {
         assert_eq!(status, 200);
         assert!(content_type.contains("application/json"));
         let text = String::from_utf8(body).unwrap();
-        assert!(text.contains("\"version\":\"1.0.0\""));
+        assert!(text.contains("\"version\":\"1.1.0\""));
         assert!(text.contains(env::consts::OS));
         assert!(text.contains(env::consts::ARCH));
     }

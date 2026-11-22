@@ -1167,8 +1167,9 @@ mod tests {
             thread::spawn(move || run_web_app_impl(port, &routes, 1).map(|v| v.to_string()));
         let url = format!("http://127.0.0.1:{}/api/ping", port);
         let mut resp = Err("لم يبدأ الاتصال بعد".to_string());
-        for _ in 0..20 {
-            thread::sleep(std::time::Duration::from_millis(15));
+        // runners بطيئة (macOS CI) قد تتأخر في ربط المنفذ: انتظر حتى ~6 ثوانٍ بدل 300ms
+        for _ in 0..240 {
+            thread::sleep(std::time::Duration::from_millis(25));
             resp = http_request_impl("GET", &url, &[], "");
             if resp.is_ok() {
                 break;

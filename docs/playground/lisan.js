@@ -176,6 +176,16 @@ class LisanRuntime {
     }
 
     /**
+     * ترجمة شيفرة لسان إلى كود MicroPython لراسبيري باي بيكو (RP2040 / Pico W)
+     */
+    pico(sourceCode) {
+        if (this.wasm && typeof this.wasm.lisan_pico_wasm === 'function') {
+            return this._callWasmStringFn('lisan_pico_wasm', sourceCode);
+        }
+        return this.raspberry(sourceCode);
+    }
+
+    /**
      * تنسيق شيفرة لسان العربية وضبط المحاذاة والمسافات
      */
     fmt(sourceCode) {
@@ -246,6 +256,9 @@ class LisanRuntime {
             case 'raspberry':
             case 'rpi':
                 return this.raspberry(sourceCode);
+            case 'pico':
+            case 'rp2040':
+                return this.pico(sourceCode);
             case 'fmt':
                 return this.fmt(sourceCode);
             case 'arduino':

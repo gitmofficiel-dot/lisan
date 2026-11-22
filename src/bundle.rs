@@ -6,8 +6,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const MAX_GENERATED_SOURCE: usize = 24_000_000;
+const MAX_GENERATED_SOURCE: usize = 32_000_000;
 const RUNTIME_SOURCES: &[(&str, &str)] = &[
+    ("ai_data.rs", include_str!("ai_data.rs")),
     ("arduino.rs", include_str!("arduino.rs")),
     ("ast.rs", include_str!("ast.rs")),
     ("bytecode.rs", include_str!("bytecode.rs")),
@@ -16,11 +17,15 @@ const RUNTIME_SOURCES: &[(&str, &str)] = &[
     ("lexer.rs", include_str!("lexer.rs")),
     ("modules.rs", include_str!("modules.rs")),
     ("parser.rs", include_str!("parser.rs")),
+    ("pico.rs", include_str!("pico.rs")),
     ("raspberry.rs", include_str!("raspberry.rs")),
+    ("robotics.rs", include_str!("robotics.rs")),
     ("runtime.rs", include_str!("runtime.rs")),
     ("stdlib_ext.rs", include_str!("stdlib_ext.rs")),
+    ("sys_games.rs", include_str!("sys_games.rs")),
     ("ui.rs", include_str!("ui.rs")),
     ("vm.rs", include_str!("vm.rs")),
+    ("web_framework.rs", include_str!("web_framework.rs")),
 ];
 
 fn str_value(text: &str) -> String { format!("{:?}.to_string()", text) }
@@ -137,7 +142,8 @@ fn emit_stmt(stmt: &Stmt) -> String {
 /// Emit a standalone Rust main that carries both the program's resolved AST and the runtime.
 pub fn generate_rust_main(program: &[Stmt]) -> Result<String, String> {
     let ast = vec_expr(program, emit_stmt);
-    let source = format!(r#"mod arduino;
+    let source = format!(r#"mod ai_data;
+mod arduino;
 mod ast;
 mod bytecode;
 mod diagnostics;
@@ -145,11 +151,15 @@ mod json;
 mod lexer;
 mod modules;
 mod parser;
+mod pico;
 mod raspberry;
+mod robotics;
 mod runtime;
 mod stdlib_ext;
+mod sys_games;
 mod ui;
 mod vm;
+mod web_framework;
 use ast::{{ClassDef, Expr, Function, Op, Stmt}};
 fn main() {{
     let program: Vec<Stmt> = {ast};

@@ -19,6 +19,23 @@ pub fn resolve_builtin_module(name: &str) -> Option<&'static str> {
         "راسبيري" | "راسبيري_باي" | "راسپيري" | "raspberry" | "raspberry_pi" | "raspberrypi" | "rasspiry" | "rpi" => {
             Some(crate::raspberry::STDLIB_RASPBERRY)
         }
+        "بيكو" | "راسبيري_بيكو" | "pico" | "rp2040" | "pico_w" => {
+            Some(crate::pico::STDLIB_PICO)
+        }
+        "روبوت" | "روبوتات" | "تحكم" | "بروتوكولات" | "صناعي" | "robotics" | "robot" | "protocols" => {
+            Some(crate::robotics::STDLIB_ROBOTICS)
+        }
+        "ذكاء" | "ذكاء_اصطناعي" | "بيانات" | "علوم_البيانات" | "مخططات" | "رسوم" | "رسوميات"
+        | "ai" | "ml" | "data" | "charts" | "svg" => {
+            Some(crate::ai_data::STDLIB_AI_DATA)
+        }
+        "اطار_ويب" | "تطبيق_ويب" | "خادم" | "خادم_ويب" | "موجه" | "ويب_كامل" | "web_framework" | "server" => {
+            Some(crate::web_framework::STDLIB_WEB_FRAMEWORK)
+        }
+        "انظمه" | "طرفيه" | "مهام" | "سجل" | "العاب" | "لعبه" | "العاب_2d"
+        | "systems" | "cli" | "games" | "game" => {
+            Some(crate::sys_games::STDLIB_SYSTEMS_AND_GAMES)
+        }
         "قاعده_بيانات" | "قواعد_بيانات" | "تشفير" | "انماط" | "منصه" | "امان" | "مكتبه_قياسيه"
         | "db" | "database" | "crypto" | "regex" | "platform" => {
             Some(crate::stdlib_ext::STDLIB_EXT_LISAN)

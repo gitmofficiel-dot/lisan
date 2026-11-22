@@ -945,9 +945,12 @@ fn api_transpile(body: &str) -> String {
         "raspberry" | "rpi" | "raspberrypi" | "راسبيري" => {
             crate::raspberry::transpile_raspberry_python(&code)
         }
+        "pico" | "rp2040" | "pico_w" | "بيكو" => {
+            crate::pico::transpile_pico_micropython(&code)
+        }
         "fmt" | "format" | "نسق" | "نسّق" => Ok(crate::fmt::format_source(&code)),
         other => Err(format!(
-            "الهدف '{}' غير مدعوم. الأهداف المتاحة: arduino, esp32, stm32, raspberry, fmt",
+            "الهدف '{}' غير مدعوم. الأهداف المتاحة: arduino, esp32, stm32, raspberry, pico, fmt",
             other
         )),
     };

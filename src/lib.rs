@@ -1,3 +1,4 @@
+pub mod ai_data;
 pub mod arduino;
 pub mod ast;
 pub mod bundle;
@@ -12,14 +13,18 @@ pub mod lsp;
 pub mod modules;
 pub mod native;
 pub mod parser;
+pub mod pico;
 pub mod pkg;
 pub mod raspberry;
+pub mod robotics;
 pub mod runtime;
 pub mod stdlib_ext;
+pub mod sys_games;
 pub mod tester;
 pub mod ui;
 pub mod vm;
 pub mod wasm;
+pub mod web_framework;
 
 pub use runtime::{Interpreter, Limits, Value};
 

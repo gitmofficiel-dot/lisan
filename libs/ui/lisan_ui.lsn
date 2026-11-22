@@ -1,4 +1,4 @@
-# مكتبة واجهة لسان (lisan-ui): مكونات جاهزة بألوان هوية لسان، مكتوبة بلغة لسان نفسها
+# مكتبة واجهة لسان (lisan-ui 2.0): مكونات جاهزة آمنة ومتاحة بألوان هوية لسان، مكتوبة بلغة لسان نفسها
 # كل دالة تعيد نص HTML. اجمعها ثم احفظها بـ اكتب_ملف.
 # الألوان: كحلي #091d37، برتقالي #e65c1a (للأزرار النصية استعمل #c2410c لتباين أعلى)
 
@@ -27,7 +27,7 @@
 
 # أنماط الهوية: ضعها مرة واحدة داخل <head>
 دالة واجهة_نمط() {
-    دع ن = "<style>:root{--ui-navy:#091d37;--ui-orange:#e65c1a;--ui-btn:#c2410c;--ui-bg:#fff;--ui-soft:#f3f5f9;--ui-text:#091d37;--ui-muted:#44546e;--ui-line:#dbe1ea}"
+    دع ن = "<style>:root{--ui-navy:#091d37;--ui-orange:#e65c1a;--ui-btn:#c2410c;--ui-bg:#fff;--ui-soft:#f3f5f9;--ui-text:#091d37;--ui-muted:#44546e;--ui-line:#dbe1ea;--ui-ok:#047857;--ui-warn:#b45309;--ui-err:#b91c1c}"
     ن = ن + "body{font-family:system-ui,'Noto Naskh Arabic',Tahoma,sans-serif;line-height:1.8;color:var(--ui-text);background:var(--ui-bg);margin:0}"
     ن = ن + ".ui-wrap{max-width:1040px;margin:0 auto;padding:0 20px}"
     ن = ن + ".ui-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 24px;border-radius:14px;font-weight:700;text-decoration:none;color:#fff;background:var(--ui-btn);border:1px solid var(--ui-btn);transition:transform .15s,box-shadow .15s}"
@@ -39,7 +39,18 @@
     ن = ن + ".ui-hero{background:linear-gradient(160deg,#0d2748,#091d37);color:#fff;border-radius:26px;padding:48px 24px;text-align:center}.ui-hero h1{margin:0 0 10px;font-size:clamp(30px,6vw,48px)}.ui-hero p{color:#c9d5e8;max-width:620px;margin:0 auto 22px}"
     ن = ن + ".ui-code{direction:rtl;unicode-bidi:plaintext;text-align:start;background:#06142a;color:#ffb98a;border-radius:14px;padding:16px;font:14px/1.8 ui-monospace,Consolas,monospace;overflow-x:auto;white-space:pre-wrap}"
     ن = ن + ".ui-hero .ui-btn.ghost{color:#fff;border-color:rgba(255,255,255,.55)}.ui-hero .ui-btn.ghost:hover{background:rgba(255,255,255,.1)}"
-    ن = ن + "a:focus-visible,button:focus-visible{outline:3px solid #091d37;outline-offset:2px}.ui-hero a:focus-visible,.ui-code a:focus-visible{outline-color:#ffb98a}@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}</style>"
+    ن = ن + ".ui-navbar{position:sticky;top:12px;z-index:50;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border:1px solid var(--ui-line);border-radius:18px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 6px 20px rgba(9,29,55,.06)}"
+    ن = ن + ".ui-brand{font-weight:900;font-size:20px;color:var(--ui-navy);text-decoration:none;display:inline-flex;align-items:center;gap:8px}.ui-brand::before{content:'';width:10px;height:10px;border-radius:50%;background:var(--ui-orange)}"
+    ن = ن + ".ui-nav-links{display:flex;align-items:center;gap:16px;flex-wrap:wrap}.ui-nav-links a{color:var(--ui-muted);text-decoration:none;font-weight:700;padding:4px 8px;border-radius:8px;transition:color .15s,background .15s}.ui-nav-links a:hover{color:var(--ui-navy);background:var(--ui-soft)}"
+    ن = ن + ".ui-alert{border-radius:16px;padding:14px 18px;border:1px solid var(--ui-line);border-inline-start:5px solid var(--ui-navy);background:var(--ui-soft)}.ui-alert strong{display:block;margin-bottom:2px}.ui-alert p{margin:0;color:var(--ui-muted)}"
+    ن = ن + ".ui-alert.info{border-inline-start-color:var(--ui-navy);background:#eef3fa}.ui-alert.success{border-inline-start-color:var(--ui-ok);background:#ecfdf5}.ui-alert.warning{border-inline-start-color:var(--ui-warn);background:#fffbeb}.ui-alert.danger{border-inline-start-color:var(--ui-err);background:#fef2f2}"
+    ن = ن + ".ui-table-wrap{overflow-x:auto;border:1px solid var(--ui-line);border-radius:16px;background:#fff}.ui-table{width:100%;border-collapse:collapse;text-align:start;font-size:15px}"
+    ن = ن + ".ui-table thead{background:var(--ui-navy);color:#fff}.ui-table th{padding:12px 16px;font-weight:700;white-space:nowrap}.ui-table td{padding:12px 16px;border-top:1px solid var(--ui-line);color:var(--ui-text)}.ui-table tbody tr:nth-child(even){background:var(--ui-soft)}"
+    ن = ن + ".ui-faq{background:#fff;border:1px solid var(--ui-line);border-radius:16px;padding:14px 18px}.ui-faq[open]{border-color:var(--ui-orange)}.ui-faq summary{cursor:pointer;font-weight:700;color:var(--ui-navy);list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px}.ui-faq summary::after{content:'+';font-size:20px;color:var(--ui-orange);font-weight:900}.ui-faq[open] summary::after{content:'−'}.ui-faq p{margin:10px 0 0;color:var(--ui-muted)}"
+    ن = ن + ".ui-pricing{background:#fff;border:1px solid var(--ui-line);border-top:5px solid var(--ui-navy);border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 24px rgba(9,29,55,.06)}.ui-pricing h3{margin:0;font-size:20px}.ui-pricing-price{font-size:34px;font-weight:900;color:var(--ui-orange);line-height:1.1}.ui-pricing p{margin:0;color:var(--ui-muted)}.ui-pricing ul{margin:4px 0 8px;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;flex:1}.ui-pricing li::before{content:'✓ ';color:var(--ui-orange);font-weight:900}"
+    ن = ن + ".ui-progress-box{background:#fff;border:1px solid var(--ui-line);border-radius:16px;padding:16px 18px}.ui-progress-head{display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:8px;font-size:14px}.ui-progress-track{height:12px;border-radius:999px;background:var(--ui-soft);overflow:hidden;border:1px solid var(--ui-line)}.ui-progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ui-navy),var(--ui-orange))}"
+    ن = ن + ".ui-footer{margin-top:24px;padding:24px 20px;border-top:2px solid var(--ui-line);background:var(--ui-soft);border-radius:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;color:var(--ui-muted);font-size:14px}.ui-footer-links{display:flex;gap:16px;flex-wrap:wrap}.ui-footer-links a{color:var(--ui-navy);text-decoration:none;font-weight:700}.ui-footer-links a:hover{color:var(--ui-orange)}"
+    ن = ن + "a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #091d37;outline-offset:2px}.ui-hero a:focus-visible,.ui-code a:focus-visible{outline-color:#ffb98a}@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}</style>"
     أرجع ن
 }
 
@@ -73,6 +84,109 @@
 
 دالة واجهة_كود(كود_لسان) {
     أرجع "<pre class=\"ui-code\"><code>" + واجهة_هرّب(كود_لسان) + "</code></pre>"
+}
+
+# شريط تنقل علوي ثابت وآمن: روابط هي قائمة عناصر [[نص، رابط]، ...] أو قواميس {"نص": ...، "رابط": ...}
+دالة واجهة_شريط_علوي(اسم_الموقع، روابط) {
+    دع كود_روابط = ""
+    لكل رابط_بند في روابط {
+        دع تسمية = ""
+        دع عنوان_رابط = "#"
+        إذا (نوع(رابط_بند) == "قاموس") {
+            إذا (يحتوي(رابط_بند، "نص")) { تسمية = رابط_بند["نص"] }
+            إذا (يحتوي(رابط_بند، "رابط")) { عنوان_رابط = رابط_بند["رابط"] }
+        } وإلا {
+            تسمية = رابط_بند[0]
+            إذا (طول(رابط_بند) > 1) { عنوان_رابط = رابط_بند[1] }
+        }
+        كود_روابط = كود_روابط + "<a href=\"" + واجهة_رابط(عنوان_رابط) + "\">" + واجهة_هرّب(تسمية) + "</a>"
+    }
+    أرجع "<header class=\"ui-navbar\"><a class=\"ui-brand\" href=\"#\">" + واجهة_هرّب(اسم_الموقع) + "</a><nav class=\"ui-nav-links\" aria-label=\"التنقل الرئيسي\">" + كود_روابط + "</nav></header>"
+}
+
+# تنبيه ملوّن (معلومات / نجاح / تحذير / خطر)
+دالة واجهة_تنبيه(عنوان، رسالة، نوع_التنبيه = "معلومات") {
+    دع فئة_تنبيه = "info"
+    دع دور_aria = "status"
+    إذا (نوع_التنبيه == "نجاح" أو نوع_التنبيه == "success") {
+        فئة_تنبيه = "success"
+    }
+    إذا (نوع_التنبيه == "تحذير" أو نوع_التنبيه == "warning") {
+        فئة_تنبيه = "warning"
+        دور_aria = "alert"
+    }
+    إذا (نوع_التنبيه == "خطر" أو نوع_التنبيه == "danger") {
+        فئة_تنبيه = "danger"
+        دور_aria = "alert"
+    }
+    أرجع "<div class=\"ui-alert " + فئة_تنبيه + "\" role=\"" + دور_aria + "\"><strong>" + واجهة_هرّب(عنوان) + "</strong><p>" + واجهة_هرّب(رسالة) + "</p></div>"
+}
+
+# جدول بيانات متجاوب ومهرب بالكامل
+دالة واجهة_جدول(ترويسات، صفوف) {
+    دع رأس = ""
+    لكل عمود في ترويسات {
+        رأس = رأس + "<th scope=\"col\">" + واجهة_هرّب(عمود) + "</th>"
+    }
+    دع جسم = ""
+    لكل صف_جدول في صفوف {
+        دع خلايا = ""
+        لكل خلية في صف_جدول {
+            خلايا = خلايا + "<td>" + واجهة_هرّب(خلية) + "</td>"
+        }
+        جسم = جسم + "<tr>" + خلايا + "</tr>"
+    }
+    أرجع "<div class=\"ui-table-wrap\"><table class=\"ui-table\"><thead><tr>" + رأس + "</tr></thead><tbody>" + جسم + "</tbody></table></div>"
+}
+
+# عنصر سؤال وجواب قابل للطي باستخدام details/summary
+دالة واجهة_سؤال(سؤال، جواب) {
+    أرجع "<details class=\"ui-faq\"><summary>" + واجهة_هرّب(سؤال) + "</summary><p>" + واجهة_هرّب(جواب) + "</p></details>"
+}
+
+# بطاقة باقة أسعار
+دالة واجهة_باقة(اسم، سعر، وصف، مزايا، نص_الزر، رابط) {
+    دع قائمة_مزايا = ""
+    لكل ميزة في مزايا {
+        قائمة_مزايا = قائمة_مزايا + "<li>" + واجهة_هرّب(ميزة) + "</li>"
+    }
+    أرجع "<article class=\"ui-pricing\"><h3>" + واجهة_هرّب(اسم) + "</h3><div class=\"ui-pricing-price\">" + واجهة_هرّب(سعر) + "</div><p>" + واجهة_هرّب(وصف) + "</p><ul>" + قائمة_مزايا + "</ul>" + واجهة_زر(نص_الزر، رابط) + "</article>"
+}
+
+# شريط تقدم متاح للجميع (ARIA progressbar)
+دالة واجهة_شريط_تقدم(عنوان، نسبة) {
+    دع قيمة_نسبة = 0
+    إذا (نوع(نسبة) == "رقم") {
+        قيمة_نسبة = نسبة
+    } وإلا {
+        قيمة_نسبة = عدد(نسبة)
+    }
+    إذا (قيمة_نسبة < 0) {
+        قيمة_نسبة = 0
+    }
+    إذا (قيمة_نسبة > 100) {
+        قيمة_نسبة = 100
+    }
+    دع نص_نسبة = نص(قيمة_نسبة)
+    أرجع "<div class=\"ui-progress-box\"><div class=\"ui-progress-head\"><span>" + واجهة_هرّب(عنوان) + "</span><span>" + واجهة_هرّب(نص_نسبة) + "%</span></div><div class=\"ui-progress-track\" role=\"progressbar\" aria-label=\"" + واجهة_هرّب(عنوان) + "\" aria-valuenow=\"" + واجهة_هرّب(نص_نسبة) + "\" aria-valuemin=\"0\" aria-valuemax=\"100\"><div class=\"ui-progress-fill\" style=\"width:" + واجهة_هرّب(نص_نسبة) + "%\"></div></div></div>"
+}
+
+# تذييل الصفحة مع روابط آمنة
+دالة واجهة_تذييل(نص_الحقوق، روابط) {
+    دع كود_روابط = ""
+    لكل رابط_بند في روابط {
+        دع تسمية = ""
+        دع عنوان_رابط = "#"
+        إذا (نوع(رابط_بند) == "قاموس") {
+            إذا (يحتوي(رابط_بند، "نص")) { تسمية = رابط_بند["نص"] }
+            إذا (يحتوي(رابط_بند، "رابط")) { عنوان_رابط = رابط_بند["رابط"] }
+        } وإلا {
+            تسمية = رابط_بند[0]
+            إذا (طول(رابط_بند) > 1) { عنوان_رابط = رابط_بند[1] }
+        }
+        كود_روابط = كود_روابط + "<a href=\"" + واجهة_رابط(عنوان_رابط) + "\">" + واجهة_هرّب(تسمية) + "</a>"
+    }
+    أرجع "<footer class=\"ui-footer\"><span>" + واجهة_هرّب(نص_الحقوق) + "</span><nav class=\"ui-footer-links\" aria-label=\"روابط التذييل\">" + كود_روابط + "</nav></footer>"
 }
 
 # صفحة كاملة: عنوان + محتوى (قائمة نصوص HTML)

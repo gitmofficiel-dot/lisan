@@ -102,6 +102,26 @@ pub extern "C" fn lisan_raspberry_wasm(ptr: *const c_char) -> *mut c_char {
     CString::new(output).unwrap_or_else(|_| CString::new("خطأ غير متوقع").unwrap()).into_raw()
 }
 
+/// تحويل شيفرة لسان إلى كود MicroPython لمتحكم راسبيري باي بيكو (RP2040 / Pico W) داخل WebAssembly
+#[no_mangle]
+pub extern "C" fn lisan_pico_wasm(ptr: *const c_char) -> *mut c_char {
+    if ptr.is_null() {
+        return CString::new("خطأ: مؤشر الإدخال فارغ").unwrap().into_raw();
+    }
+    let c_str = unsafe { CStr::from_ptr(ptr) };
+    let source = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return CString::new("خطأ: نص غير متوافق مع UTF-8").unwrap().into_raw(),
+    };
+
+    let output = match crate::pico::transpile_pico_micropython(source) {
+        Ok(py) => py,
+        Err(err) => format!("خطأ: {}", err),
+    };
+
+    CString::new(output).unwrap_or_else(|_| CString::new("خطأ غير متوقع").unwrap()).into_raw()
+}
+
 /// تنسيق كود لسان داخل WebAssembly
 #[no_mangle]
 pub extern "C" fn lisan_fmt_wasm(ptr: *const c_char) -> *mut c_char {

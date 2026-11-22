@@ -678,7 +678,30 @@ impl Interpreter {
 
                 return body_result;
             }
-            Stmt::Function(f) => { self.functions.insert(f.name.clone(), f.clone()); }
+            Stmt::Function(f) => {
+                if self.call_depth > 0 {
+                    let mut captured = Vec::new();
+                    for scope in self.scopes.iter().skip(1) {
+                        for (k, v) in scope {
+                            if let Some((_, existing)) = captured.iter_mut().find(|(ek, _): &&mut (String, Value)| ek == k) {
+                                *existing = v.clone();
+                            } else {
+                                captured.push((k.clone(), v.clone()));
+                            }
+                        }
+                    }
+                    let lambda = Value::Lambda {
+                        params: f.params.clone(),
+                        body: f.body.clone(),
+                        captured,
+                    };
+                    if let Some(current_scope) = self.scopes.last_mut() {
+                        current_scope.insert(f.name.clone(), lambda);
+                    }
+                } else {
+                    self.functions.insert(f.name.clone(), f.clone());
+                }
+            }
             Stmt::Class(c) => {
                 if c.parent.as_deref() == Some(c.name.as_str()) {
                     return Err(format!("لا يجوز للصنف '{}' أن يرث من نفسه", c.name));
@@ -1985,7 +2008,10 @@ fn is_builtin(name: &str) -> bool {
         "عنصر_بطاقة" | "عنصر_زر" | "عنصر_إحصائية" | "عنصر_احصائية" |
         "عنصر_مفتاح" | "عنصر_تنبيه" | "عنصر_شارة" | "عنصر_حقل" | "عنصر_شريط_تقدم" |
         "بناء_تطبيق_هاتف" | "تصدير_تطبيق_هاتف" | "بناء_صفحة_ويب" |
-        "تصدير_صفحة_ويب" | "تصدير_موقع") || crate::stdlib_ext::is_ext_builtin(name)
+        "تصدير_صفحة_ويب" | "تصدير_موقع")
+        || crate::stdlib_ext::is_ext_builtin(name)
+        || crate::web_framework::is_web_builtin(name)
+        || crate::sys_games::is_sys_builtin(name)
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -2904,6 +2930,12 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
         _ => {
             if crate::stdlib_ext::is_ext_builtin(name) {
                 return crate::stdlib_ext::eval_ext_builtin(name, args);
+            }
+            if crate::web_framework::is_web_builtin(name) {
+                return crate::web_framework::eval_web_builtin(name, args);
+            }
+            if crate::sys_games::is_sys_builtin(name) {
+                return crate::sys_games::eval_sys_builtin(name, args);
             }
             let empty: Vec<&str> = Vec::new();
             Err(crate::diagnostics::suggest_function_error(name, &empty))

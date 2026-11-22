@@ -678,7 +678,25 @@ impl Interpreter {
 
                 return body_result;
             }
-            Stmt::Function(f) => { self.functions.insert(f.name.clone(), f.clone()); }
+            Stmt::Function(f) => {
+                self.functions.insert(f.name.clone(), f.clone());
+                // A function defined inside another function captures the enclosing variables.
+                if self.scopes.len() > 1 && f.vararg.is_none() && f.defaults.iter().all(|d| d.is_none()) {
+                    let mut captured: Vec<(String, Value)> = Vec::new();
+                    for scope in self.scopes.iter().skip(1) {
+                        for (k, v) in scope {
+                            if k == &f.name { continue; }
+                            if let Some((_, existing)) = captured.iter_mut().find(|(ek, _): &&mut (String, Value)| ek == k) {
+                                *existing = v.clone();
+                            } else {
+                                captured.push((k.clone(), v.clone()));
+                            }
+                        }
+                    }
+                    let lam = Value::Lambda { params: f.params.clone(), body: f.body.clone(), captured };
+                    self.scopes.last_mut().expect("scope exists").insert(f.name.clone(), lam);
+                }
+            }
             Stmt::Class(c) => {
                 if c.parent.as_deref() == Some(c.name.as_str()) {
                     return Err(format!("لا يجوز للصنف '{}' أن يرث من نفسه", c.name));

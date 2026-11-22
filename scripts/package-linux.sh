@@ -5,13 +5,13 @@ set -euo pipefail
 # سكربت تحزيم لغة لسان واستوديو لسان لأنظمة Linux و Raspberry Pi (ARM64 / x86_64)
 # ينتج:
 #   - dist/lisan-linux-<arch>.tar.gz
-#   - dist/lisan_1.0.0_<deb_arch>.deb (حزمة Debian / Ubuntu / Raspberry Pi OS)
+#   - dist/lisan_1.1.0_<deb_arch>.deb (حزمة Debian / Ubuntu / Raspberry Pi OS)
 # ==============================================================================
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 HOST_ARCH="$(uname -m)"
 TARGET="${1:-}"
 SKIP_BUILD="${SKIP_BUILD:-0}"

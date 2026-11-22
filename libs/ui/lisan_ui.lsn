@@ -8,9 +8,21 @@
 
 # تهريب رموز HTML
 دالة واجهة_هرّب(س) {
-    دع ن = استبدل(س، "&"، "&amp;")
+    # يهرّب النص للمحتوى وللسمات معا: & < > " '
+    دع ن = استبدل(نص(س)، "&"، "&amp;")
     ن = استبدل(ن، "<"، "&lt;")
-    أرجع استبدل(ن، ">"، "&gt;")
+    ن = استبدل(ن، ">"، "&gt;")
+    ن = استبدل(ن، "\""، "&quot;")
+    أرجع استبدل(ن، "'"، "&#39;")
+}
+
+# رابط آمن: يقبل http و https و mailto والمسارات النسبية والمرساة (#)، ويرفض غيرها مثل javascript:
+دالة واجهة_رابط(ر) {
+    دع م = نظّف(نص(ر))
+    إذا (يبدأ_ب(م، "https://") أو يبدأ_ب(م، "http://") أو يبدأ_ب(م، "mailto:") أو يبدأ_ب(م، "/") أو يبدأ_ب(م، "#") أو يبدأ_ب(م، "./") أو يبدأ_ب(م، "../")) {
+        أرجع واجهة_هرّب(م)
+    }
+    أرجع "#"
 }
 
 # أنماط الهوية: ضعها مرة واحدة داخل <head>
@@ -25,18 +37,18 @@
     ن = ن + ".ui-badge{display:inline-block;padding:2px 12px;border-radius:999px;background:var(--ui-navy);color:#fff;font-size:13px;font-weight:700}"
     ن = ن + ".ui-stat{text-align:center;padding:18px}.ui-stat b{display:block;font-size:44px;font-weight:900;color:var(--ui-orange);line-height:1.1}.ui-stat small{color:var(--ui-muted);font-weight:600}"
     ن = ن + ".ui-hero{background:linear-gradient(160deg,#0d2748,#091d37);color:#fff;border-radius:26px;padding:48px 24px;text-align:center}.ui-hero h1{margin:0 0 10px;font-size:clamp(30px,6vw,48px)}.ui-hero p{color:#c9d5e8;max-width:620px;margin:0 auto 22px}"
-    ن = ن + ".ui-code{direction:rtl;unicode-bidi:plaintext;text-align:right;background:#06142a;color:#ffb98a;border-radius:14px;padding:16px;font:14px/1.8 ui-monospace,Consolas,monospace;overflow-x:auto;white-space:pre-wrap}"
+    ن = ن + ".ui-code{direction:rtl;unicode-bidi:plaintext;text-align:start;background:#06142a;color:#ffb98a;border-radius:14px;padding:16px;font:14px/1.8 ui-monospace,Consolas,monospace;overflow-x:auto;white-space:pre-wrap}"
     ن = ن + ".ui-hero .ui-btn.ghost{color:#fff;border-color:rgba(255,255,255,.55)}.ui-hero .ui-btn.ghost:hover{background:rgba(255,255,255,.1)}"
-    ن = ن + "a:focus-visible,button:focus-visible{outline:3px solid #ffb98a;outline-offset:2px}</style>"
+    ن = ن + "a:focus-visible,button:focus-visible{outline:3px solid #091d37;outline-offset:2px}.ui-hero a:focus-visible,.ui-code a:focus-visible{outline-color:#ffb98a}@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}</style>"
     أرجع ن
 }
 
 دالة واجهة_زر(نص_الزر، رابط) {
-    أرجع "<a class=\"ui-btn\" href=\"" + رابط + "\">" + واجهة_هرّب(نص_الزر) + "</a>"
+    أرجع "<a class=\"ui-btn\" href=\"" + واجهة_رابط(رابط) + "\">" + واجهة_هرّب(نص_الزر) + "</a>"
 }
 
 دالة واجهة_زر_شفاف(نص_الزر، رابط) {
-    أرجع "<a class=\"ui-btn ghost\" href=\"" + رابط + "\">" + واجهة_هرّب(نص_الزر) + "</a>"
+    أرجع "<a class=\"ui-btn ghost\" href=\"" + واجهة_رابط(رابط) + "\">" + واجهة_هرّب(نص_الزر) + "</a>"
 }
 
 دالة واجهة_بطاقة(عنوان، وصف) {
@@ -48,7 +60,7 @@
 }
 
 دالة واجهة_إحصائية(رقم، وصف) {
-    أرجع "<div class=\"ui-stat\"><b>" + نص(رقم) + "</b><small>" + واجهة_هرّب(وصف) + "</small></div>"
+    أرجع "<div class=\"ui-stat\"><b>" + واجهة_هرّب(رقم) + "</b><small>" + واجهة_هرّب(وصف) + "</small></div>"
 }
 
 دالة واجهة_شبكة(عناصر) {

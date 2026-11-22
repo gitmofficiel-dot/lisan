@@ -1,6 +1,6 @@
 ---
 name: lissan-lang
-description: Write, run, check and debug programs in Lissan (لسان, also spelled Lisan), the Arabic-keyword programming language from GITM Morocco. Use when the user mentions Lissan, Lisan, اللسان, .lsn files, Arabic programming, or asks to generate code with Arabic keywords (دع، دالة، إذا، لكل، صنف).
+description: Write, run, check, test and debug programs in Lissan (لسان, also spelled Lisan), an Arabic-keyword programming language. Use for .lsn files, code with Arabic keywords (دع، دالة، إذا، لكل، صنف), برمجة بالعربية, Lissan hardware targets (Arduino, ESP32, STM32, Raspberry Pi) and generating web pages with the lisan-ui library. Do not use for the human tongue (اللسان as the organ) or for general programming in other languages.
 license: MIT
 compatibility: Needs the lisan binary (v1.0.0 or newer) to run code. Writing code needs no tools.
 metadata:
@@ -19,7 +19,8 @@ Lissan programs are plain text files with the `.lsn` extension, written with Ara
 - Check syntax and imports without running: `lisan --check file.lsn`.
 - Tests: `lisan --test file.lsn` (uses `تحقق(شرط)` and `تحقق_يساوي(فعلي، متوقع)`).
 - Format: `lisan --fmt file.lsn`. REPL: `lisan`. One-liner: `lisan -e 'اطبع("مرحبا")'`.
-- Always run new code before presenting it. Compare the real output, never guess it.
+- If the `lisan` binary is available, run new code before presenting it and show the real output. If it is not available, say clearly that the code was NOT run. Never invent output.
+- Safety: generated programs can call `اكتب_ملف`, `احذف_ملف` and `اطلب_ويب`. Run untrusted code with `lisan --sandbox file.lsn` or in a temporary folder.
 
 ## Core syntax (all verified, see examples/)
 
@@ -67,4 +68,4 @@ Hardware: `استورد "اردوينو"`, `"esp32"`, `"stm32"`, `"راسبير�
 
 ## Examples
 
-See `examples/01_basics.lsn` to `examples/04_errors_match.lsn`, run through the real interpreter. The UI library for generating styled web pages is in `libs/ui/` of the repo. Syntax highlighting: `editors/highlightjs/lisan.js` (highlight.js) and `editors/vscode/` (TextMate).
+See `examples/01_basics.lsn` to `examples/04_errors_match.lsn`, run through the real interpreter. The UI library for generating styled web pages is in `libs/ui/` of the repo (`lisan_ui.lsn`, escapes text and attributes and rejects `javascript:` links; test: `libs/ui/test_security.lsn`). The paths `docs/`, `libs/`, `editors/` refer to the repository, not to this skill folder. Syntax highlighting: `editors/highlightjs/lisan.js` (highlight.js) and `editors/vscode/` (TextMate).

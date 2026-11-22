@@ -171,7 +171,7 @@ fn builtin_argument_count_error() {
 #[test]
 fn invalid_index_error() {
     assert!(run("اطبع([1][2])؛").unwrap_err().contains("خارج حدود"));
-    assert!(run("اطبع([1][-1])؛").unwrap_err().contains("غير سالب"));
+    assert!(run("اطبع([1][-2])؛").unwrap_err().contains("خارج"));
     assert!(run("اطبع([1][0.5])؛").unwrap_err().contains("غير سالب"));
 }
 

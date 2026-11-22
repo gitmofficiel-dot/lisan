@@ -47,7 +47,7 @@ Argument and list separator: the Arabic comma `،`. A Latin `,` is a syntax erro
 1. Both Latin (`123`) and Arabic-Indic (`١٢٣`) digits are accepted. Output prints Latin digits. See docs/NUMBERS-AND-STYLE.md.
 2. `خطأ` is the keyword **false**. Never use it as a variable name, for example `التقط (خطأ)` fails. Use `رسالة` or `عطل`.
 3. Convert numbers to text before joining: `"عدد: " + نص(ن)`.
-4. Function names are not values. You cannot pass or print `مضروب` itself; call it.
+4. Functions are values: you can pass a named function or an anonymous `دالة(س) { ... }` as an argument, store it in a variable, and `نوع(f)` gives `دالة`. Limits found by testing v1.0.0: inner functions do NOT capture outer variables (using one fails with "متغير غير معرّف"), and a call needs a name, so `قائمة[0](5)` is rejected (assign it to a variable first).
 5. `استورد "x.lsn"` resolves **relative to the importing file**, not the working directory.
 6. Do not name a library file `ui.lsn`. It collides with a built-in module name and the functions silently stay undefined. Use a distinctive name (the bundled UI library is `lisan_ui.lsn`).
 7. `أضف(قائمة، عنصر)` mutates the list in place. Dict assignment `d["k"] = v` also mutates.

@@ -315,8 +315,8 @@ impl VM {
                     let target = self.pop()?;
                     match target {
                         Value::List(items) => match index {
-                            Value::Number(n) if n >= 0.0 && n.fract() == 0.0 => {
-                                let idx = n as usize;
+                            Value::Number(n) if n.fract() == 0.0 && (n >= 0.0 || (-n) as usize <= items.borrow().len()) => {
+                                let idx = if n >= 0.0 { n as usize } else { items.borrow().len() - (-n) as usize };
                                 let borrowed = items.borrow();
                                 if let Some(item) = borrowed.get(idx) {
                                     self.stack.push(item.clone());

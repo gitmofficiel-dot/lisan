@@ -1460,6 +1460,12 @@ impl Interpreter {
                         (Value::Text(from), Value::Text(to)) => Ok(Value::Text(text.replace(from, to))),
                         _ => Err("طريقة استبدل تتطلب نصين (القديم والجديد)".into()),
                     },
+                    "قسّم" | "قسم" | "نظّف" | "نظف" | "اقتطع" => {
+                        let mut call_args = Vec::with_capacity(evaluated_args.len() + 1);
+                        call_args.push(Value::Text(text.clone()));
+                        call_args.extend(evaluated_args.iter().cloned());
+                        call_builtin(method_name, call_args)
+                    }
                     _ => Err(format!("الطريقة '{}' غير مدعومة للنصوص", method_name)),
                 }
             }

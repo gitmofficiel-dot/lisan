@@ -1,6 +1,6 @@
 # AGENTS.md — Authoritative Guide for AI Coding Agents Writing Lisan (لسان)
 
-This repository implements **Lisan (لسان, v1.1.0)**, a modern, full-stack, **100% Arabic-only** programming language compiled and interpreted in Rust. This guide applies to **all AI coding agents** (Claude, Gemini, GPT/Codex, GitHub Copilot, Cursor, Antigravity, and MCP clients).
+This repository implements **Lisan (لسان, v1.2.0)**, a modern, full-stack, **100% Arabic-only** programming language compiled and interpreted in Rust. This guide applies to **all AI coding agents** (Claude, Gemini, GPT/Codex, GitHub Copilot, Cursor, Antigravity, and MCP clients).
 
 ---
 

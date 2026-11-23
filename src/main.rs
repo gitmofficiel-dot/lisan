@@ -9,7 +9,7 @@ fn main() {
 fn real_main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && (args[0] == "-h" || args[0] == "--help") {
-        println!("لسان 1.1.0 | لغة برمجة عربية عصرية وشاملة لجميع المنصات والعتاد\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan استوديو [منفذ] تشغيل تطبيق استوديو لسان لسطح المكتب (--studio / --app)\n  lisan منصات          عرض كافة أنظمة التشغيل واللوحات المدعومة (--platforms)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan --mcp          تشغيل خادم وكلاء الذكاء الاصطناعي (MCP — خادم_وكيل)\n  lisan --dap          تشغيل مصحح أخطاء لسان (DAP — مصحح) لمحرر VS Code\n  lisan --python ملف.lsn [--output app.py]     ترجمة إلى كود بايثون (Python 3)\n  lisan --js ملف.lsn [--output app.js]         ترجمة إلى كود جافاسكربت (ES2022)\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan اختبار [ملفات...] تشغيل حزمة اختبارات وتحققات لسان (--test)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات C++\n  lisan --esp32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود ESP32 C++ (WiFi/BLE/CAM/OTA)\n  lisan --stm32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود STM32 C++ (Timers/CAN/DMA/DAC)\n  lisan --raspberry ملف.lsn [--output app.py]    ترجمة إلى كود راسبيري باي Python 3 (GPIO/Camera/SenseHAT)\n  lisan --pico ملف.lsn [--output main_pico.py]   ترجمة إلى كود راسبيري بيكو MicroPython (RP2040/Pico W)\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL\n  lisan doctor / --doctor  لفحص بيئة التطوير");
+        println!("لسان 1.2.0 | لغة برمجة عربية عصرية وشاملة لجميع المنصات والعتاد\nالاستخدام:\n  lisan ملف.lsn  يترجم إلى ملف آلة أصلي (الخيار الافتراضي)\n  lisan استوديو [منفذ] تشغيل تطبيق استوديو لسان لسطح المكتب (--studio / --app)\n  lisan منصات          عرض كافة أنظمة التشغيل واللوحات المدعومة (--platforms)\n  lisan --vm ملف.lsn   تشغيل عبر آلة البايت كود الافتراضية السريعة\n  lisan --interpret ملف.lsn  تشغيل مباشر عبر المفسّر (بلا حد للخطوات)\n  lisan --sandbox ملف.lsn  تشغيل آمن بحدود محدودة للشيفرة غير الموثوقة\n  lisan --lsp          تشغيل خادم لغة لسان (LSP) لمحررات VS Code وغيرها\n  lisan --mcp          تشغيل خادم وكلاء الذكاء الاصطناعي (MCP — خادم_وكيل)\n  lisan --dap          تشغيل مصحح أخطاء لسان (DAP — مصحح) لمحرر VS Code\n  lisan --python ملف.lsn [--output app.py]     ترجمة إلى كود بايثون (Python 3)\n  lisan --js ملف.lsn [--output app.js]         ترجمة إلى كود جافاسكربت (ES2022)\n  lisan نسّق [ملف.lsn]    تنسيق الشيفرة وضبط المسافات والمحاذاة (--fmt)\n  lisan اختبار [ملفات...] تشغيل حزمة اختبارات وتحققات لسان (--test)\n  lisan حزمة [تهيئة|أضف|قفل]  إدارة الحزم والاعتماديات وملف القفل\n  lisan --arduino ملف.lsn [--output sketch.ino]  ترجمة إلى كود أردوينو ومتحكمات C++\n  lisan --esp32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود ESP32 C++ (WiFi/BLE/CAM/OTA)\n  lisan --stm32 ملف.lsn [--output sketch.ino]    ترجمة إلى كود STM32 C++ (Timers/CAN/DMA/DAC)\n  lisan --raspberry ملف.lsn [--output app.py]    ترجمة إلى كود راسبيري باي Python 3 (GPIO/Camera/SenseHAT)\n  lisan --pico ملف.lsn [--output main_pico.py]   ترجمة إلى كود راسبيري بيكو MicroPython (RP2040/Pico W)\n  lisan --mobile ملف.lsn [--output مجلد]  تشغيل وتصدير تطبيق هاتف ذكي (PWA)\n  lisan --init [اسم_المشروع]  إنشاء مشروع لسان جديد\n  lisan --web [منفذ]   تشغيل بيئة التطوير التفاعلية في المتصفح\n  lisan --check ملف.lsn  لفحص قواعد الملف واستيراداته\n  lisan --test ملف.lsn   تشغيل تحققات البرنامج\n  lisan --native ملف.lsn --output البرنامج  ترجمة إلى ملف آلة أصلي عبر Clang\n  lisan --emit-llvm ملف.lsn --output الملف.ll  إخراج LLVM IR\n  lisan --build ملف.lsn [--output الناتج]  بناء حزمة تطبيق تنفيذي مستقل\n  lisan --tokens ملف.lsn  عرض الرموز\n  lisan --ast ملف.lsn  عرض شجرة بناء التعليمات\n  lisan -e 'اطبع(\"مرحبا\")'\n  lisan                 فتح الطرفية التفاعلية REPL\n  lisan doctor / --doctor  لفحص بيئة التطوير");
         return;
     }
     if !args.is_empty() && (args[0] == "--platforms" || args[0] == "--targets" || args[0] == "منصات") {
@@ -35,7 +35,7 @@ fn real_main() {
         return;
     }
     if args.len() == 1 && (args[0] == "-V" || args[0] == "--version") {
-        println!("لسان 1.1.0");
+        println!("لسان 1.2.0");
         return;
     }
     if !args.is_empty() && (args[0] == "--lsp" || args[0] == "lsp") {
@@ -434,7 +434,7 @@ fn real_main() {
 
 fn start_repl() {
     use std::io::{self, Write};
-    println!("لسان 1.1.0 | الطرفية التفاعلية للغة لسان");
+    println!("لسان 1.2.0 | الطرفية التفاعلية للغة لسان");
     println!("اكتب تعليماتك البرمجية بالعربية واضغط Enter للتنفيذ.");
     println!("اكتب 'خروج' أو 'exit' للإنهاء، أو 'مسح' لإعادة تهيئة المتغيرات.\n");
 
@@ -484,7 +484,7 @@ fn init_project(name: &str) -> Result<(), String> {
     fs::create_dir_all(&src_dir).map_err(|e| format!("تعذّر إنشاء مجلد المشروع: {}", e))?;
 
     let manifest = format!(
-        "{{\n  \"الاسم\": \"{}\",\n  \"الإصدار\": \"1.1.0\",\n  \"المدخل\": \"src/الرئيسي.lsn\"\n}}\n",
+        "{{\n  \"الاسم\": \"{}\",\n  \"الإصدار\": \"1.2.0\",\n  \"المدخل\": \"src/الرئيسي.lsn\"\n}}\n",
         name
     );
     fs::write(root.join("lisan.json"), manifest)
@@ -543,7 +543,7 @@ fn serve_web_playground(port: u16) -> Result<(), String> {
             ("application/wasm", wasm)
         } else {
             let html = std::fs::read("web/index.html").unwrap_or_else(|_| {
-                b"<h1>Lisan 1.1.0 Web Playground</h1>".to_vec()
+                b"<h1>Lisan 1.2.0 Web Playground</h1>".to_vec()
             });
             ("text/html; charset=utf-8", html)
         };

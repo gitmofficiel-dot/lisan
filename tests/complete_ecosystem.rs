@@ -96,7 +96,7 @@ fn test_desktop_studio_api_endpoints() {
     let (status, _, info_body) = lisan::desktop::handle_http_request("GET", "/api/info", "");
     assert_eq!(status, 200);
     let info_str = String::from_utf8_lossy(&info_body);
-    assert!(info_str.contains("1.1.0"));
+    assert!(info_str.contains("1.2.0"));
 
     let run_req = r#"{"code": "اطبع(10 + 32)"}"#;
     let (status, _, run_body) = lisan::desktop::handle_http_request("POST", "/api/run", run_req);

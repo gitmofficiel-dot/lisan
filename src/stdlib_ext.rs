@@ -1099,7 +1099,7 @@ fn build_system_info() -> Value {
         ("الأنوية".to_string(), Value::Number(cores)),
         ("مجلد_المستخدم".to_string(), Value::Text(home_dir)),
         ("مجلد_مؤقت".to_string(), Value::Text(temp_dir)),
-        ("إصدار_لسان".to_string(), Value::Text("1.1.0".to_string())),
+        ("إصدار_لسان".to_string(), Value::Text("1.2.0".to_string())),
     ])
 }
 

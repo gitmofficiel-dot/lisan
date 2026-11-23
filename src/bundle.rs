@@ -8,11 +8,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_GENERATED_SOURCE: usize = 32_000_000;
 const RUNTIME_SOURCES: &[(&str, &str)] = &[
+    ("ai_agents.rs", include_str!("ai_agents.rs")),
     ("ai_data.rs", include_str!("ai_data.rs")),
     ("arduino.rs", include_str!("arduino.rs")),
     ("ast.rs", include_str!("ast.rs")),
+    ("async_rt.rs", include_str!("async_rt.rs")),
     ("bytecode.rs", include_str!("bytecode.rs")),
     ("diagnostics.rs", include_str!("diagnostics.rs")),
+    ("ffi.rs", include_str!("ffi.rs")),
     ("interop.rs", include_str!("interop.rs")),
     ("json.rs", include_str!("json.rs")),
     ("lexer.rs", include_str!("lexer.rs")),
@@ -27,6 +30,7 @@ const RUNTIME_SOURCES: &[(&str, &str)] = &[
     ("ui.rs", include_str!("ui.rs")),
     ("vm.rs", include_str!("vm.rs")),
     ("web_framework.rs", include_str!("web_framework.rs")),
+    ("web_modern.rs", include_str!("web_modern.rs")),
 ];
 
 fn str_value(text: &str) -> String { format!("{:?}.to_string()", text) }
@@ -161,7 +165,11 @@ mod sys_games;
 mod ui;
 mod vm;
 mod web_framework;
+mod web_modern;
 mod interop;
+mod async_rt;
+mod ffi;
+mod ai_agents;
 use ast::{{ClassDef, Expr, Function, Op, Stmt}};
 fn main() {{
     let program: Vec<Stmt> = {ast};

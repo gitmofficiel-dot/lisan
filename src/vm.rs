@@ -782,7 +782,8 @@ impl VM {
                             Value::Text(crate::json::to_json_string(&args[0])?)
                         }
                         other => {
-                            if let Ok(val) = crate::runtime::call_builtin_for_module("", other, args) {
+                            let canonical = crate::diagnostics::pure_arabic_to_canonical(other).unwrap_or(other);
+                            if let Ok(val) = crate::runtime::call_builtin_for_module("", canonical, args) {
                                 val
                             } else {
                                 let empty: Vec<&str> = Vec::new();
@@ -1028,6 +1029,34 @@ impl Compiler {
                             self.chunk.emit(OpCode::DefineGlobal(item.clone()), 0);
                         }
                     }
+                }
+            }
+            Stmt::Match { target, cases, default_case } => {
+                let match_var = format!("__هدف_مطابقة_{}__", self.chunk.instructions.len());
+                self.compile_expr(target)?;
+                self.chunk.emit(OpCode::DefineGlobal(match_var.clone()), 0);
+                let mut end_jumps = Vec::new();
+                for (case_expr, case_body) in cases {
+                    self.chunk.emit(OpCode::GetGlobal(match_var.clone()), 0);
+                    self.compile_expr(case_expr)?;
+                    self.chunk.emit(OpCode::Equal, 0);
+                    let skip_case = self.chunk.emit(OpCode::JumpIfFalse(0), 0);
+                    for s in case_body {
+                        self.compile_stmt(s)?;
+                    }
+                    let done_jmp = self.chunk.emit(OpCode::Jump(0), 0);
+                    end_jumps.push(done_jmp);
+                    let next_case_ip = self.chunk.instructions.len();
+                    self.chunk.patch_jump(skip_case, next_case_ip);
+                }
+                if let Some(def_stmts) = default_case {
+                    for s in def_stmts {
+                        self.compile_stmt(s)?;
+                    }
+                }
+                let match_end = self.chunk.instructions.len();
+                for j in end_jumps {
+                    self.chunk.patch_jump(j, match_end);
                 }
             }
             _ => return Err(format!("الجملة غير مدعومة بعد في محرك البايت كود: {:?}", stmt)),

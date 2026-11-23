@@ -154,6 +154,23 @@ impl Parser {
             return Ok(Stmt::With { expr, alias, body });
         }
 
+        // دعم الدوال غير المتزامنة بالعربية الخالصة:
+        // دالة_غير_متزامنة اسم(...) { ... }  أو  غير_متزامنة دالة اسم(...) { ... }
+        if let TokenKind::Identifier(ref word) = self.current().kind {
+            let norm = crate::diagnostics::normalize_arabic(word);
+            if norm == "داله_غير_متزامنه" {
+                self.cursor += 1;
+                let func = self.function_declaration()?;
+                return Ok(Stmt::Function(func));
+            }
+            if norm == "غير_متزامنه"
+                && matches!(self.peek_next().map(|t| &t.kind), Some(TokenKind::Function))
+            {
+                self.cursor += 2;
+                let func = self.function_declaration()?;
+                return Ok(Stmt::Function(func));
+            }
+        }
         if self.take(&TokenKind::Function) {
             let func = self.function_declaration()?;
             return Ok(Stmt::Function(func));
@@ -550,6 +567,29 @@ impl Parser {
     fn unary(&mut self) -> Result<Expr, String> {
         if self.take(&TokenKind::Bang) { return Ok(Expr::Unary(Op::Not, Box::new(self.unary()?))); }
         if self.take(&TokenKind::Minus) { return Ok(Expr::Unary(Op::Negate, Box::new(self.unary()?))); }
+        if let TokenKind::Identifier(ref word) = self.current().kind {
+            if word == "انتظر" {
+                if let Some(next) = self.peek_next() {
+                    if matches!(
+                        next.kind,
+                        TokenKind::Identifier(_)
+                            | TokenKind::Number(_)
+                            | TokenKind::String(_)
+                            | TokenKind::FString(_)
+                            | TokenKind::True
+                            | TokenKind::False
+                            | TokenKind::Null
+                            | TokenKind::New
+                            | TokenKind::LeftBracket
+                            | TokenKind::LeftBrace
+                    ) {
+                        self.cursor += 1;
+                        let inner = self.unary()?;
+                        return Ok(Expr::Call("انتظر_قيمة".to_string(), vec![inner]));
+                    }
+                }
+            }
+        }
         self.power()
     }
     fn power(&mut self) -> Result<Expr, String> {

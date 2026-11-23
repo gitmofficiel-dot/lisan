@@ -1,12 +1,15 @@
+pub mod ai_agents;
 pub mod ai_data;
 pub mod arduino;
 pub mod ast;
+pub mod async_rt;
 pub mod bundle;
 pub mod bytecode;
 pub mod dap;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
 pub mod diagnostics;
+pub mod ffi;
 pub mod fmt;
 pub mod interop;
 pub mod json;
@@ -28,6 +31,7 @@ pub mod ui;
 pub mod vm;
 pub mod wasm;
 pub mod web_framework;
+pub mod web_modern;
 
 pub use runtime::{Interpreter, Limits, Value};
 

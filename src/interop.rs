@@ -811,7 +811,7 @@ def _resolve_attr(module_name, dotted_name):
     return obj
 
 try:
-    req = json.loads(sys.stdin.read() or "{}")
+    req = json.loads(sys.stdin.buffer.read().decode("utf-8") or "{}")
     mode = req.get("mode", "")
     if mode == "call":
         target = _resolve_attr(req["module"], req["func"])
@@ -922,7 +922,7 @@ const PYTHON_HTTP_FALLBACK: &str = r#"
 import json, ssl, sys, urllib.request, urllib.error
 
 try:
-    req_data = json.loads(sys.stdin.read() or "{}")
+    req_data = json.loads(sys.stdin.buffer.read().decode("utf-8") or "{}")
     url = req_data["url"]
     method = req_data["method"]
     headers = req_data.get("headers", {})
@@ -994,6 +994,8 @@ fn run_process_with_stdin(program: &str, args: &[&str], stdin_data: &str) -> Res
     use std::process::{Command, Stdio};
     let mut child = Command::new(program)
         .args(args)
+        .env("PYTHONUTF8", "1")
+        .env("PYTHONIOENCODING", "utf-8")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -3236,7 +3238,7 @@ mod tests {
                 py_cmd,
                 &[
                     "-c",
-                    "import sys; code = sys.stdin.read(); compile(code, '<gen>', 'exec'); exec(code, {})",
+                    "import sys; sys.stdout.reconfigure(encoding='utf-8'); code = sys.stdin.buffer.read().decode('utf-8'); compile(code, '<gen>', 'exec'); exec(code, {})",
                 ],
                 &py,
             )

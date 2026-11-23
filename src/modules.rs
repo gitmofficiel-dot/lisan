@@ -46,6 +46,18 @@ pub fn resolve_builtin_module(name: &str) -> Option<&'static str> {
         "توافق" | "ترابط" | "بايثون" | "جافاسكربت" | "ذكاء_خارجي" | "interop" | "python" | "javascript" | "js" => {
             Some(crate::interop::STDLIB_INTEROP)
         }
+        "تزامن" | "غير_متزامن" | "مهام_متزامنه" | "async" | "concurrency" => {
+            Some(crate::async_rt::STDLIB_ASYNC)
+        }
+        "ربط_خارجي" | "مكتبه_خارجيه" | "مكتبات_نظام" | "ffi" | "c_abi" => {
+            Some(crate::ffi::STDLIB_FFI)
+        }
+        "ويب_حديث" | "تفاعلي" | "مقبس_حي" | "كاباسيتور" | "تاوري" | "فيجما" | "web_modern" | "reactive" => {
+            Some(crate::web_modern::STDLIB_WEB_MODERN)
+        }
+        "وكلاء" | "وكيل" | "استرجاع" | "متجهات" | "لوحه_موحده" | "بايتورش" | "ai_agents" | "rag" | "agents" => {
+            Some(crate::ai_agents::STDLIB_AI_AGENTS)
+        }
         _ => None,
     }
 }

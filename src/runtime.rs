@@ -2035,6 +2035,9 @@ fn is_builtin(name: &str) -> bool {
         || crate::web_framework::is_web_builtin(name)
         || crate::sys_games::is_sys_builtin(name)
         || crate::interop::is_interop_builtin(name)
+        || crate::async_rt::is_async_builtin(name)
+        || crate::ffi::is_ffi_builtin(name)
+        || crate::web_modern::is_web_modern_builtin(name)
 }
 
 fn require_args(name: &str, values: &[Value], count: usize) -> Result<(), String> {
@@ -2963,6 +2966,15 @@ fn call_builtin(name: &str, args: Vec<Value>) -> Result<Value, String> {
             }
             if let Some(res) = crate::interop::try_call_interop_builtin(name, &args) {
                 return res;
+            }
+            if crate::async_rt::is_async_builtin(name) {
+                return crate::async_rt::eval_async_builtin(name, args);
+            }
+            if crate::ffi::is_ffi_builtin(name) {
+                return crate::ffi::eval_ffi_builtin(name, args);
+            }
+            if crate::web_modern::is_web_modern_builtin(name) {
+                return crate::web_modern::eval_web_modern_builtin(name, args);
             }
             let empty: Vec<&str> = Vec::new();
             Err(crate::diagnostics::suggest_function_error(name, &empty))

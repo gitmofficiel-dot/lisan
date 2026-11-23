@@ -1,0 +1,75 @@
+{
+  "name": "ليلي لسان (Lisan Midnight)",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#0b1120",
+    "editor.foreground": "#e2e8f0",
+    "editorLineNumber.foreground": "#475569",
+    "editorLineNumber.activeForeground": "#38bdf8",
+    "editorCursor.foreground": "#10b981",
+    "editor.selectionBackground": "#0284c755",
+    "editor.lineHighlightBackground": "#1e293b88",
+    "sideBar.background": "#0f172a",
+    "sideBar.foreground": "#cbd5e1",
+    "sideBarTitle.foreground": "#38bdf8",
+    "activityBar.background": "#090e1a",
+    "activityBar.foreground": "#38bdf8",
+    "activityBarBadge.background": "#10b981",
+    "activityBarBadge.foreground": "#042f2e",
+    "titleBar.activeBackground": "#090e1a",
+    "titleBar.activeForeground": "#f8fafc",
+    "titleBar.inactiveBackground": "#0b1120",
+    "statusBar.background": "#0284c7",
+    "statusBar.foreground": "#ffffff",
+    "statusBar.noFolderBackground": "#0f766e",
+    "tab.activeBackground": "#0b1120",
+    "tab.activeForeground": "#38bdf8",
+    "tab.activeBorderTop": "#10b981",
+    "tab.inactiveBackground": "#0f172a",
+    "tab.inactiveForeground": "#94a3b8",
+    "panel.background": "#0f172a",
+    "panel.border": "#1e293b",
+    "terminal.background": "#090e1a",
+    "terminal.foreground": "#e2e8f0",
+    "button.background": "#0284c7",
+    "button.hoverBackground": "#0369a1",
+    "button.foreground": "#ffffff",
+    "input.background": "#1e293b",
+    "input.border": "#334155",
+    "focusBorder": "#38bdf8"
+  },
+  "tokenColors": [
+    {
+      "scope": ["comment", "punctuation.definition.comment"],
+      "settings": { "foreground": "#64748b", "fontStyle": "italic" }
+    },
+    {
+      "scope": ["keyword", "keyword.control", "storage.type", "storage.modifier"],
+      "settings": { "foreground": "#f59e0b", "fontStyle": "bold" }
+    },
+    {
+      "scope": ["string", "string.quoted"],
+      "settings": { "foreground": "#34d399" }
+    },
+    {
+      "scope": ["constant.numeric", "constant.language"],
+      "settings": { "foreground": "#c084fc" }
+    },
+    {
+      "scope": ["entity.name.function", "support.function"],
+      "settings": { "foreground": "#38bdf8" }
+    },
+    {
+      "scope": ["entity.name.type", "entity.name.class", "support.class"],
+      "settings": { "foreground": "#fb7185", "fontStyle": "bold" }
+    },
+    {
+      "scope": ["variable", "variable.parameter"],
+      "settings": { "foreground": "#e2e8f0" }
+    },
+    {
+      "scope": ["keyword.operator"],
+      "settings": { "foreground": "#94a3b8" }
+    }
+  ]
+}

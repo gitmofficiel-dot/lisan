@@ -1,0 +1,43 @@
+{
+  "name": "lisan-studio-experience",
+  "displayName": "استوديو لسان — الواجهة والسمات (Lisan Studio Experience)",
+  "description": "السمات الرسمية ولوحة الترحيب العربية المتكاملة لمحرر استوديو لسان (Lisan Studio IDE)",
+  "version": "1.2.0",
+  "publisher": "lisan-lang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Themes",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "themes": [
+      {
+        "label": "ليلي لسان (Lisan Midnight)",
+        "uiTheme": "vs-dark",
+        "path": "./themes/lisan-midnight-color-theme.json"
+      },
+      {
+        "label": "نهاري لسان (Lisan Daylight)",
+        "uiTheme": "vs",
+        "path": "./themes/lisan-daylight-color-theme.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "lisanStudio.openWelcome",
+        "title": "استوديو لسان: لوحة الترحيب الرئيسية",
+        "icon": "$(home)"
+      },
+      {
+        "command": "lisanStudio.copyMcpConfig",
+        "title": "استوديو لسان: نسخ إعداد خادم وكلاء الذكاء (MCP)"
+      }
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "nameShort": "Lisan Studio",
+  "nameLong": "استوديو لسان — Lisan Studio",
+  "applicationName": "lisan-studio",
+  "dataFolderName": ".lisan-studio",
+  "urlProtocol": "lisan-studio",
+  "win32MutexName": "lisanstudio",
+  "win32DirName": "Lisan Studio",
+  "win32NameVersion": "Lisan Studio",
+  "win32RegValueName": "LisanStudio",
+  "win32AppUserModelId": "Lisan.Studio",
+  "win32ShellNameShort": "Lisan Studio",
+  "darwinBundleIdentifier": "com.lisan.studio",
+  "linuxIconName": "lisan-studio",
+  "licenseName": "MIT",
+  "licenseUrl": "https://github.com/gitmofficiel-dot/lisan/blob/main/LICENSE",
+  "reportIssueUrl": "https://github.com/gitmofficiel-dot/lisan/issues/new",
+  "documentationUrl": "https://github.com/gitmofficiel-dot/lisan#readme",
+  "releaseNotesUrl": "https://github.com/gitmofficiel-dot/lisan/releases",
+  "downloadUrl": "https://github.com/gitmofficiel-dot/lisan/releases/latest",
+  "extensionsGallery": {
+    "serviceUrl": "https://open-vsx.org/vscode/gallery",
+    "itemUrl": "https://open-vsx.org/vscode/item",
+    "resourceUrlTemplate": "https://open-vsx.org/vscode/unpkg/{publisher}/{name}/{version}/{path}",
+    "controlUrl": "https://open-vsx.org/vscode/control",
+    "nlsBaseUrl": "https://open-vsx.org/vscode/nls"
+  },
+  "enableTelemetry": false
+}

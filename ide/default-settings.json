@@ -1,0 +1,18 @@
+{
+  "workbench.colorTheme": "ليلي لسان (Lisan Midnight)",
+  "workbench.startupEditor": "none",
+  "editor.fontSize": 15,
+  "editor.lineHeight": 24,
+  "editor.tabSize": 4,
+  "editor.unicodeHighlight.nonBasicASCII": false,
+  "editor.unicodeHighlight.ambiguousCharacters": false,
+  "editor.unicodeHighlight.invisibleCharacters": false,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.formatOnSave": false,
+  "terminal.integrated.fontSize": 14,
+  "telemetry.telemetryLevel": "off",
+  "update.mode": "none",
+  "lisan.executablePath": "lisan",
+  "lisan.lsp.enabled": true,
+  "lisan.arabicOnlyStrict": true
+}

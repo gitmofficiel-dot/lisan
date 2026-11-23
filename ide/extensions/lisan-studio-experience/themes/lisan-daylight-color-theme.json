@@ -1,0 +1,51 @@
+{
+  "name": "نهاري لسان (Lisan Daylight)",
+  "type": "light",
+  "colors": {
+    "editor.background": "#f8fafc",
+    "editor.foreground": "#0f172a",
+    "editorLineNumber.foreground": "#94a3b8",
+    "editorLineNumber.activeForeground": "#0284c7",
+    "editorCursor.foreground": "#0284c7",
+    "editor.selectionBackground": "#bae6fd99",
+    "sideBar.background": "#f1f5f9",
+    "sideBar.foreground": "#334155",
+    "activityBar.background": "#e2e8f0",
+    "activityBar.foreground": "#0369a1",
+    "activityBarBadge.background": "#059669",
+    "titleBar.activeBackground": "#e2e8f0",
+    "titleBar.activeForeground": "#0f172a",
+    "statusBar.background": "#0369a1",
+    "statusBar.foreground": "#ffffff",
+    "tab.activeBackground": "#f8fafc",
+    "tab.activeForeground": "#0369a1",
+    "tab.activeBorderTop": "#059669",
+    "tab.inactiveBackground": "#e2e8f0"
+  },
+  "tokenColors": [
+    {
+      "scope": ["comment"],
+      "settings": { "foreground": "#64748b", "fontStyle": "italic" }
+    },
+    {
+      "scope": ["keyword", "keyword.control", "storage.type"],
+      "settings": { "foreground": "#b45309", "fontStyle": "bold" }
+    },
+    {
+      "scope": ["string"],
+      "settings": { "foreground": "#047857" }
+    },
+    {
+      "scope": ["constant.numeric", "constant.language"],
+      "settings": { "foreground": "#7c3aed" }
+    },
+    {
+      "scope": ["entity.name.function", "support.function"],
+      "settings": { "foreground": "#0369a1" }
+    },
+    {
+      "scope": ["entity.name.type", "entity.name.class"],
+      "settings": { "foreground": "#be123c", "fontStyle": "bold" }
+    }
+  ]
+}

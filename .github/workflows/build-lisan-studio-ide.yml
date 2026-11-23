@@ -95,7 +95,7 @@ jobs:
 
   build-macos-arm64:
     name: Build Lisan Studio IDE (macOS Apple Silicon + bundled Lisan)
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Download VSCodium + Lisan macOS arm64 and build Lisan Studio.app

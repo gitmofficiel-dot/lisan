@@ -50,7 +50,12 @@ Prebuilt packages are on the [Releases page](https://github.com/gitmofficiel-dot
   ```powershell
   irm https://raw.githubusercontent.com/gitmofficiel-dot/lisan/main/install.ps1 | iex
   ```
-* **حزم الإصدار الجاهزة:** راجع صفحة [Releases (`v1.2.0`)](https://github.com/gitmofficiel-dot/lisan/releases/tag/v1.2.0) لتحميل حزم `.deb` و`.tar.gz` و`.zip` وتطبيق سطح المكتب `Lisan Studio`.
+* **حزم الإصدار الجاهزة (CLI + Desktop Studio):** راجع صفحة [Releases (`v1.2.0`)](https://github.com/gitmofficiel-dot/lisan/releases/tag/v1.2.0) لتحميل حزم `.deb` و`.tar.gz` و`.zip` وتطبيق سطح المكتب.
+* **محرر الشيفرة الرسمي «استوديو لسان — Lisan Studio IDE» (`v1.2.0-ide`):** نسخة معدّلة ومفتوحة المصدر من Code-OSS مع **مترجم `lisan v1.2.0` مدمج**، ونظام **حسابات لسان (`👤 حسابي في لسان`)**، وخادم `LSP`، ومصحح الأخطاء `DAP (F5)`، ومحوّل بايثون ← لسان دون إنترنت:
+  * **Linux (x64):** [Lisan-Studio-IDE-linux-x64.tar.gz](https://github.com/gitmofficiel-dot/lisan/releases/download/v1.2.0-ide/Lisan-Studio-IDE-linux-x64.tar.gz)
+  * **Windows (x64):** [Lisan-Studio-IDE-windows-x64.zip](https://github.com/gitmofficiel-dot/lisan/releases/download/v1.2.0-ide/Lisan-Studio-IDE-windows-x64.zip)
+  * **macOS (Apple Silicon):** [Lisan-Studio-IDE-macos-arm64.zip](https://github.com/gitmofficiel-dot/lisan/releases/download/v1.2.0-ide/Lisan-Studio-IDE-macos-arm64.zip)
+* **لوكلاء الذكاء الاصطناعي (AI Coding Agents):** راجع [`AGENTS.md`](AGENTS.md) و[`docs/llms.txt`](docs/llms.txt) وشغّل خادم MCP عبر `lisan --mcp`.
 
 ### التشغيل والبناء من المصدر
 ```sh

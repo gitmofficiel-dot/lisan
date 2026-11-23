@@ -25,10 +25,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download VSCodium + Lisan Linux x64 and build Lisan Studio IDE
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.event.inputs.codium_version }}"
           if [ -z "$TAG" ]; then
-            TAG=$(curl -sSf https://api.github.com/repos/VSCodium/vscodium/releases/latest | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])')
+            TAG=$(curl -sSf -H "Authorization: Bearer ${GH_TOKEN}" https://api.github.com/repos/VSCodium/vscodium/releases/latest | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])' || echo "1.143.17232")
           fi
           LISAN_TAG="${{ github.event.inputs.lisan_release_tag }}"
           if [ -z "$LISAN_TAG" ]; then LISAN_TAG="v1.2.0"; fi
@@ -55,11 +57,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download VSCodium + Lisan Windows x64 and build Lisan Studio IDE
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
         run: |
           $tag = "${{ github.event.inputs.codium_version }}"
           if (-not $tag) {
-            $tag = (Invoke-RestMethod "https://api.github.com/repos/VSCodium/vscodium/releases/latest").tag_name
+            try { $tag = (Invoke-RestMethod -Headers @{ Authorization = "Bearer $env:GH_TOKEN" } "https://api.github.com/repos/VSCodium/vscodium/releases/latest").tag_name } catch { $tag = "1.143.17232" }
           }
           $lisanTag = "${{ github.event.inputs.lisan_release_tag }}"
           if (-not $lisanTag) { $lisanTag = "v1.2.0" }
@@ -99,10 +103,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download VSCodium + Lisan macOS arm64 and build Lisan Studio.app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.event.inputs.codium_version }}"
           if [ -z "$TAG" ]; then
-            TAG=$(curl -sSf https://api.github.com/repos/VSCodium/vscodium/releases/latest | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])')
+            TAG=$(curl -sSf -H "Authorization: Bearer ${GH_TOKEN}" https://api.github.com/repos/VSCodium/vscodium/releases/latest | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])' || echo "1.143.17232")
           fi
           LISAN_TAG="${{ github.event.inputs.lisan_release_tag }}"
           if [ -z "$LISAN_TAG" ]; then LISAN_TAG="v1.2.0"; fi

@@ -61,7 +61,24 @@ const ARABIC_HOVER_DOCS = {
     'انحدار_خطي': '**الانحدار الخطي (`انحدار_خطي`):** نموذج تعلم آلي للتنبؤ العددي في وحدة `ذكاء`.',
     'لعبة_ثنائية_الأبعاد': '**محرك الألعاب (`لعبة_ثنائية_الأبعاد`):** بناء ألعاب أركيد عربية متكاملة.',
     'لوحة_راسبيري': '**راسبيري باي (`لوحة_راسبيري`):** إدارة لوحات Raspberry Pi ومنافذ GPIO.',
-    'لوحة_بيكو': '**راسبيري بيكو (`لوحة_بيكو`):** برمجة لوحات RP2040 / Pico W.'
+    'لوحة_بيكو': '**راسبيري بيكو (`لوحة_بيكو`):** برمجة لوحات RP2040 / Pico W.',
+    'طابق': '**مطابقة الأنماط (`طابق` / `اختر`):** مطابقة القيم مع حالات متعددة بشكل عصري في المفسّر والآلة الافتراضية.',
+    'دالة_غير_متزامنة': '**دالة غير متزامنة (`دالة_غير_متزامنة`):** تعريف دالة للمهام غير المتزامنة مع `انتظر` و`مهمة` و`حلقة_أحداث`.',
+    'انتظر': '**انتظار نتيجة مهمة (`انتظر`):** استخلاص قيمة `مهمة` أو `وعد` عند اكتمالها.',
+    'تشغيل_متوازٍ': '**التنفيذ المتوازي (`تشغيل_متوازٍ`):** تنفيذ عدة مهام لسان على خيوط نظام التشغيل بالتوازي.',
+    'مكتبة_بايثون': '**الربط ببايثون (`استورد بايثون "..." كـ ...`):** استدعاء أي مكتبة بايثون (PyTorch، NumPy، Pandas، FastAPI) من شيفرة لسان العربية.',
+    'مكتبة_جافاسكربت': '**الربط بجافاسكربت (`استورد جافاسكربت "..." كـ ...`):** استدعاء وحدات Node.js وnpm من شيفرة لسان.',
+    'نموذج_ذكاء': '**عميل نماذج الذكاء الاصطناعي (`نموذج_ذكاء`):** واجهة عربية موحدة لـ Gemini وOpenAI وClaude وOllama عبر HTTPS.',
+    'طلب_شبكي_آمن': '**طلب HTTPS/TLS آمن (`طلب_شبكي_آمن`):** إرسال طلبات GET/POST/PUT/DELETE مشفرة كاملة.',
+    'مكتبة_خارجية': '**جسر C ABI FFI (`مكتبة_خارجية`):** استدعاء دوال المكتبات المشتركة (`.so`/`.dylib`/`.dll`) مباشرة.',
+    'مخزن_متجهات': '**مخزن المتجهات (`مخزن_متجهات`):** فهرسة النصوص العربية والبحث الدلالي بالتشابه الجيبي.',
+    'محرك_استرجاع_وتوليد': '**محرك RAG العربي (`محرك_استرجاع_وتوليد`):** تقطيع المستندات واسترجاع السياق وتوليد الإجابات.',
+    'وكيل_ذكي': '**إطار الوكلاء (`وكيل_ذكي`):** بناء وكلاء ذكاء اصطناعي عرب بأدوات مغلقة وذاكرة محادثة.',
+    'لوحة_موحدة': '**الواجهة العتادية الموحدة (`لوحة_موحدة`):** برمجة Arduino وESP32 وSTM32 وRaspberry Pi وPico بنفس الشيفرة.',
+    'تطبيق_تفاعلي': '**تطبيق ويب تفاعلي (`تطبيق_تفاعلي`):** مكونات تفاعلية عربية مع تصدير Capacitor (APK/IPA) وTauri وFigma.',
+    'مصنف_الجيران_الأقرب': '**مصنف الجيران الأقرب (`مصنف_الجيران_الأقرب`):** تصنيف تعلم آلي بالعربية الخالصة.',
+    'متحكم_تناسبي_تكاملي': '**متحكم PID (`متحكم_تناسبي_تكاملي`):** متحكم صناعي وروبوتي دقيق بالعربية الخالصة.',
+    'بصمة_تحقق': '**بصمة CRC-32 (`بصمة_تحقق`):** حساب بصمة التحقق القياسية IEEE 802.3.'
 };
 
 const FALLBACK_COMPLETIONS = [
@@ -103,8 +120,35 @@ const FALLBACK_COMPLETIONS = [
     ['صف', 'نوع صف ثابت', vscode.CompletionItemKind.TypeParameter],
     ['مجموعة', 'نوع مجموعة فريدة', vscode.CompletionItemKind.TypeParameter],
     ['فارغ', 'نوع إرجاع فارغ', vscode.CompletionItemKind.TypeParameter],
-    ['أي', 'نوع عام يقبل أي قيمة', vscode.CompletionItemKind.TypeParameter]
+    ['أي', 'نوع عام يقبل أي قيمة', vscode.CompletionItemKind.TypeParameter],
+    ['طابق', 'مطابقة الأنماط العصرية', vscode.CompletionItemKind.Keyword],
+    ['دالة_غير_متزامنة', 'تعريف دالة غير متزامنة', vscode.CompletionItemKind.Keyword],
+    ['انتظر', 'انتظار اكتمال مهمة غير متزامنة', vscode.CompletionItemKind.Keyword],
+    ['تشغيل_متوازٍ', 'تنفيذ مهام بالتوازي على خيوط متعددة', vscode.CompletionItemKind.Function],
+    ['طلب_شبكي_آمن', 'إرسال طلب HTTPS/TLS آمن', vscode.CompletionItemKind.Function],
+    ['استورد_بايثون', 'استيراد مكتبة Python 3 بالعربية', vscode.CompletionItemKind.Function],
+    ['استورد_جافاسكربت', 'استيراد وحدة Node.js بالعربية', vscode.CompletionItemKind.Function],
+    ['نموذج_ذكاء', 'عميل نماذج الذكاء الموحد (Gemini/OpenAI/Claude/Ollama)', vscode.CompletionItemKind.Class],
+    ['مخزن_متجهات', 'مخزن متجهات دلالي للبحث العربي', vscode.CompletionItemKind.Class],
+    ['محرك_استرجاع_وتوليد', 'محرك RAG عربي كامل', vscode.CompletionItemKind.Class],
+    ['وكيل_ذكي', 'إنشاء وكيل ذكاء اصطناعي بأدوات وذاكرة', vscode.CompletionItemKind.Class],
+    ['لوحة_موحدة', 'واجهة موحدة لكل المتحكمات الدقيقة', vscode.CompletionItemKind.Class],
+    ['تطبيق_تفاعلي', 'تطبيق ويب تفاعلي مع تصدير Capacitor/Tauri/Figma', vscode.CompletionItemKind.Class],
+    ['مكتبة_خارجية', 'ربط مكتبات النظام الأصلية C ABI (FFI)', vscode.CompletionItemKind.Class]
 ];
+
+const ENGLISH_TO_ARABIC_FIX = {
+    'if': 'إذا', 'else': 'وإلا', 'elif': 'وإلا', 'while': 'طالما', 'for': 'لكل',
+    'in': 'في', 'def': 'دالة', 'function': 'دالة', 'fn': 'دالة', 'return': 'أرجع',
+    'import': 'استورد', 'from': 'من', 'as': 'كـ', 'class': 'صنف', 'struct': 'صنف',
+    'extends': 'يرث', 'new': 'جديد', 'this': 'هذا', 'self': 'هذا', 'true': 'صحيح',
+    'false': 'خطأ', 'null': 'لاشيء', 'none': 'لاشيء', 'and': 'و', 'or': 'أو',
+    'not': 'ليس', 'try': 'حاول', 'except': 'التقط', 'catch': 'التقط',
+    'finally': 'أخيرًا', 'raise': 'ارمِ', 'throw': 'ارمِ', 'break': 'توقف',
+    'continue': 'تابع', 'match': 'طابق', 'switch': 'طابق', 'case': 'حالة',
+    'default': 'افتراضي', 'let': 'دع', 'var': 'دع', 'const': 'دع', 'print': 'اطبع',
+    'with': 'مع', 'async': 'دالة_غير_متزامنة', 'await': 'انتظر'
+};
 
 const FORBIDDEN_ENGLISH_KEYWORDS = new Set([
     'function', 'def', 'class', 'return', 'import', 'from', 'if', 'else', 'elif',
@@ -120,7 +164,36 @@ function getConfig() {
 }
 
 function getLisanPath() {
-    return getConfig().get('executablePath', 'lisan') || 'lisan';
+    const configured = getConfig().get('executablePath', 'lisan') || 'lisan';
+    if (configured !== 'lisan') {
+        return configured;
+    }
+    const exeName = process.platform === 'win32' ? 'lisan.exe' : 'lisan';
+    const candidates = [];
+    if (vscode.env && vscode.env.appRoot) {
+        candidates.push(path.join(vscode.env.appRoot, '..', '..', 'bin', exeName));
+        candidates.push(path.join(vscode.env.appRoot, '..', '..', exeName));
+        candidates.push(path.join(vscode.env.appRoot, 'bin', exeName));
+    }
+    const home = os.homedir();
+    if (process.platform === 'win32') {
+        candidates.push(path.join(home, '.lisan', exeName));
+        candidates.push(path.join(home, '.cargo', 'bin', exeName));
+    } else {
+        candidates.push(path.join(home, '.local', 'bin', exeName));
+        candidates.push(path.join(home, '.cargo', 'bin', exeName));
+        candidates.push('/usr/local/bin/lisan');
+    }
+    for (const candidate of candidates) {
+        try {
+            if (fs.existsSync(candidate)) {
+                return candidate;
+            }
+        } catch (_) {
+            // تجاهل
+        }
+    }
+    return configured;
 }
 
 function getOutputChannel() {
@@ -978,7 +1051,91 @@ function activate(context) {
                 if (word && ARABIC_HOVER_DOCS[word]) {
                     return new vscode.Hover(new vscode.MarkdownString(ARABIC_HOVER_DOCS[word]), wordRange);
                 }
+                if (word && ENGLISH_TO_ARABIC_FIX[word.toLowerCase()]) {
+                    const fix = ENGLISH_TO_ARABIC_FIX[word.toLowerCase()];
+                    return new vscode.Hover(
+                        new vscode.MarkdownString(`**لسان عربية خالصة (` + '`ل0001`' + `):** استخدم **\`${fix}\`** بدلاً من \`${word}\`.`),
+                        wordRange
+                    );
+                }
                 return null;
+            }
+        }),
+
+        // 2.1) مزوّد الإصلاح السريع (Quick Fix): استبدال أي كلمة مفتاحية إنجليزية بالعربية بضغطة واحدة
+        vscode.languages.registerCodeActionsProvider('lisan', {
+            provideCodeActions(document, range) {
+                const actions = [];
+                const lineText = document.lineAt(range.start.line).text;
+                const re = /\b([A-Za-z_][A-Za-z0-9_]*)\b/g;
+                let match;
+                while ((match = re.exec(lineText)) !== null) {
+                    const word = match[1];
+                    const arabicFix = ENGLISH_TO_ARABIC_FIX[word.toLowerCase()];
+                    if (arabicFix) {
+                        const wordRange = new vscode.Range(
+                            range.start.line,
+                            match.index,
+                            range.start.line,
+                            match.index + word.length
+                        );
+                        const action = new vscode.CodeAction(
+                            `استبدل '${word}' بالكلمة العربية '${arabicFix}' (ل0001)`,
+                            vscode.CodeActionKind.QuickFix
+                        );
+                        action.edit = new vscode.WorkspaceEdit();
+                        action.edit.replace(document.uri, wordRange, arabicFix);
+                        action.isPreferred = true;
+                        actions.push(action);
+                    }
+                }
+                return actions;
+            }
+        }, { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] }),
+
+        // 2.2) مزوّد الانتقال إلى التعريف (Go to Definition) للدوال والأصناف والمتغيرات العربية
+        vscode.languages.registerDefinitionProvider('lisan', {
+            provideDefinition(document, position) {
+                const wordRange = document.getWordRangeAtPosition(
+                    position,
+                    /[\u0600-\u06FF_a-zA-Z0-9\u0640]+/
+                );
+                if (!wordRange) {
+                    return null;
+                }
+                const word = document.getText(wordRange);
+                const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const declRe = new RegExp(`(?:دالة_غير_متزامنة|دالة|صنف|فئة|هيكل|دع|ليكن|متغير)\\s+(${escaped})(?=[\\s(:=،,]|$)`);
+                for (let i = 0; i < document.lineCount; i++) {
+                    const m = declRe.exec(document.lineAt(i).text);
+                    if (m) {
+                        const col = m.index + m[0].lastIndexOf(word);
+                        return new vscode.Location(document.uri, new vscode.Position(i, col));
+                    }
+                }
+                return null;
+            }
+        }),
+
+        // 2.3) مزوّد مخطط الملف (Document Outline Symbols)
+        vscode.languages.registerDocumentSymbolProvider('lisan', {
+            provideDocumentSymbols(document) {
+                const symbols = [];
+                for (let i = 0; i < document.lineCount; i++) {
+                    const text = document.lineAt(i).text;
+                    const fnMatch = /(?:دالة_غير_متزامنة|دالة)\s+([\u0600-\u06FF_a-zA-Z0-9\u0640]+)/.exec(text);
+                    if (fnMatch) {
+                        const r = new vscode.Range(i, 0, i, text.length);
+                        symbols.push(new vscode.DocumentSymbol(fnMatch[1], 'دالة لسان', vscode.SymbolKind.Function, r, r));
+                        continue;
+                    }
+                    const clsMatch = /(?:صنف|فئة|هيكل)\s+([\u0600-\u06FF_a-zA-Z0-9\u0640]+)/.exec(text);
+                    if (clsMatch) {
+                        const r = new vscode.Range(i, 0, i, text.length);
+                        symbols.push(new vscode.DocumentSymbol(clsMatch[1], 'صنف لسان', vscode.SymbolKind.Class, r, r));
+                    }
+                }
+                return symbols;
             }
         })
     );

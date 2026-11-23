@@ -1,7 +1,7 @@
 {
   "name": "lisan-studio-experience",
-  "displayName": "استوديو لسان — الواجهة والسمات (Lisan Studio Experience)",
-  "description": "السمات الرسمية ولوحة الترحيب العربية المتكاملة لمحرر استوديو لسان (Lisan Studio IDE)",
+  "displayName": "استوديو لسان — الحسابات والواجهة والسمات (Lisan Studio Experience)",
+  "description": "نظام حسابات المستخدمين، الشريط الجانبي العربي، محوّل بايثون إلى لسان، والسمات الرسمية لمحرر استوديو لسان",
   "version": "1.2.0",
   "publisher": "lisan-lang",
   "engines": {
@@ -12,7 +12,10 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onAuthenticationRequest:lisan-account",
+    "onView:lisanStudio.accountView",
+    "onView:lisanStudio.toolsView"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -28,6 +31,35 @@
         "path": "./themes/lisan-daylight-color-theme.json"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "lisanStudio",
+          "title": "استوديو لسان",
+          "icon": "media/lisan-activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "lisanStudio": [
+        {
+          "type": "webview",
+          "id": "lisanStudio.accountView",
+          "name": "حسابي في لسان"
+        },
+        {
+          "type": "webview",
+          "id": "lisanStudio.toolsView",
+          "name": "أدوات لسان ومحوّل بايثون"
+        }
+      ]
+    },
+    "authentication": [
+      {
+        "id": "lisan-account",
+        "label": "حساب لسان (Lisan Account)"
+      }
+    ],
     "commands": [
       {
         "command": "lisanStudio.openWelcome",
@@ -35,9 +67,32 @@
         "icon": "$(home)"
       },
       {
+        "command": "lisanStudio.signUp",
+        "title": "استوديو لسان: إنشاء حساب جديد"
+      },
+      {
+        "command": "lisanStudio.signIn",
+        "title": "استوديو لسان: تسجيل الدخول إلى حساب لسان"
+      },
+      {
+        "command": "lisanStudio.signOut",
+        "title": "استوديو لسان: تسجيل الخروج من حساب لسان"
+      },
+      {
         "command": "lisanStudio.copyMcpConfig",
         "title": "استوديو لسان: نسخ إعداد خادم وكلاء الذكاء (MCP)"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "استوديو لسان (Lisan Studio)",
+      "properties": {
+        "lisanStudio.accountServerUrl": {
+          "type": "string",
+          "default": "",
+          "description": "رابط خادم حسابات سحابي اختياري لمزامنة حسابات لسان (اتركه فارغاً للحسابات المحلية المشفّرة)"
+        }
+      }
+    }
   }
 }

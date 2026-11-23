@@ -12,14 +12,17 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_TAR=""
 TARGET_DIR=""
+LISAN_BIN=""
 INSTALL_DESKTOP=0
-INSTALL_ARABIC_PACK=1
+INSTALL_ARABIC_PACK=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --source-tar) SOURCE_TAR="$2"; shift 2 ;;
     --target-dir) TARGET_DIR="$2"; shift 2 ;;
+    --lisan-bin) LISAN_BIN="$2"; shift 2 ;;
     --install-desktop) INSTALL_DESKTOP=1; shift ;;
+    --with-arabic-pack) INSTALL_ARABIC_PACK=1; shift ;;
     --no-arabic-pack) INSTALL_ARABIC_PACK=0; shift ;;
     *) echo "خيار غير معروف: $1"; exit 2 ;;
   esac
@@ -112,13 +115,28 @@ if [[ ! -f "$USER_DATA_DIR/User/argv.json" ]]; then
 ARGV
 fi
 
-# إنشاء السكربت التنفيذي lisan-studio داخل الحزمة (يتتبع الروابط الرمزية ويدعم الأقراص الخارجية وUbuntu 24.04)
+# دمج الملف التنفيذي لمترجم لغة لسان (lisan) مباشرة داخل حزمة المحرر ليعمل فور التحميل بلا تثبيت إضافي
 mkdir -p "$TARGET_DIR/bin"
+if [[ -z "$LISAN_BIN" ]]; then
+  for cand in "$HOME/.local/bin/lisan" "$REPO_ROOT/target/release/lisan" "$(command -v lisan 2>/dev/null || true)"; do
+    if [[ -n "$cand" && -f "$cand" ]]; then
+      LISAN_BIN="$cand"
+      break
+    fi
+  done
+fi
+if [[ -n "$LISAN_BIN" && -f "$LISAN_BIN" ]]; then
+  cp "$LISAN_BIN" "$TARGET_DIR/bin/lisan"
+  chmod +x "$TARGET_DIR/bin/lisan"
+  echo "✅ تم دمج مترجم لغة لسان مباشرة داخل المحرر: $TARGET_DIR/bin/lisan"
+fi
+
+# إنشاء السكربت التنفيذي lisan-studio داخل الحزمة (يتتبع الروابط الرمزية ويدعم الأقراص الخارجية وUbuntu 24.04)
 cat > "$TARGET_DIR/bin/lisan-studio" <<'EOF'
 #!/usr/bin/env bash
 REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
 SELF_DIR="$(cd "$(dirname "${REAL_SCRIPT}")/.." && pwd)"
-export PATH="${HOME}/.local/bin:${PATH}"
+export PATH="${SELF_DIR}/bin:${HOME}/.local/bin:${PATH}"
 
 EXTRA_ARGS=()
 if [[ -f "${SELF_DIR}/chrome-sandbox" ]]; then

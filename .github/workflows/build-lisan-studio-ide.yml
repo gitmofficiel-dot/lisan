@@ -1,4 +1,4 @@
-name: Build Lisan Studio IDE (Linux / Windows / macOS)
+name: Build & Publish Lisan Studio IDE (Linux / Windows / macOS)
 
 on:
   workflow_dispatch:
@@ -7,6 +7,10 @@ on:
         description: 'VSCodium/Code-OSS version tag (leave empty for latest)'
         required: false
         default: ''
+      lisan_release_tag:
+        description: 'Lisan binary release tag to bundle (e.g. v1.2.0)'
+        required: false
+        default: 'v1.2.0'
   push:
     tags:
       - 'v*-ide'
@@ -16,19 +20,26 @@ permissions:
 
 jobs:
   build-linux-x64:
-    name: Build Lisan Studio IDE (Linux x64)
+    name: Build Lisan Studio IDE (Linux x64 + bundled Lisan)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download VSCodium Linux x64 and rebrand into Lisan Studio IDE
+      - name: Download VSCodium + Lisan Linux x64 and build Lisan Studio IDE
         run: |
           TAG="${{ github.event.inputs.codium_version }}"
           if [ -z "$TAG" ]; then
             TAG=$(curl -sSf https://api.github.com/repos/VSCodium/vscodium/releases/latest | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])')
           fi
+          LISAN_TAG="${{ github.event.inputs.lisan_release_tag }}"
+          if [ -z "$LISAN_TAG" ]; then LISAN_TAG="v1.2.0"; fi
+
           curl -fSL "https://github.com/VSCodium/vscodium/releases/download/${TAG}/VSCodium-linux-x64-${TAG}.tar.gz" -o /tmp/vscodium.tar.gz
+          curl -fSL "https://github.com/gitmofficiel-dot/lisan/releases/download/${LISAN_TAG}/lisan-linux-x86_64.tar.gz" -o /tmp/lisan-bin.tar.gz
+          mkdir -p /tmp/lisan-bin && tar -xzf /tmp/lisan-bin.tar.gz -C /tmp/lisan-bin
+          LISAN_BIN=$(find /tmp/lisan-bin -type f -name lisan | head -n 1)
+
           chmod +x ide/build-ide.sh
-          ./ide/build-ide.sh --source-tar /tmp/vscodium.tar.gz --target-dir dist/Lisan-Studio-linux-x64
+          ./ide/build-ide.sh --source-tar /tmp/vscodium.tar.gz --target-dir dist/Lisan-Studio-linux-x64 --lisan-bin "$LISAN_BIN"
           tar -czf dist/Lisan-Studio-IDE-linux-x64.tar.gz -C dist Lisan-Studio-linux-x64
           sha256sum dist/Lisan-Studio-IDE-linux-x64.tar.gz > dist/Lisan-Studio-IDE-linux-x64.tar.gz.sha256
       - uses: actions/upload-artifact@v4
@@ -39,47 +50,77 @@ jobs:
             dist/Lisan-Studio-IDE-linux-x64.tar.gz.sha256
 
   build-windows-x64:
-    name: Build Lisan Studio IDE (Windows x64)
+    name: Build Lisan Studio IDE (Windows x64 + bundled Lisan)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download VSCodium Windows x64 and rebrand into Lisan Studio IDE
+      - name: Download VSCodium + Lisan Windows x64 and build Lisan Studio IDE
         shell: pwsh
         run: |
           $tag = "${{ github.event.inputs.codium_version }}"
           if (-not $tag) {
             $tag = (Invoke-RestMethod "https://api.github.com/repos/VSCodium/vscodium/releases/latest").tag_name
           }
+          $lisanTag = "${{ github.event.inputs.lisan_release_tag }}"
+          if (-not $lisanTag) { $lisanTag = "v1.2.0" }
+
           Invoke-WebRequest "https://github.com/VSCodium/vscodium/releases/download/$tag/VSCodium-win32-x64-$tag.zip" -OutFile "$env:TEMP\vscodium.zip"
-          New-Item -ItemType Directory -Force -Path "dist\Lisan-Studio-win32-x64" | Out-Null
-          Expand-Archive "$env:TEMP\vscodium.zip" -DestinationPath "dist\Lisan-Studio-win32-x64" -Force
+          Invoke-WebRequest "https://github.com/gitmofficiel-dot/lisan/releases/download/$lisanTag/lisan-windows-x86_64.zip" -OutFile "$env:TEMP\lisan-win.zip"
+
+          $dest = "dist\Lisan-Studio-win32-x64"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Expand-Archive "$env:TEMP\vscodium.zip" -DestinationPath $dest -Force
+
+          New-Item -ItemType Directory -Force -Path "$env:TEMP\lisan-win" | Out-Null
+          Expand-Archive "$env:TEMP\lisan-win.zip" -DestinationPath "$env:TEMP\lisan-win" -Force
+          $lisanExe = Get-ChildItem -Path "$env:TEMP\lisan-win" -Filter "lisan.exe" -Recurse | Select-Object -First 1
+          if ($lisanExe) {
+            New-Item -ItemType Directory -Force -Path "$dest\bin" | Out-Null
+            Copy-Item -Force $lisanExe.FullName "$dest\bin\lisan.exe"
+          }
+
           python -c "import json; p='dist/Lisan-Studio-win32-x64/resources/app/product.json'; d=json.load(open(p,encoding='utf-8')); d.update(json.load(open('ide/product.patch.json',encoding='utf-8'))); json.dump(d,open(p,'w',encoding='utf-8'),ensure_ascii=False,indent=2)"
-          Copy-Item -Recurse -Force "editors\vscode" "dist\Lisan-Studio-win32-x64\resources\app\extensions\lisan-arabic-lang"
-          Copy-Item -Recurse -Force "ide\extensions\lisan-studio-experience" "dist\Lisan-Studio-win32-x64\resources\app\extensions\lisan-studio-experience"
-          New-Item -ItemType Directory -Force -Path "dist\Lisan-Studio-win32-x64\data\user-data\User" | Out-Null
-          Copy-Item "ide\default-settings.json" "dist\Lisan-Studio-win32-x64\data\user-data\User\settings.json"
-          Compress-Archive -Path "dist\Lisan-Studio-win32-x64" -DestinationPath "dist\Lisan-Studio-IDE-windows-x64.zip" -Force
+          Copy-Item -Recurse -Force "editors\vscode" "$dest\resources\app\extensions\lisan-arabic-lang"
+          Copy-Item -Recurse -Force "ide\extensions\lisan-studio-experience" "$dest\resources\app\extensions\lisan-studio-experience"
+          New-Item -ItemType Directory -Force -Path "$dest\data\user-data\User" | Out-Null
+          Copy-Item "ide\default-settings.json" "$dest\data\user-data\User\settings.json"
+          Compress-Archive -Path $dest -DestinationPath "dist\Lisan-Studio-IDE-windows-x64.zip" -Force
+          (Get-FileHash "dist\Lisan-Studio-IDE-windows-x64.zip" -Algorithm SHA256).Hash.ToLower() + "  Lisan-Studio-IDE-windows-x64.zip" | Out-File -Encoding ascii "dist\Lisan-Studio-IDE-windows-x64.zip.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: lisan-studio-ide-windows-x64
-          path: dist/Lisan-Studio-IDE-windows-x64.zip
+          path: |
+            dist/Lisan-Studio-IDE-windows-x64.zip
+            dist/Lisan-Studio-IDE-windows-x64.zip.sha256
 
   build-macos-arm64:
-    name: Build Lisan Studio IDE (macOS Apple Silicon)
+    name: Build Lisan Studio IDE (macOS Apple Silicon + bundled Lisan)
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-      - name: Download VSCodium macOS arm64 and rebrand into Lisan Studio.app
+      - name: Download VSCodium + Lisan macOS arm64 and build Lisan Studio.app
         run: |
           TAG="${{ github.event.inputs.codium_version }}"
           if [ -z "$TAG" ]; then
             TAG=$(curl -sSf https://api.github.com/repos/VSCodium/vscodium/releases/latest | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])')
           fi
+          LISAN_TAG="${{ github.event.inputs.lisan_release_tag }}"
+          if [ -z "$LISAN_TAG" ]; then LISAN_TAG="v1.2.0"; fi
+
           curl -fSL "https://github.com/VSCodium/vscodium/releases/download/${TAG}/VSCodium-darwin-arm64-${TAG}.zip" -o /tmp/vscodium.zip
+          curl -fSL "https://github.com/gitmofficiel-dot/lisan/releases/download/${LISAN_TAG}/lisan-macos-arm64.tar.gz" -o /tmp/lisan-mac.tar.gz
+          mkdir -p /tmp/lisan-mac && tar -xzf /tmp/lisan-mac.tar.gz -C /tmp/lisan-mac
+          LISAN_BIN=$(find /tmp/lisan-mac -type f -name lisan | head -n 1)
+
           mkdir -p dist/mac
           ditto -x -k /tmp/vscodium.zip dist/mac
           mv "dist/mac/VSCodium.app" "dist/mac/Lisan Studio.app"
           APP="dist/mac/Lisan Studio.app/Contents/Resources/app"
+          mkdir -p "$APP/bin"
+          if [ -n "$LISAN_BIN" ]; then
+            cp "$LISAN_BIN" "$APP/bin/lisan"
+            chmod +x "$APP/bin/lisan"
+          fi
           python3 - "$APP/product.json" ide/product.patch.json <<'PY'
           import json, sys
           d = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -90,7 +131,34 @@ jobs:
           cp -r ide/extensions/lisan-studio-experience "$APP/extensions/lisan-studio-experience"
           cp assets/lisan.icns "dist/mac/Lisan Studio.app/Contents/Resources/codium.icns" 2>/dev/null || true
           ditto -c -k --sequesterRsrc --keepParent "dist/mac/Lisan Studio.app" "dist/Lisan-Studio-IDE-macos-arm64.zip"
+          shasum -a 256 dist/Lisan-Studio-IDE-macos-arm64.zip > dist/Lisan-Studio-IDE-macos-arm64.zip.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: lisan-studio-ide-macos-arm64
-          path: dist/Lisan-Studio-IDE-macos-arm64.zip
+          path: |
+            dist/Lisan-Studio-IDE-macos-arm64.zip
+            dist/Lisan-Studio-IDE-macos-arm64.zip.sha256
+
+  publish-ide-release:
+    name: Publish Lisan Studio IDE GitHub Release
+    needs: [build-linux-x64, build-windows-x64, build-macos-arm64]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish GitHub Release for Lisan Studio IDE
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "استوديو لسان — Lisan Studio IDE (${{ github.ref_name }})"
+          body: |
+            ## محرر استوديو لسان الرسمي — Lisan Studio IDE
+
+            نسخة معدّلة ومفتوحة المصدر (Code-OSS / MIT — بلا تتبّع) مخصّصة بالكامل للغة البرمجة العربية **لسان v1.2.0**، تحتوي على:
+            - **مترجم ومفسّر لسان `v1.2.0` مدمج جاهز للعمل فور التحميل** (لا يحتاج تثبيتاً منفصلاً).
+            - **نظام حسابات لسان المدمج (`👤 حسابي في لسان`):** إنشاء حساب جديد، تسجيل دخول بتجزئة Scrypt مشفّرة، ملف شخصي، ومزامنة الإعدادات.
+            - **دعم شامل للغة لسان:** تلوين نحوي، خادم اللغة `LSP`، مصحح الأخطاء `DAP (F5)`، فحص العربية الخالصة `ل0001` وإصلاحات سريعة بضغطة، الانتقال للتعريف، مخطط الرموز، محوّل بايثون ← لسان دون إنترنت، معاينة ويب/هاتف حية، وترجمة ورفع للمتحكمات.
+            - **سمتا «ليلي لسان» و«نهاري لسان»** + لوحة ترحيب عربية + متجر Open VSX المفتوح.
+          files: release-assets/*

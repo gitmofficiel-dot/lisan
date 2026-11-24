@@ -722,8 +722,8 @@ impl Interpreter {
                 let stack_len = self.call_stack.len();
                 let prev_span = self.current_span;
                 let try_res = self.execute_statements(try_body, true);
-                let mut flow = match try_res {
-                    Ok(signal) => signal,
+                let mut outcome = match try_res {
+                    Ok(signal) => Ok(signal),
                     Err(err_msg) => {
                         self.call_stack.truncate(stack_len);
                         self.current_span = prev_span;
@@ -733,16 +733,27 @@ impl Interpreter {
                         }
                         let catch_res = self.execute_statements(catch_body, false);
                         self.scopes.pop();
-                        catch_res?
+                        catch_res
                     }
                 };
                 if let Some(finally) = finally_body {
+                    let saved_err_state = if outcome.is_err() {
+                        let state = (self.call_stack.clone(), self.current_span);
+                        self.call_stack.truncate(stack_len);
+                        self.current_span = prev_span;
+                        Some(state)
+                    } else {
+                        None
+                    };
                     let fin_res = self.execute_statements(finally, true)?;
                     if matches!(fin_res, Flow::Return(_) | Flow::Break | Flow::Continue) {
-                        flow = fin_res;
+                        outcome = Ok(fin_res);
+                    } else if let Some((saved_stack, saved_span)) = saved_err_state {
+                        self.call_stack = saved_stack;
+                        self.current_span = saved_span;
                     }
                 }
-                return Ok(flow);
+                return outcome;
             }
             Stmt::Match { target, cases, default_case } => {
                 let target_val = self.eval(target)?;

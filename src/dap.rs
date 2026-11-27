@@ -7,7 +7,7 @@
 use crate::ast::Stmt;
 use crate::json::{parse_json, to_json_string};
 use crate::runtime::{Interpreter, Limits, Value};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -18,7 +18,10 @@ pub struct DapServer {
     source_code: String,
     statements: Vec<Stmt>,
     current_index: usize,
-    breakpoints: HashMap<String, Vec<usize>>,
+    next_breakpoint_id: i64,
+    requested_breakpoints: HashMap<String, Vec<StoredBreakpoint>>,
+    hittable_lines: HashSet<usize>,
+    active_breakpoints: HashSet<usize>,
     interpreter: Interpreter,
     stop_on_entry: bool,
     started: bool,
@@ -26,6 +29,17 @@ pub struct DapServer {
     disconnected: bool,
     last_line: usize,
     last_column: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct StoredBreakpoint {
+    id: i64,
+    source_path: String,
+    requested_line: Option<i64>,
+    verified: bool,
+    reason: &'static str,
+    message: Option<String>,
+    resolved_line: Option<usize>,
 }
 
 impl Default for DapServer {
@@ -43,7 +57,10 @@ impl DapServer {
             source_code: String::new(),
             statements: Vec::new(),
             current_index: 0,
-            breakpoints: HashMap::new(),
+            next_breakpoint_id: 1,
+            requested_breakpoints: HashMap::new(),
+            hittable_lines: HashSet::new(),
+            active_breakpoints: HashSet::new(),
             interpreter: Interpreter::with_limits(Limits::full()),
             stop_on_entry: false,
             started: false,
@@ -144,7 +161,8 @@ impl DapServer {
             "stackTrace" => self.handle_stack_trace(request_seq),
             "scopes" => self.handle_scopes(request_seq),
             "variables" => self.handle_variables(request_seq, arguments.as_ref()),
-            "next" | "stepIn" | "stepOut" => self.handle_step(request_seq, &command),
+            "next" => self.handle_step(request_seq, &command),
+            "stepIn" | "stepOut" => self.handle_unsupported_step(request_seq, &command),
             "continue" => self.handle_continue(request_seq),
             "pause" => self.handle_pause(request_seq),
             "evaluate" => self.handle_evaluate(request_seq, arguments.as_ref()),
@@ -195,14 +213,17 @@ impl DapServer {
             .and_then(|a| get_bool(a, "stopOnEntry"))
             .unwrap_or(false);
 
-        if let Err(err) = self.load_program(&program) {
+        let mut changed_bps = Vec::new();
+        if let Err(err) = self.load_program(&program, &mut changed_bps) {
             return vec![self.make_response(request_seq, "launch", false, Some(&err), None)];
         }
 
-        vec![self.make_response(request_seq, "launch", true, None, None)]
+        let mut out = vec![self.make_response(request_seq, "launch", true, None, None)];
+        self.emit_breakpoint_changed_events(&changed_bps, &mut out);
+        out
     }
 
-    fn load_program(&mut self, program: &str) -> Result<(), String> {
+    fn load_program(&mut self, program: &str, changed_bps: &mut Vec<StoredBreakpoint>) -> Result<(), String> {
         let source = fs::read_to_string(program)
             .map_err(|e| format!("تعذّرت قراءة ملف لسان '{}': {}", program, e))?;
         let tokens = crate::lexer::tokenize(&source)?;
@@ -212,6 +233,7 @@ impl DapServer {
         self.source_code = source;
         self.statements = statements;
         self.current_index = 0;
+        self.hittable_lines = collect_top_level_hittable_lines(&self.statements);
         self.interpreter = Interpreter::with_limits(Limits::full());
         self.started = false;
         self.terminated = false;
@@ -225,7 +247,138 @@ impl DapServer {
             self.last_column = 1;
         }
 
+        self.reconcile_breakpoints(changed_bps);
         Ok(())
+    }
+
+    fn alloc_breakpoint_id(&mut self) -> i64 {
+        let id = self.next_breakpoint_id;
+        self.next_breakpoint_id += 1;
+        id
+    }
+
+    fn resolve_single_breakpoint(
+        &self,
+        source_path: &str,
+        requested_line: Option<i64>,
+    ) -> (bool, &'static str, Option<String>, Option<usize>) {
+        let line_num = match requested_line {
+            Some(n) if n >= 1 => n as usize,
+            _ => {
+                return (
+                    false,
+                    "failed",
+                    Some("رقم السطر غير صالح؛ يجب أن يكون 1 أو أكبر".into()),
+                    None,
+                );
+            }
+        };
+
+        if self.program_path.is_none() {
+            return (
+                false,
+                "pending",
+                Some("نقطة التوقف معلّقة بانتظار بدء تشغيل البرنامج".into()),
+                Some(line_num),
+            );
+        }
+
+        if source_path.trim().is_empty() || !self.path_matches_program(source_path) {
+            return (
+                false,
+                "failed",
+                Some("الملف المحدد لا يطابق الملف الرئيسي قيد التصحيح".into()),
+                Some(line_num),
+            );
+        }
+
+        if self.hittable_lines.contains(&line_num) {
+            (true, "pending", None, Some(line_num))
+        } else {
+            (
+                false,
+                "failed",
+                Some("السطر غير قابل للتوقف على المستوى الأعلى (تعليق أو فارغ أو متداخل أو مستورد)".into()),
+                Some(line_num),
+            )
+        }
+    }
+
+    fn stored_to_dap_value(bp: &StoredBreakpoint) -> Value {
+        let mut bp_obj = vec![
+            ("id".into(), Value::Number(bp.id as f64)),
+            ("verified".into(), Value::Bool(bp.verified)),
+        ];
+        if !bp.verified {
+            bp_obj.push(("reason".into(), Value::Text(bp.reason.into())));
+        }
+        if let Some(msg) = &bp.message {
+            bp_obj.push(("message".into(), Value::Text(msg.clone())));
+        }
+        if let Some(line) = bp.resolved_line {
+            bp_obj.push(("line".into(), Value::Number(line as f64)));
+        }
+        if !bp.source_path.is_empty() {
+            bp_obj.push((
+                "source".into(),
+                Value::map(vec![("path".into(), Value::Text(bp.source_path.clone()))]),
+            ));
+        }
+        Value::map(bp_obj)
+    }
+
+    fn rebuild_active_breakpoints(&mut self) {
+        self.active_breakpoints.clear();
+        for entries in self.requested_breakpoints.values() {
+            for bp in entries {
+                if bp.verified {
+                    if let Some(line) = bp.resolved_line {
+                        self.active_breakpoints.insert(line);
+                    }
+                }
+            }
+        }
+    }
+
+    fn reconcile_breakpoints(&mut self, changed_bps: &mut Vec<StoredBreakpoint>) {
+        let keys: Vec<String> = self.requested_breakpoints.keys().cloned().collect();
+
+        for key in keys {
+            let entries = match self.requested_breakpoints.get(&key) {
+                Some(list) => list.clone(),
+                None => continue,
+            };
+            let mut updated_entries = Vec::with_capacity(entries.len());
+            for mut bp in entries {
+                let (verified, reason, message, resolved_line) =
+                    self.resolve_single_breakpoint(&bp.source_path, bp.requested_line);
+                let changed = bp.verified != verified
+                    || bp.reason != reason
+                    || bp.message != message
+                    || bp.resolved_line != resolved_line;
+                bp.verified = verified;
+                bp.reason = reason;
+                bp.message = message;
+                bp.resolved_line = resolved_line;
+                if changed {
+                    changed_bps.push(bp.clone());
+                }
+                updated_entries.push(bp);
+            }
+            self.requested_breakpoints.insert(key, updated_entries);
+        }
+
+        self.rebuild_active_breakpoints();
+    }
+
+    fn emit_breakpoint_changed_events(&mut self, changed_bps: &[StoredBreakpoint], out: &mut Vec<String>) {
+        for bp in changed_bps {
+            let body = Value::map(vec![
+                ("reason".into(), Value::Text("changed".into())),
+                ("breakpoint".into(), Self::stored_to_dap_value(bp)),
+            ]);
+            out.push(self.make_event("breakpoint", Some(body)));
+        }
     }
 
     fn handle_set_breakpoints(&mut self, request_seq: i64, arguments: Option<&Value>) -> Vec<String> {
@@ -234,56 +387,49 @@ impl DapServer {
             .and_then(|s| get_string(&s, "path"))
             .unwrap_or_default();
 
-        let mut lines: Vec<usize> = Vec::new();
+        let mut requested_lines: Vec<Option<i64>> = Vec::new();
         if let Some(args) = arguments {
             if let Some(Value::List(bps)) = get_field(args, "breakpoints") {
                 for bp in bps.borrow().iter() {
-                    if let Some(line_num) = get_number(bp, "line") {
-                        let line = line_num.max(1.0) as usize;
-                        if !lines.contains(&line) {
-                            lines.push(line);
-                        }
-                    }
+                    let line_opt = get_number(bp, "line").map(|n| n.trunc() as i64);
+                    requested_lines.push(line_opt);
                 }
             } else if let Some(Value::List(raw_lines)) = get_field(args, "lines") {
                 for item in raw_lines.borrow().iter() {
-                    if let Value::Number(line_num) = item {
-                        let line = line_num.max(1.0) as usize;
-                        if !lines.contains(&line) {
-                            lines.push(line);
-                        }
-                    }
+                    let line_opt = match item {
+                        Value::Number(line_num) => Some(line_num.trunc() as i64),
+                        _ => None,
+                    };
+                    requested_lines.push(line_opt);
                 }
             }
         }
-        lines.sort_unstable();
+
+        let mut stored_list = Vec::with_capacity(requested_lines.len());
+        let mut bp_values = Vec::with_capacity(requested_lines.len());
+
+        for req_line in requested_lines {
+            let id = self.alloc_breakpoint_id();
+            let (verified, reason, message, resolved_line) =
+                self.resolve_single_breakpoint(&source_path, req_line);
+            let stored = StoredBreakpoint {
+                id,
+                source_path: source_path.clone(),
+                requested_line: req_line,
+                verified,
+                reason,
+                message,
+                resolved_line,
+            };
+            bp_values.push(Self::stored_to_dap_value(&stored));
+            stored_list.push(stored);
+        }
 
         let norm_key = normalize_path(&source_path);
         if !norm_key.is_empty() {
-            self.breakpoints.insert(norm_key, lines.clone());
+            self.requested_breakpoints.insert(norm_key, stored_list);
         }
-
-        let total_lines = self.source_code.lines().count();
-        let mut bp_values = Vec::new();
-        for (idx, line) in lines.iter().enumerate() {
-            let verified = if total_lines > 0 && self.path_matches_program(&source_path) {
-                *line >= 1 && *line <= total_lines
-            } else {
-                *line >= 1
-            };
-            let mut bp_obj = vec![
-                ("id".into(), Value::Number((idx + 1) as f64)),
-                ("verified".into(), Value::Bool(verified)),
-                ("line".into(), Value::Number(*line as f64)),
-            ];
-            if !source_path.is_empty() {
-                bp_obj.push((
-                    "source".into(),
-                    Value::map(vec![("path".into(), Value::Text(source_path.clone()))]),
-                ));
-            }
-            bp_values.push(Value::map(bp_obj));
-        }
+        self.rebuild_active_breakpoints();
 
         let body = Value::map(vec![("breakpoints".into(), Value::list(bp_values))]);
         vec![self.make_response(request_seq, "setBreakpoints", true, None, Some(body))]
@@ -461,6 +607,14 @@ impl DapServer {
         vec![self.make_response(request_seq, "variables", true, None, Some(body))]
     }
 
+    fn handle_unsupported_step(&mut self, request_seq: i64, command: &str) -> Vec<String> {
+        let msg = format!(
+            "الأمر '{}' غير مدعوم حالياً؛ المصحح يدعم التتبع على مستوى التعليمات العليا فقط",
+            command
+        );
+        vec![self.make_response(request_seq, command, false, Some(&msg), None)]
+    }
+
     fn handle_step(&mut self, request_seq: i64, command: &str) -> Vec<String> {
         let mut out = vec![self.make_response(request_seq, command, true, None, None)];
 
@@ -586,11 +740,13 @@ impl DapServer {
             )];
         };
 
-        if let Err(err) = self.load_program(&program) {
+        let mut changed_bps = Vec::new();
+        if let Err(err) = self.load_program(&program, &mut changed_bps) {
             return vec![self.make_response(request_seq, "restart", false, Some(&err), None)];
         }
 
         let mut out = vec![self.make_response(request_seq, "restart", true, None, None)];
+        self.emit_breakpoint_changed_events(&changed_bps, &mut out);
         self.started = true;
         if self.stop_on_entry && !self.statements.is_empty() {
             let (l, c) = stmt_span(&self.statements[0]);
@@ -719,28 +875,7 @@ impl DapServer {
     }
 
     fn has_breakpoint_at(&self, line: usize) -> bool {
-        let Some(prog) = self.program_path.as_deref() else {
-            return false;
-        };
-        let norm_prog = normalize_path(prog);
-        if let Some(lines) = self.breakpoints.get(&norm_prog) {
-            if lines.contains(&line) {
-                return true;
-            }
-        }
-        if let Ok(canon_prog) = fs::canonicalize(prog) {
-            for (bp_path, lines) in &self.breakpoints {
-                if !lines.contains(&line) {
-                    continue;
-                }
-                if let Ok(canon_bp) = fs::canonicalize(bp_path) {
-                    if canon_bp == canon_prog {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
+        self.active_breakpoints.contains(&line)
     }
 }
 
@@ -749,6 +884,17 @@ fn stmt_span(stmt: &Stmt) -> (usize, usize) {
         Stmt::Spanned(_, line, col) => (*line, *col),
         _ => (1, 1),
     }
+}
+
+fn collect_top_level_hittable_lines(stmts: &[Stmt]) -> HashSet<usize> {
+    let mut lines = HashSet::new();
+    for stmt in stmts {
+        let (line, _) = stmt_span(stmt);
+        if line >= 1 {
+            lines.insert(line);
+        }
+    }
+    lines
 }
 
 fn normalize_path(path: &str) -> String {
@@ -1085,6 +1231,271 @@ mod tests {
                 .as_deref()
                 == Some("terminated")
         }));
+
+        let _ = fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn test_dap_set_breakpoints_preserves_order_duplicates_invalid_lines_and_stable_ids() {
+        let src = "// تعليق\nدع أ = 1\n\nدع ب = 2\nاطبع(أ + ب)\n";
+        let file_path = write_temp_lisan_file("bp_order", src);
+        let escaped_path = json_escape(&file_path.to_string_lossy());
+
+        let mut server = DapServer::new();
+        server.handle_message(r#"{"seq":1,"type":"request","command":"initialize"}"#);
+        let launch_req = format!(
+            r#"{{"seq":2,"type":"request","command":"launch","arguments":{{"program":"{}"}}}}"#,
+            escaped_path
+        );
+        let launch_msgs = server.handle_message(&launch_req);
+        assert_eq!(get_bool(&parse_json(&launch_msgs[0]).unwrap(), "success"), Some(true));
+
+        // السطور الصالحة العليا: 2، 4، 5. السطر 1 تعليق، 3 فارغ، 0 و -5 غير صالحين، 4 مكرر
+        let bp_req = format!(
+            r#"{{"seq":3,"type":"request","command":"setBreakpoints","arguments":{{"source":{{"path":"{}"}},"breakpoints":[{{"line":5}},{{"line":0}},{{"line":-5}},{{"line":4}},{{"line":4}},{{"line":1}},{{"line":3}}]}}}}"#,
+            escaped_path
+        );
+        let bp_msgs = server.handle_message(&bp_req);
+        assert_eq!(bp_msgs.len(), 1);
+        let bp_resp = parse_json(&bp_msgs[0]).unwrap();
+        let body = get_field(&bp_resp, "body").unwrap();
+        let list = match get_field(&body, "breakpoints").unwrap() {
+            Value::List(l) => l.borrow().clone(),
+            _ => panic!("متوقع مصفوفة breakpoints"),
+        };
+
+        assert_eq!(list.len(), 7);
+
+        // 0: line 5 -> verified: true, id: 1
+        assert_eq!(get_number(&list[0], "id"), Some(1.0));
+        assert_eq!(get_bool(&list[0], "verified"), Some(true));
+        assert_eq!(get_number(&list[0], "line"), Some(5.0));
+        assert!(get_field(&list[0], "reason").is_none());
+
+        // 1: line 0 -> verified: false, reason: "failed", line محذوف (بدون تحويل إلى 1)
+        assert_eq!(get_number(&list[1], "id"), Some(2.0));
+        assert_eq!(get_bool(&list[1], "verified"), Some(false));
+        assert_eq!(get_string(&list[1], "reason").as_deref(), Some("failed"));
+        assert!(get_field(&list[1], "line").is_none());
+        assert!(get_string(&list[1], "message").is_some());
+
+        // 2: line -5 -> verified: false, reason: "failed", line محذوف
+        assert_eq!(get_number(&list[2], "id"), Some(3.0));
+        assert_eq!(get_bool(&list[2], "verified"), Some(false));
+        assert_eq!(get_string(&list[2], "reason").as_deref(), Some("failed"));
+        assert!(get_field(&list[2], "line").is_none());
+        assert!(get_string(&list[2], "message").is_some());
+
+        // 3 & 4: duplicate line 4 -> محفوظان بالترتيب بمعرفين مختلفين
+        assert_eq!(get_number(&list[3], "id"), Some(4.0));
+        assert_eq!(get_bool(&list[3], "verified"), Some(true));
+        assert_eq!(get_number(&list[3], "line"), Some(4.0));
+
+        assert_eq!(get_number(&list[4], "id"), Some(5.0));
+        assert_eq!(get_bool(&list[4], "verified"), Some(true));
+        assert_eq!(get_number(&list[4], "line"), Some(4.0));
+
+        // 5 & 6: comment line 1 & blank line 3 -> verified: false, reason: "failed"
+        assert_eq!(get_number(&list[5], "id"), Some(6.0));
+        assert_eq!(get_bool(&list[5], "verified"), Some(false));
+        assert_eq!(get_string(&list[5], "reason").as_deref(), Some("failed"));
+        assert_eq!(get_number(&list[5], "line"), Some(1.0));
+
+        assert_eq!(get_number(&list[6], "id"), Some(7.0));
+        assert_eq!(get_bool(&list[6], "verified"), Some(false));
+        assert_eq!(get_string(&list[6], "reason").as_deref(), Some("failed"));
+        assert_eq!(get_number(&list[6], "line"), Some(3.0));
+
+        // إعادة إرسال setBreakpoints يجب ألا تعيد استخدام المعرفات السابقة (تبدأ من 8)
+        let bp_req2 = format!(
+            r#"{{"seq":4,"type":"request","command":"setBreakpoints","arguments":{{"source":{{"path":"{}"}},"breakpoints":[{{"line":2}}]}}}}"#,
+            escaped_path
+        );
+        let bp_resp2 = parse_json(&server.handle_message(&bp_req2)[0]).unwrap();
+        let list2 = match get_field(&get_field(&bp_resp2, "body").unwrap(), "breakpoints").unwrap() {
+            Value::List(l) => l.borrow().clone(),
+            _ => panic!("متوقع مصفوفة breakpoints"),
+        };
+        assert_eq!(get_number(&list2[0], "id"), Some(8.0));
+        assert_eq!(get_bool(&list2[0], "verified"), Some(true));
+
+        let _ = fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn test_dap_nested_imported_and_foreign_breakpoints_unverified() {
+        let helper_src = "دع قيمة_مستوردة = 99\n";
+        let helper_path = write_temp_lisan_file("helper_mod", helper_src);
+        let helper_name = helper_path.file_name().unwrap().to_string_lossy().to_string();
+
+        // سطر 1: استيراد، سطر 2: تعريف دالة، سطر 3: سطر متداخل داخل الدالة، سطر 4: قوس الإغلاق، سطر 5: استدعاء أعلى
+        let main_src = format!(
+            "استورد \"{}\"\nدالة جمع(س، ص) {{\n    أرجع س + ص\n}}\nاطبع(جمع(قيمة_مستوردة، 1))\n",
+            helper_name
+        );
+        let main_path = write_temp_lisan_file("main_nested", &main_src);
+        let escaped_main = json_escape(&main_path.to_string_lossy());
+        let escaped_helper = json_escape(&helper_path.to_string_lossy());
+
+        let mut server = DapServer::new();
+        server.handle_message(r#"{"seq":1,"type":"request","command":"initialize"}"#);
+        let launch_msgs = server.handle_message(&format!(
+            r#"{{"seq":2,"type":"request","command":"launch","arguments":{{"program":"{}"}}}}"#,
+            escaped_main
+        ));
+        assert_eq!(get_bool(&parse_json(&launch_msgs[0]).unwrap(), "success"), Some(true));
+
+        // سطر 2 (بداية الدالة) وسطر 5 (الاستدعاء) أعلى مستوى، بينما سطر 3 متداخل داخل الدالة
+        let bp_main = format!(
+            r#"{{"seq":3,"type":"request","command":"setBreakpoints","arguments":{{"source":{{"path":"{}"}},"breakpoints":[{{"line":2}},{{"line":3}},{{"line":5}}]}}}}"#,
+            escaped_main
+        );
+        let resp_main = parse_json(&server.handle_message(&bp_main)[0]).unwrap();
+        let bps_main = match get_field(&get_field(&resp_main, "body").unwrap(), "breakpoints").unwrap() {
+            Value::List(l) => l.borrow().clone(),
+            _ => panic!("متوقع breakpoints"),
+        };
+        assert_eq!(get_bool(&bps_main[0], "verified"), Some(true));
+        assert_eq!(get_bool(&bps_main[1], "verified"), Some(false));
+        assert_eq!(get_string(&bps_main[1], "reason").as_deref(), Some("failed"));
+        assert_eq!(get_bool(&bps_main[2], "verified"), Some(true));
+
+        // نقطة توقف في ملف خارجي/مستورد يجب أن تكون غير محققة
+        let bp_foreign = format!(
+            r#"{{"seq":4,"type":"request","command":"setBreakpoints","arguments":{{"source":{{"path":"{}"}},"breakpoints":[{{"line":1}}]}}}}"#,
+            escaped_helper
+        );
+        let resp_foreign = parse_json(&server.handle_message(&bp_foreign)[0]).unwrap();
+        let bps_foreign = match get_field(&get_field(&resp_foreign, "body").unwrap(), "breakpoints").unwrap() {
+            Value::List(l) => l.borrow().clone(),
+            _ => panic!("متوقع breakpoints"),
+        };
+        assert_eq!(get_bool(&bps_foreign[0], "verified"), Some(false));
+        assert_eq!(get_string(&bps_foreign[0], "reason").as_deref(), Some("failed"));
+
+        let _ = fs::remove_file(main_path);
+        let _ = fs::remove_file(helper_path);
+    }
+
+    #[test]
+    fn test_dap_prelaunch_pending_reconciled_on_launch_and_restart() {
+        let src_v1 = "// تعليق\nدع س = 1\nدع ص = 2\n";
+        let file_path = write_temp_lisan_file("prelaunch_reconcile", src_v1);
+        let escaped_path = json_escape(&file_path.to_string_lossy());
+
+        let mut server = DapServer::new();
+        server.handle_message(r#"{"seq":1,"type":"request","command":"initialize"}"#);
+
+        // ضبط نقاط التوقف قبل launch: سطر 1 (تعليق) وسطر 3 (جملة) -> كلاهما pending قبل التحميل
+        let bp_req = format!(
+            r#"{{"seq":2,"type":"request","command":"setBreakpoints","arguments":{{"source":{{"path":"{}"}},"breakpoints":[{{"line":1}},{{"line":3}}]}}}}"#,
+            escaped_path
+        );
+        let pre_resp = parse_json(&server.handle_message(&bp_req)[0]).unwrap();
+        let pre_bps = match get_field(&get_field(&pre_resp, "body").unwrap(), "breakpoints").unwrap() {
+            Value::List(l) => l.borrow().clone(),
+            _ => panic!("متوقع breakpoints"),
+        };
+        assert_eq!(get_bool(&pre_bps[0], "verified"), Some(false));
+        assert_eq!(get_string(&pre_bps[0], "reason").as_deref(), Some("pending"));
+        assert_eq!(get_bool(&pre_bps[1], "verified"), Some(false));
+        assert_eq!(get_string(&pre_bps[1], "reason").as_deref(), Some("pending"));
+        let id_line1 = get_number(&pre_bps[0], "id");
+        let id_line3 = get_number(&pre_bps[1], "id");
+
+        // launch يجب أن يصالح نقاط التوقف ويُصدر أحداث breakpoint(changed) بالمعرفات نفسها
+        let launch_req = format!(
+            r#"{{"seq":3,"type":"request","command":"launch","arguments":{{"program":"{}","stopOnEntry":true}}}}"#,
+            escaped_path
+        );
+        let launch_msgs = server.handle_message(&launch_req);
+        let launch_seqs: Vec<f64> = launch_msgs
+            .iter()
+            .map(|m| get_number(&parse_json(m).unwrap(), "seq").unwrap())
+            .collect();
+        assert!(launch_seqs.windows(2).all(|w| w[0] < w[1]), "seq يجب أن يكون متزايداً بشكل صارم بعد launch: {:?}", launch_seqs);
+
+        assert_eq!(get_bool(&parse_json(&launch_msgs[0]).unwrap(), "success"), Some(true));
+        let bp_events: Vec<Value> = launch_msgs[1..]
+            .iter()
+            .map(|m| parse_json(m).unwrap())
+            .filter(|v| get_string(v, "event").as_deref() == Some("breakpoint"))
+            .collect();
+        assert_eq!(bp_events.len(), 2);
+
+        let ev0_bp = get_field(&get_field(&bp_events[0], "body").unwrap(), "breakpoint").unwrap();
+        assert_eq!(get_number(&ev0_bp, "id"), id_line1);
+        assert_eq!(get_bool(&ev0_bp, "verified"), Some(false));
+        assert_eq!(get_string(&ev0_bp, "reason").as_deref(), Some("failed"));
+
+        let ev1_bp = get_field(&get_field(&bp_events[1], "body").unwrap(), "breakpoint").unwrap();
+        assert_eq!(get_number(&ev1_bp, "id"), id_line3);
+        assert_eq!(get_bool(&ev1_bp, "verified"), Some(true));
+
+        // تعديل الملف بحيث يصبح السطر 1 جملة تنفيذية والسطر 3 تعليقاً ثم تنفيذ restart
+        let src_v2 = "دع س = 1\nدع ص = 2\n// تعليق الآن\n";
+        fs::write(&file_path, src_v2).unwrap();
+
+        let restart_msgs = server.handle_message(r#"{"seq":4,"type":"request","command":"restart"}"#);
+        let restart_seqs: Vec<f64> = restart_msgs
+            .iter()
+            .map(|m| get_number(&parse_json(m).unwrap(), "seq").unwrap())
+            .collect();
+        assert!(restart_seqs.windows(2).all(|w| w[0] < w[1]), "seq يجب أن يكون متزايداً بشكل صارم بعد restart: {:?}", restart_seqs);
+
+        assert_eq!(get_bool(&parse_json(&restart_msgs[0]).unwrap(), "success"), Some(true));
+        let restart_bp_events: Vec<Value> = restart_msgs[1..]
+            .iter()
+            .map(|m| parse_json(m).unwrap())
+            .filter(|v| get_string(v, "event").as_deref() == Some("breakpoint"))
+            .collect();
+        assert_eq!(restart_bp_events.len(), 2);
+
+        let rev0_bp = get_field(&get_field(&restart_bp_events[0], "body").unwrap(), "breakpoint").unwrap();
+        assert_eq!(get_number(&rev0_bp, "id"), id_line1);
+        assert_eq!(get_bool(&rev0_bp, "verified"), Some(true));
+
+        let rev1_bp = get_field(&get_field(&restart_bp_events[1], "body").unwrap(), "breakpoint").unwrap();
+        assert_eq!(get_number(&rev1_bp, "id"), id_line3);
+        assert_eq!(get_bool(&rev1_bp, "verified"), Some(false));
+        assert_eq!(get_string(&rev1_bp, "reason").as_deref(), Some("failed"));
+
+        let _ = fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn test_dap_rejects_step_in_and_step_out_without_advancing() {
+        let src = "دع س = 1\nدع ص = 2\n";
+        let file_path = write_temp_lisan_file("reject_step_in_out", src);
+        let escaped_path = json_escape(&file_path.to_string_lossy());
+
+        let mut server = DapServer::new();
+        server.handle_message(r#"{"seq":1,"type":"request","command":"initialize"}"#);
+        let launch_msgs = server.handle_message(&format!(
+            r#"{{"seq":2,"type":"request","command":"launch","arguments":{{"program":"{}","stopOnEntry":true}}}}"#,
+            escaped_path
+        ));
+        assert_eq!(get_bool(&parse_json(&launch_msgs[0]).unwrap(), "success"), Some(true));
+        server.handle_message(r#"{"seq":3,"type":"request","command":"configurationDone"}"#);
+
+        for (seq, cmd) in [(4, "stepIn"), (5, "stepOut")] {
+            let req = format!(r#"{{"seq":{},"type":"request","command":"{}"}}"#, seq, cmd);
+            let msgs = server.handle_message(&req);
+            assert_eq!(msgs.len(), 1);
+            let resp = parse_json(&msgs[0]).unwrap();
+            assert_eq!(get_bool(&resp, "success"), Some(false));
+            assert_eq!(get_string(&resp, "command").as_deref(), Some(cmd));
+            assert!(get_string(&resp, "message").is_some());
+        }
+
+        // التحقق من بقاء المؤشر عند السطر 1 دون تقدم
+        let st_msgs = server.handle_message(r#"{"seq":6,"type":"request","command":"stackTrace"}"#);
+        let st_resp = parse_json(&st_msgs[0]).unwrap();
+        if let Some(Value::List(frames)) = get_field(&get_field(&st_resp, "body").unwrap(), "stackFrames") {
+            assert_eq!(get_number(&frames.borrow()[0], "line"), Some(1.0));
+        } else {
+            panic!("متوقع stackFrames");
+        }
 
         let _ = fs::remove_file(file_path);
     }

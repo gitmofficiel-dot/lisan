@@ -710,12 +710,28 @@ pub fn handle_json_rpc(payload: &str) -> Option<String> {
     }
 }
 
+fn extract_json_rpc_method(payload: &str) -> Option<String> {
+    let parsed = crate::json::parse_json(payload).ok()?;
+    match parsed {
+        crate::runtime::Value::Map(pairs) => pairs
+            .borrow()
+            .iter()
+            .find(|(k, _)| k == "method")
+            .and_then(|(_, v)| match v {
+                crate::runtime::Value::Text(s) => Some(s.clone()),
+                _ => None,
+            }),
+        _ => None,
+    }
+}
+
 /// Run the LSP language server loop over standard input and output.
 pub fn run_lsp_server() -> io::Result<()> {
     let stdin = io::stdin();
     let mut stdin_lock = stdin.lock();
     let stdout = io::stdout();
     let mut stdout_lock = stdout.lock();
+    let mut shutdown_requested = false;
 
     loop {
         let mut content_length: Option<usize> = None;
@@ -748,6 +764,22 @@ pub fn run_lsp_server() -> io::Result<()> {
         let mut body_bytes = vec![0u8; length];
         stdin_lock.read_exact(&mut body_bytes)?;
         let body_str = String::from_utf8_lossy(&body_bytes);
+
+        match extract_json_rpc_method(&body_str).as_deref() {
+            Some("shutdown") => {
+                shutdown_requested = true;
+            }
+            Some("exit") => {
+                if shutdown_requested {
+                    return Ok(());
+                }
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "تم استلام إشعار exit قبل طلب shutdown",
+                ));
+            }
+            _ => {}
+        }
 
         if let Some(resp) = handle_json_rpc(&body_str) {
             let resp_bytes = resp.as_bytes();

@@ -218,14 +218,16 @@ pub fn build_executable(input: &Path, output: Option<&Path>) -> Result<PathBuf, 
     for (file, contents) in RUNTIME_SOURCES {
         fs::write(dir.join("src").join(file), contents).map_err(|e| e.to_string())?;
     }
+    let target_dir = dir.join("target");
     let result = Command::new("cargo").arg("build").arg("--release").arg("--offline")
+        .arg("--target-dir").arg(&target_dir)
         .current_dir(&dir).output()
         .map_err(|e| format!("تعذر تشغيل Cargo. ثبّت Rust وCargo أولًا: {e}"))?;
     if !result.status.success() {
         let logs = String::from_utf8_lossy(&result.stderr);
         return Err(format!("فشل بناء برنامج لسان بواسطة Cargo:\n{logs}"));
     }
-    let bin = dir.join("target").join("release").join(format!("lisan_standalone{}", std::env::consts::EXE_SUFFIX));
+    let bin = target_dir.join("release").join(format!("lisan_standalone{}", std::env::consts::EXE_SUFFIX));
     fs::copy(&bin, &out_path).map_err(|e| format!("فشل نسخ البرنامج إلى '{}': {e}", out_path.display()))?;
     Ok(out_path)
 }

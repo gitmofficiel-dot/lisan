@@ -63,3 +63,132 @@ fn test_lsp_completion_items() {
     assert!(resp.contains("\"label\":\"دع\""));
     assert!(resp.contains("\"label\":\"استورد\""));
 }
+
+fn lsp_frame(json_body: &str) -> Vec<u8> {
+    let bytes = json_body.as_bytes();
+    let mut framed = format!("Content-Length: {}\r\n\r\n", bytes.len()).into_bytes();
+    framed.extend_from_slice(bytes);
+    framed
+}
+
+fn wait_for_exit_while_stdin_open(
+    child: &mut std::process::Child,
+    timeout: std::time::Duration,
+) -> Option<std::process::ExitStatus> {
+    let deadline = std::time::Instant::now() + timeout;
+    while std::time::Instant::now() < deadline {
+        if let Some(status) = child.try_wait().expect("try_wait failed") {
+            return Some(status);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    None
+}
+
+#[test]
+fn test_lsp_subprocess_exits_zero_after_shutdown_with_stdin_open() {
+    use std::io::{Read, Write};
+    use std::process::{Command, Stdio};
+    use std::time::Duration;
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_lisan"))
+        .arg("--lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn lisan --lsp");
+
+    let mut stdin = child.stdin.take().expect("stdin pipe missing");
+    stdin
+        .write_all(&lsp_frame(
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        ))
+        .expect("failed to write initialize");
+    stdin
+        .write_all(&lsp_frame(
+            r#"{"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}"#,
+        ))
+        .expect("failed to write shutdown");
+    stdin
+        .write_all(&lsp_frame(
+            r#"{"jsonrpc":"2.0","method":"exit","params":null}"#,
+        ))
+        .expect("failed to write exit");
+    stdin.flush().expect("failed to flush stdin");
+
+    // Keep stdin intentionally open until after the child process exits.
+    let status = wait_for_exit_while_stdin_open(&mut child, Duration::from_secs(3));
+    if status.is_none() {
+        let _ = child.kill();
+        let _ = child.wait();
+        panic!("lisan --lsp hung after shutdown+exit while stdin remained open");
+    }
+    drop(stdin);
+
+    let exit_status = status.unwrap();
+    assert_eq!(
+        exit_status.code(),
+        Some(0),
+        "Expected exit code 0 after shutdown+exit, got {:?}",
+        exit_status.code()
+    );
+
+    let mut stdout_buf = String::new();
+    child
+        .stdout
+        .take()
+        .unwrap()
+        .read_to_string(&mut stdout_buf)
+        .expect("failed reading stdout");
+    assert!(
+        stdout_buf.contains(r#""id":2,"result":null"#),
+        "Expected shutdown response on stdout, got: {}",
+        stdout_buf
+    );
+}
+
+#[test]
+fn test_lsp_subprocess_exits_one_without_shutdown_with_stdin_open() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    use std::time::Duration;
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_lisan"))
+        .arg("--lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn lisan --lsp");
+
+    let mut stdin = child.stdin.take().expect("stdin pipe missing");
+    stdin
+        .write_all(&lsp_frame(
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        ))
+        .expect("failed to write initialize");
+    stdin
+        .write_all(&lsp_frame(
+            r#"{"jsonrpc":"2.0","method":"exit","params":null}"#,
+        ))
+        .expect("failed to write exit");
+    stdin.flush().expect("failed to flush stdin");
+
+    // Keep stdin intentionally open until after the child process exits.
+    let status = wait_for_exit_while_stdin_open(&mut child, Duration::from_secs(3));
+    if status.is_none() {
+        let _ = child.kill();
+        let _ = child.wait();
+        panic!("lisan --lsp hung after exit-without-shutdown while stdin remained open");
+    }
+    drop(stdin);
+
+    let exit_status = status.unwrap();
+    assert_eq!(
+        exit_status.code(),
+        Some(1),
+        "Expected exit code 1 for exit without prior shutdown, got {:?}",
+        exit_status.code()
+    );
+}
